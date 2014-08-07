@@ -20,7 +20,7 @@ def Feature65C02 : SubtargetFeature<"65C02", "Has65C02", "true",
                                     "Enable 65C02 instructions">;
 def Feature65C816 : SubtargetFeature<"65C816", "Has65C816", "true",
                                     "Enable 65C816 instructions",
-                                    [Feature65C02]>
+                                    [Feature65C02]>;
 
 // TODO : Implement additional instructions found on some 65C02s
 //def FeatureBitManip<"bit-manip", "HasBitManip", "BitManip",
@@ -33,8 +33,8 @@ def Feature65C816 : SubtargetFeature<"65C816", "Has65C816", "true",
 //                                  "Enable WAI instruction",
 //                                  [Feature65C02]>;
 
-class Proc<string Name, list<SubtargetFeatures> Features>
-  : ProcessorModel<Name, NoItineraries, Features>;
+class Proc<string Name, list<SubtargetFeature> Features>
+  : Processor<Name, NoItineraries, Features>;
 
 def : Proc<"6502",   []>;
 def : Proc<"65C02",  [Feature65C02]>;
