@@ -15,6 +15,6 @@ using namespace llvm;
 Target llvm::The65C816Target;
 
 extern "C" void LLVMInitializeC65TargetInfo() {
-  RegisterTarget<Triple::C65, /*HasJIT=*/false>
+  RegisterTarget<Triple::c65, /*HasJIT=*/false>
     X(The65C816Target, "65c816", "65C816");
 }

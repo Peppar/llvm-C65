@@ -1,0 +1,16 @@
+Got this error while debugging my tablegen files:
+
+llvm-tblgen: /home/peppar/clang/llvm/utils/TableGen/CodeGenDAGPatterns.h:646: llvm::Record *llvm::DAGInstruction::getResult(unsigned int) const: Assertion `RN < Results.size()' failed.
+
+
+
+/home/peppar/clang/llvm/lib/Target/C65/C65InstrInfo.td:183:5: error: In ASLa: Could not infer all types in pattern!
+
+Changed the immediate 1 to (i8 i)... Don't really know what this will yield..!
+
+
+Added C65 to these files
+  /home/peppar/clang/llvm/include/llvm/ADT/Triple.h
+  /home/peppar/clang/llvm/lib/Support/Triple.cpp
+
+

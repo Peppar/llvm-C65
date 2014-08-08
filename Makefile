@@ -13,6 +13,7 @@ TARGET = C65
 
 # Make sure that tblgen is run, first thing.
 BUILT_SOURCES = C65GenRegisterInfo.inc \
+		C65GenSubtargetInfo.inc \
 		C65GenInstrInfo.inc \
 		C65GenCallingConv.inc
 

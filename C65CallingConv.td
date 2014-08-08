@@ -9,7 +9,7 @@ def CC_C65 : CallingConv<[
   // Handles byval parameters.
   //CCIfByVal<CCPassByVal<1, 1>>,
 
-  CCIfType<[i8], CCAssignToReg<[AL, XL, YL]>>,
+//  CCIfType<[i8], CCAssignToReg<[AL, XL, YL]>>,
   CCIfType<[i16], CCAssignToReg<[A, X, Y]>>,
 
   CCAssignToStack<1, 1>
