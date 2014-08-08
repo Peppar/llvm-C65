@@ -31,18 +31,8 @@ class Fcc<bits<3> op, bits<3> addrmode, bits<2> cc,
 }
 
 //===----------------------------------------------------------------------===//
-// C65 feature predicate definitions
-//===----------------------------------------------------------------------===//
-
-//def Has65C02 : Predicate<"Subtarget->has65C02()">;
-//def Has65C816 : Predicate<"Subtarget->has65C816()">;
-
-//===----------------------------------------------------------------------===//
 // C65-specific node definitions
 //===----------------------------------------------------------------------===//
-
-//def C65cmp : SDNode<"C65ISD::CMP", SDT_C65cmp, [SDNPOutGlue]>;
-//def C65jsr : SDNode<"C65ISD::JSR", SDT_54
 
 def SDTC65cmp : SDTypeProfile<0, 2, [SDTCisInt<0>, SDTCisSameAs<0, 1>]>;
 
@@ -51,6 +41,13 @@ def C65cmp : SDNode<"C65ISD::CMP", SDTC65cmp, [SDNPOutGlue]>;
 //===----------------------------------------------------------------------===//
 // C65 assembler operand definitions
 //===----------------------------------------------------------------------===//
+
+// 8-bit PC-relative branch target assembler operand
+def PCRelAsmOperand : AsmOperandClass {
+  let Name = "PCRel";
+  let RenderMethod = "addImmOperands";
+  let ParserMethod = "parsePCRel";
+}
 
 // 16-bit address assembler operand
 def MEMiAsmOperand : AsmOperandClass {
@@ -70,12 +67,9 @@ def MEMiyAsmOperand : AsmOperandClass {
   let ParserMethod = "parseMEMOperand";
 }
 
-// 8-bit PC-relative branch target assembler operand
-def PCRelAsmOperand : AsmOperandClass {
-  let Name = "PCRel";
-  let RenderMethod = "addImmOperands";
-  let ParserMethod = "parsePCRel";
-}
+//===----------------------------------------------------------------------===//
+// C65 operand definitions
+//===----------------------------------------------------------------------===//
 
 // 8-bit PC-relative branch target operand
 def brtarget8 : Operand<OtherVT> {
@@ -109,21 +103,10 @@ def MEMiy : Operand<iPTR> {
   let MIOperandInfo = (ops IY16, i16imm);
 }
 
-//// Branch target (JMP)
-//def brtarget : Operand<OtherVT> {
-//  let PrintMethod = "printMemOperand";
-//}
-
-// Call target (JSR)
-//def calltarget : Operand<OtherVT> {
-//  let PrintMethod = "printMemOperand";
-//}
-
 //===----------------------------------------------------------------------===//
 // C65 complex pattern definitions
 //===----------------------------------------------------------------------===//
 
-// Address pattern definitions
 def ADDRi : ComplexPattern<iPTR, 2, "SelectADDRi", [], []>;
 def ADDRix : ComplexPattern<iPTR, 2, "SelectADDRix", [], []>;
 def ADDRiy : ComplexPattern<iPTR, 2, "SelectADDRiy", [], []>;
@@ -154,119 +137,104 @@ multiclass F01_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
 }
 
 let Defs = [SR], Constraints = "$src = $dst" in {
-  defm ORA : F01_binary<0b000, "ora", or>;
-  defm AND : F01_binary<0b001, "and", and>;
-  defm EOR : F01_binary<0b010, "eor", xor>;
+  defm ORA : F01_binary<0b000, "ORA", or>;
+  defm AND : F01_binary<0b001, "AND", and>;
+  defm EOR : F01_binary<0b010, "EOR", xor>;
   let Uses = [SR] in {
-    defm ADC : F01_binary<0b011, "adc", addc>;
-    defm SBC : F01_binary<0b111, "adc", subc>;
+    defm ADC : F01_binary<0b011, "ADC", addc>;
+    defm SBC : F01_binary<0b111, "SBC", subc>;
   }
 }
 
 let mayStore = 1 in {
   def STAi   : F01<0b100, 0b011, (outs), (ins ACC16:$src, MEMi:$addr),
-                   "sta $addr",
+                   "STA $addr",
                    [(store ACC16:$src, ADDRi:$addr)]>;
 
   def STAix  : F01<0b100, 0b110, (outs), (ins ACC16:$src, MEMix:$addr),
-                   "sta $addr,X",
+                   "STA $addr,X",
                    [(store ACC16:$src, ADDRix:$addr)]>;
 }
 
 let Defs = [SR] in {
   def LDAimm : F01<0b101, 0b010, (outs ACC16:$dst), (ins i16imm:$imm),
-                   "lda #$imm",
+                   "LDA #$imm",
                    [(set ACC16:$dst, i16imm:$imm)]>;
 
   def CMPimm : F01<0b110, 0b010, (outs), (ins ACC16:$src, i16imm:$imm),
-                   "cmp #$imm",
+                   "CMP #$imm",
                    [(C65cmp ACC16:$src, i16imm:$imm)]>;
 
   let mayLoad = 1 in {
     def LDAi   : F01<0b101, 0b011, (outs ACC16:$dst), (ins MEMi:$addr),
-                     "lda $addr",
+                     "LDA $addr",
                      [(set ACC16:$dst, (load ADDRi:$addr))]>;
 
     def LDAix  : F01<0b101, 0b110, (outs ACC16:$dst), (ins MEMix:$addr),
-                     "lda $addr,X",
+                     "LDA $addr,X",
                      [(set ACC16:$dst, (load ADDRix:$addr))]>;
 
     def CMPi   : F01<0b110, 0b011, (outs), (ins ACC16:$src, MEMi:$addr),
-                     "cmp $addr",
+                     "CMP $addr",
                      [(C65cmp ACC16:$src, (load ADDRi:$addr))]>;
 
     def CMPix  : F01<0b110, 0b011, (outs), (ins ACC16:$src, MEMix:$addr),
-                     "cmp $addr,X",
+                     "CMP $addr,X",
                      [(C65cmp ACC16:$src, (load ADDRix:$addr))]>;
   }
 }
 
 //===----------------------------------------------------------------------===//
 // Format 10 instructions : asl, rol, lsr, ror, stx, ldx, dec, inc
+//===----------------------------------------------------------------------===//
 
 class F10<bits<3> op, bits<3> addrmode, dag outs, dag ins,
           string asmstr, list<dag> pattern>
    : Fcc<op, addrmode, 0b10, outs, ins, asmstr, pattern>;
 
-// multiclass F10_shift<bits<3> op, string asmstr, SDPatternOperator operator> {
-//   // Unary operation
-//   def i  : F10<op, 0b011, (outs), (ins MEMi:$addr),
-//                !strconcat(asmstr, " $addr"),
-//                [(store (operator (load ADDRi:$addr), (i8 1)), ADDRi:$addr)]>;
-
-//   def ix : F10<op, 0b111, (outs), (ins MEMix:$addr),
-//                !strconcat(asmstr, " $addr,X"),
-//                [(store (operator (load ADDRix:$addr), (i8 1)), ADDRix:$addr)]>;
-//}
-
 let mayStore = 1 in {
   def STXi   : F01<0b100, 0b011, (outs), (ins IX16:$src, MEMi:$addr),
-                   "stx $addr",
+                   "STX $addr",
                    [(store IX16:$src, ADDRi:$addr)]>;
 }
 
 let Defs = [SR], Uses = [SR], Constraints = "$src = $dst" in {
-//  let mayStore = 1 in {
-  // defm ASL : F10_shift<0b000, "asl", shl>;
-  // defm ROL : F10_shift<0b001, "rol", rotl>;
-  // defm LSR : F10_shift<0b010, "lsr", srl>;
-  // defm ROR : F10_shift<0b011, "ror", rotr>;
-//  }
   def ASLa : F10<0b000, 0b010, (outs ACC16:$dst), (ins ACC16:$src),
-                 "asl A",
+                 "ASL A",
                  [(set ACC16:$dst, (shl ACC16:$src, (i8 1)))]>;
 
   def ROLa : F10<0b001, 0b010, (outs ACC16:$dst), (ins ACC16:$src),
-                 "rol A",
+                 "ROL A",
                  [(set ACC16:$dst, (rotl ACC16:$src, (i8 1)))]>;
 
   def LSRa : F10<0b001, 0b010, (outs ACC16:$dst), (ins ACC16:$src),
-                 "lsr A",
+                 "LSR A",
                  [(set ACC16:$dst, (srl ACC16:$src, (i8 1)))]>;
 
   def RORa : F10<0b001, 0b010, (outs ACC16:$dst), (ins ACC16:$src),
-                 "ror A",
+                 "ROR A",
                  [(set ACC16:$dst, (rotl ACC16:$src, (i8 1)))]>;
 }
 
 let Defs = [SR] in {
   def LDXimm : F10<0b101, 0b000, (outs IX16:$dst), (ins i16imm:$imm),
-                   "ldx #$imm",
+                   "LDX #$imm",
                    [(set IX16:$dst, i16imm:$imm)]>;
 
   let mayLoad = 1 in {
     def LDXi  : F10<0b101, 0b011, (outs IX16:$dst), (ins MEMi:$addr),
-                    "ldx $addr",
+                    "LDX $addr",
                     [(set IX16:$dst, (load ADDRi:$addr))]>;
 
     def LDXiy : F10<0b101, 0b111, (outs IX16:$dst), (ins MEMiy:$addr),
-                    "ldx $addr,Y",
+                    "LDX $addr,Y",
                     [(set IX16:$dst, (load ADDRiy:$addr))]>;
   }
 }
 
 //===----------------------------------------------------------------------===//
 // Format 00 instructions : bit, jmp, sty, ldy, cpy, cpx
+//===----------------------------------------------------------------------===//
 
 class F00<bits<3> op, bits<3> addrmode, dag outs, dag ins,
           string asmstr, list<dag> pattern>
@@ -274,34 +242,37 @@ class F00<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 
 let mayStore = 1 in {
   def STYi : F00<0b100, 0b011, (outs), (ins IY16:$src, MEMi:$addr),
-                 "sty $addr",
+                 "STY $addr",
                  [(store IY16:$src, ADDRi:$addr)]>;
 }
 
 let Defs = [SR] in {
   def LDYimm : F00<0b101, 0b000, (outs IY16:$dst), (ins i16imm:$imm),
-                   "ldy #$imm",
+                   "LDY #$imm",
                    [(set IY16:$dst, i16imm:$imm)]>;
 
   let mayLoad = 1 in {
     def LDYi   : F00<0b101, 0b011, (outs IY16:$dst), (ins MEMi:$addr),
-                     "ldy $addr",
+                     "LDY $addr",
                      [(set IY16:$dst, (load ADDRi:$addr))]>;
 
     def LDYix  : F00<0b101, 0b111, (outs IY16:$dst), (ins MEMix:$addr),
-                     "ldy $addr,X",
+                     "LDY $addr,X",
                      [(set IY16:$dst, (load ADDRix:$addr))]>;
   }
 }
 
-// let isBranch = 1, isTerminator = 1, isBarrier = 1 in {
-//   def JMPi : F00<0b011, 0b011, (outs), (ins brtarget:$dst),
-//                  "jmp $dst",
-//                  [(br bb:$dst)]>;
-// }
+//===----------------------------------------------------------------------===//
+// Format 11 instructions : Extended ora, and, eor, adc, sta, lda, cmp, sbc
+//===----------------------------------------------------------------------===//
+
+class F11<bits<3> op, bits<3> addrmode, dag outs, dag ins,
+          string asmstr, list<dag> pattern>
+   : Fcc<op, addrmode, 0b11, outs, ins, asmstr, pattern>;
 
 //===----------------------------------------------------------------------===//
 // Conditional branch instructions : bpl, bmi, bvc, bvs, bcc, bcs, bne, beq
+//===----------------------------------------------------------------------===//
 
 class CondFlag<bits<2> ix> { bits<2> flagIndex = ix; }
 def CondNegative : CondFlag<0b00>;
@@ -317,25 +288,19 @@ class FC<CondFlag cf, bit value, string asmstr>
 }
 
 let Uses = [SR], isBranch = 1, isTerminator = 1 in {
-  def BPL : FC<CondNegative, 0, "bpl">;
-  def BMI : FC<CondNegative, 1, "bmi">;
-  def BVC : FC<CondOverflow, 0, "bvc">;
-  def BVS : FC<CondOverflow, 1, "bvs">;
-  def BCC : FC<CondCarry,    0, "bcc">;
-  def BCS : FC<CondCarry,    1, "bcs">;
-  def BNE : FC<CondZero,     0, "bne">;
-  def BEQ : FC<CondZero,     1, "beq">;
+  def BPL : FC<CondNegative, 0, "BPL">;
+  def BMI : FC<CondNegative, 1, "BMI">;
+  def BVC : FC<CondOverflow, 0, "BVC">;
+  def BVS : FC<CondOverflow, 1, "BVS">;
+  def BCC : FC<CondCarry,    0, "BCC">;
+  def BCS : FC<CondCarry,    1, "BCS">;
+  def BNE : FC<CondZero,     0, "BNE">;
+  def BEQ : FC<CondZero,     1, "BEQ">;
 }
 
 //===----------------------------------------------------------------------===//
-// Format 11 instructions : Extended ora, and, eor, adc, sta, lda, cmp, sbc
-
-class F11<bits<3> op, bits<3> addrmode, dag outs, dag ins,
-          string asmstr, list<dag> pattern>
-   : Fcc<op, addrmode, 0b11, outs, ins, asmstr, pattern>;
-
-//===----------------------------------------------------------------------===//
 // Free format instructions
+//===----------------------------------------------------------------------===//
 
 class FF<bits<8> op, dag outs, dag ins,
          string asmstr, list<dag> pattern>
@@ -343,110 +308,113 @@ class FF<bits<8> op, dag outs, dag ins,
   let Inst = op;
 }
 
+// NOP
 let neverHasSideEffects = 1 in {
-  def NOOP : FF<0xea, (outs), (ins), "nop", []>;
+  def NOOP : FF<0xea, (outs), (ins), "NOP", []>;
 }
+// Push and pull stack operations
 let Defs = [SP], Uses = [SP, SR], neverHasSideEffects = 1 in {
   let mayLoad = 1 in {
-    def PLA : FF<0x68, (outs ACC16:$dst), (ins), "pla",
+    def PLA : FF<0x68, (outs ACC16:$dst), (ins), "PLA",
                  []>;
-    def PLX : FF<0xfa, (outs IX16:$dst), (ins), "plx",
+    def PLX : FF<0xfa, (outs IX16:$dst), (ins), "PLX",
                  []>;
-    def PLY : FF<0x7a, (outs IY16:$dst), (ins), "ply",
+    def PLY : FF<0x7a, (outs IY16:$dst), (ins), "PLY",
                  []>;
   }
   let mayStore = 1 in {
-    def PHA : FF<0x48, (outs), (ins ACC16:$src), "pha",
+    def PHA : FF<0x48, (outs), (ins ACC16:$src), "PHA",
                  []>;
-    def PHX : FF<0xda, (outs), (ins IX16:$src), "phx",
+    def PHX : FF<0xda, (outs), (ins IX16:$src), "PHX",
                  []>;
-    def PHY : FF<0x5a, (outs), (ins IY16:$src), "phy",
+    def PHY : FF<0x5a, (outs), (ins IY16:$src), "PHY",
+                 []>;
+    def PEA : FF<0xf4, (outs), (ins i16:$imm), "PEA $imm",
+                 []>;
+    def PEI : FF<0xd4, (outs), (ins MEMi:$addr), "pei $addr",
+                 []>;
+    def PER : FF<0x62, (outs), (ins brtarget8:$addr), "per $addr",
                  []>;
   }
 }
 
+// Branch relative and jump instructions
 let isBranch = 1, isTerminator = 1, isBarrier = 1 in {
   def BRA : FF<0x80, (outs), (ins brtarget8:$addr),
-               "bra $addr",
+               "BRA $addr",
                [(br brtarget8:$addr)]>;
 
   def JMP : FF<0x6c, (outs), (ins brtarget16:$addr),
-               "jmp $addr",
+               "JMP $addr",
                [(br brtarget16:$addr)]>;
 }
 
+// Jump subroutine (call)
 let Defs = [A, X, Y, SR], isCall = 1 in {
   def JSR : FF<0x20, (outs), (ins MEMi:$addr),
-               "jsr $addr",
+               "JSR $addr",
                []>;
 }
 
+// Return from subroutine
 let isReturn = 1, isTerminator = 1, isBarrier = 1,
      DecoderMethod = "DecodeReturn" in {
-  def RTS : FF<0x60, (outs), (ins), "rts", []>;
+  def RTS : FF<0x60, (outs), (ins), "RTS", []>;
 }
 
-//===----------------------------------------------------------------------===//
-// Transfer instructions
-
+// Transfer between registers
 let Defs = [SR], neverHasSideEffects = 1 in {
-  def TAX : FF<0xaa, (outs IX16:$dst), (ins ACC16:$src), "tax",
+  def TAX : FF<0xaa, (outs IX16:$dst), (ins ACC16:$src), "TAX",
                [(set IX16:$dst, ACC16:$src)]>;
 
-  def TAY : FF<0xa8, (outs IY16:$dst), (ins ACC16:$src), "tay",
+  def TAY : FF<0xa8, (outs IY16:$dst), (ins ACC16:$src), "TAY",
                [(set IY16:$dst, ACC16:$src)]>;
 
-  def TXA : FF<0x8a, (outs ACC16:$dst), (ins IX16:$src), "txa",
+  def TXA : FF<0x8a, (outs ACC16:$dst), (ins IX16:$src), "TXA",
                [(set ACC16:$dst, IX16:$src)]>;
 
-  def TYA : FF<0xa8, (outs ACC16:$dst), (ins IY16:$src), "tya",
+  def TYA : FF<0xa8, (outs ACC16:$dst), (ins IY16:$src), "TYA",
                [(set ACC16:$dst, IY16:$src)]>;
 
-  def TXY : FF<0x9b, (outs IY16:$dst), (ins IX16:$src), "txy",
+  def TXY : FF<0x9b, (outs IY16:$dst), (ins IX16:$src), "TXY",
                [(set IY16:$dst, IX16:$src)]>;
-//            Requires<[Has65C816]>;
 
-  def TYX : FF<0xbb, (outs IX16:$dst), (ins IY16:$src), "tyx",
+  def TYX : FF<0xbb, (outs IX16:$dst), (ins IY16:$src), "TYX",
                [(set IX16:$dst, IY16:$src)]>;
-//            Requires<[Has65C816]>;
 }
 
-//===----------------------------------------------------------------------===//
-// Flag instructions
-
+// Clear and set flag instructions
 let Defs = [SR], Uses = [SR] in {
-  def CLC : FF<0x18, (outs), (ins), "clc", []>;
-  def SEC : FF<0x38, (outs), (ins), "stc", []>;
-  def CLD : FF<0xd8, (outs), (ins), "cld", []>;
-  def SED : FF<0xf8, (outs), (ins), "std", []>;
-  def CLI : FF<0x58, (outs), (ins), "cli", []>;
-  def SEI : FF<0x78, (outs), (ins), "sti", []>;
-  def CLV : FF<0xb8, (outs), (ins), "clv", []>;
+  def CLC : FF<0x18, (outs), (ins), "CLC", []>;
+  def SEC : FF<0x38, (outs), (ins), "STC", []>;
+  def CLD : FF<0xd8, (outs), (ins), "CLD", []>;
+  def SED : FF<0xf8, (outs), (ins), "STD", []>;
+  def CLI : FF<0x58, (outs), (ins), "CLI", []>;
+  def SEI : FF<0x78, (outs), (ins), "STI", []>;
+  def CLV : FF<0xb8, (outs), (ins), "CLV", []>;
+  def REP : FF<0xc2, (outs), (ins i8:$imm), "REP #$imm", []>;
+  def SEP : FF<0xe2, (outs), (ins i8:$imm), "SEP #$imm", []>;
 }
 
-//===----------------------------------------------------------------------===//
-//  Arithmetic Instructions.
-
+// Miscellaneous arithmetic instructions
 let Defs = [SR] in {
 let Constraints = "$src = $dst" in {
-  def INCa : FF<0x1a, (outs ACC16:$dst), (ins ACC16:$src), "inc A",
-               [(set ACC16:$dst, (add ACC16:$src, 1))]>;
-//             Requires<[Has65C02]>;
+  def INCa : FF<0x1a, (outs ACC16:$dst), (ins ACC16:$src), "INC A",
+                [(set ACC16:$dst, (add ACC16:$src, 1))]>;
 
-  def INX : FF<0xe8, (outs IX16:$dst), (ins IX16:$src), "inx",
-               [(set IX16:$dst, (add IX16:$src, 1))]>;
+  def INX  : FF<0xe8, (outs IX16:$dst), (ins IX16:$src), "INX",
+                [(set IX16:$dst, (add IX16:$src, 1))]>;
 
-  def INY : FF<0xc8, (outs IY16:$dst), (ins IY16:$src), "iny",
-               [(set IY16:$dst, (add IY16:$src, 1))]>;
+  def INY  : FF<0xc8, (outs IY16:$dst), (ins IY16:$src), "INY",
+                [(set IY16:$dst, (add IY16:$src, 1))]>;
 
-  def DECa : FF<0x3a, (outs ACC16:$dst), (ins ACC16:$src), "dec A",
-               [(set ACC16:$dst, (sub ACC16:$src, 1))]>;
-//             Requires<[Has65C02]>;
+  def DECa : FF<0x3a, (outs ACC16:$dst), (ins ACC16:$src), "DEC A",
+                [(set ACC16:$dst, (sub ACC16:$src, 1))]>;
 
-  def DEX : FF<0xca, (outs IX16:$dst), (ins IX16:$src), "dex",
-               [(set IX16:$dst, (sub IX16:$src, 1))]>;
+  def DEX  : FF<0xca, (outs IX16:$dst), (ins IX16:$src), "DEX",
+                [(set IX16:$dst, (sub IX16:$src, 1))]>;
 
-  def DEY : FF<0x88, (outs IY16:$dst), (ins IY16:$src), "dey",
-               [(set IY16:$dst, (sub IY16:$src, 1))]>;
+  def DEY  : FF<0x88, (outs IY16:$dst), (ins IY16:$src), "DEY",
+                [(set IY16:$dst, (sub IY16:$src, 1))]>;
 }
 }
