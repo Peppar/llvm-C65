@@ -14,3 +14,9 @@ Added C65 to these files
   /home/peppar/clang/llvm/lib/Support/Triple.cpp
 
 
+Removed other targets from 
+
+~/clang/build/include/llvm/Config/
+
+ LLVM_TARGET(R600) LLVM_TARGET(SystemZ) LLVM_TARGET(Hexagon) LLVM_TARGET(NVPTX) LLVM_TARGET(CppBackend) LLVM_TARGET(MSP430) LLVM_TARGET(XCore) LLVM_TARGET(Mips) LLVM_TARGET(AArch64) LLVM_TARGET(ARM) LLVM_TARGET(PowerPC) LLVM_TARGET(Sparc) 
+

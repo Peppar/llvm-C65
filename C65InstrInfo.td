@@ -34,9 +34,22 @@ class Fcc<bits<3> op, bits<3> addrmode, bits<2> cc,
 // C65-specific node definitions
 //===----------------------------------------------------------------------===//
 
-def SDTC65cmp : SDTypeProfile<0, 2, [SDTCisInt<0>, SDTCisSameAs<0, 1>]>;
+def SDT_C65cmp : SDTypeProfile<0, 2, [SDTCisInt<0>, SDTCisSameAs<0, 1>]>;
+def SDT_C65ret : SDTypeProfile<0, 0, []>;
 
-def C65cmp : SDNode<"C65ISD::CMP", SDTC65cmp, [SDNPOutGlue]>;
+def C65cmp : SDNode<"C65ISD::CMP", SDT_C65cmp,
+                    [SDNPOutGlue]>;
+def C65ret : SDNode<"C65ISD::RET", SDT_C65ret,
+                    [SDNPHasChain, SDNPOptInGlue]>;
+
+//  These are target-independent nodes, but have target-specific formats.
+def SDT_C65CallSeqStart : SDCallSeqStart<[SDTCisVT<0, i32>]>;
+def SDT_C65CallSeqEnd   : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
+
+def callseq_start : SDNode<"ISD::CALLSEQ_START", SDT_C65CallSeqStart,
+                           [SDNPHasChain, SDNPOutGlue]>;
+def callseq_end   : SDNode<"ISD::CALLSEQ_END",   SDT_C65CallSeqEnd,
+                           [SDNPHasChain, SDNPOptInGlue, SDNPOutGlue]>;
 
 //===----------------------------------------------------------------------===//
 // C65 assembler operand definitions
@@ -108,8 +121,8 @@ def MEMiy : Operand<iPTR> {
 //===----------------------------------------------------------------------===//
 
 def ADDRi : ComplexPattern<iPTR, 2, "SelectADDRi", [], []>;
-def ADDRix : ComplexPattern<iPTR, 2, "SelectADDRix", [], []>;
-def ADDRiy : ComplexPattern<iPTR, 2, "SelectADDRiy", [], []>;
+def ADDRix : ComplexPattern<iPTR, 2, "SelectADDRix", [frameindex], []>;
+def ADDRiy : ComplexPattern<iPTR, 2, "SelectADDRiy", [frameindex], []>;
 
 //===----------------------------------------------------------------------===//
 // Format 01 instructions : ora, and, eor, adc, sta, lda, cmp, sbc
@@ -117,7 +130,7 @@ def ADDRiy : ComplexPattern<iPTR, 2, "SelectADDRiy", [], []>;
 
 class F01<bits<3> op, bits<3> addrmode, dag outs, dag ins,
           string asmstr, list<dag> pattern>
-   : Fcc<op, addrmode, 0b01, outs, ins, asmstr, pattern>;
+    : Fcc<op, addrmode, 0b01, outs, ins, asmstr, pattern>;
 
 multiclass F01_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
   // Binary operation on 16-bit accumulator
@@ -141,8 +154,8 @@ let Defs = [SR], Constraints = "$src = $dst" in {
   defm AND : F01_binary<0b001, "AND", and>;
   defm EOR : F01_binary<0b010, "EOR", xor>;
   let Uses = [SR] in {
-    defm ADC : F01_binary<0b011, "ADC", addc>;
-    defm SBC : F01_binary<0b111, "SBC", subc>;
+    defm ADC : F01_binary<0b011, "ADC", adde>;
+    defm SBC : F01_binary<0b111, "SBC", sube>;
   }
 }
 
@@ -190,7 +203,7 @@ let Defs = [SR] in {
 
 class F10<bits<3> op, bits<3> addrmode, dag outs, dag ins,
           string asmstr, list<dag> pattern>
-   : Fcc<op, addrmode, 0b10, outs, ins, asmstr, pattern>;
+    : Fcc<op, addrmode, 0b10, outs, ins, asmstr, pattern>;
 
 let mayStore = 1 in {
   def STXi   : F01<0b100, 0b011, (outs), (ins IX16:$src, MEMi:$addr),
@@ -233,12 +246,12 @@ let Defs = [SR] in {
 }
 
 //===----------------------------------------------------------------------===//
-// Format 00 instructions : bit, jmp, sty, ldy, cpy, cpx
+// Format 00 instructions : bit, (jmp), sty, ldy, cpy, cpx
 //===----------------------------------------------------------------------===//
 
 class F00<bits<3> op, bits<3> addrmode, dag outs, dag ins,
           string asmstr, list<dag> pattern>
-   : Fcc<op, addrmode, 0b00, outs, ins, asmstr, pattern>;
+    : Fcc<op, addrmode, 0b00, outs, ins, asmstr, pattern>;
 
 let mayStore = 1 in {
   def STYi : F00<0b100, 0b011, (outs), (ins IY16:$src, MEMi:$addr),
@@ -262,6 +275,26 @@ let Defs = [SR] in {
   }
 }
 
+let Defs = [SR] in {
+  def CPYimm : F01<0b110, 0b000, (outs), (ins IY16:$src, i16imm:$imm),
+                   "CPY #$imm",
+                   [(C65cmp IY16:$src, i16imm:$imm)]>;
+
+  def CPXimm : F01<0b111, 0b000, (outs), (ins IX16:$src, i16imm:$imm),
+                   "CPX #$imm",
+                   [(C65cmp IX16:$src, i16imm:$imm)]>;
+
+  let mayLoad = 1 in {
+    def CPYi   : F01<0b110, 0b011, (outs), (ins IY16:$src, MEMi:$addr),
+                     "CPY $addr",
+                     [(C65cmp IY16:$src, (load ADDRi:$addr))]>;
+
+    def CPXi   : F01<0b111, 0b011, (outs), (ins IX16:$src, MEMi:$addr),
+                     "CPX $addr",
+                     [(C65cmp IX16:$src, (load ADDRi:$addr))]>;
+  }
+}
+
 //===----------------------------------------------------------------------===//
 // Format 11 instructions : Extended ora, and, eor, adc, sta, lda, cmp, sbc
 //===----------------------------------------------------------------------===//
@@ -280,6 +313,7 @@ def CondOverflow : CondFlag<0b01>;
 def CondCarry    : CondFlag<0b10>;
 def CondZero     : CondFlag<0b11>;
 
+// Branch if the value of the flag 'cf' equals 'value'
 class FC<CondFlag cf, bit value, string asmstr>
     : InstC65<(outs), (ins brtarget8:$dst), asmstr, []> {
   let Inst{7-6} = cf.flagIndex;
@@ -312,29 +346,23 @@ class FF<bits<8> op, dag outs, dag ins,
 let neverHasSideEffects = 1 in {
   def NOOP : FF<0xea, (outs), (ins), "NOP", []>;
 }
+
 // Push and pull stack operations
-let Defs = [SP], Uses = [SP, SR], neverHasSideEffects = 1 in {
-  let mayLoad = 1 in {
-    def PLA : FF<0x68, (outs ACC16:$dst), (ins), "PLA",
-                 []>;
-    def PLX : FF<0xfa, (outs IX16:$dst), (ins), "PLX",
-                 []>;
-    def PLY : FF<0x7a, (outs IY16:$dst), (ins), "PLY",
-                 []>;
+let neverHasSideEffects = 1 in {
+  let Defs = [SR], mayLoad = 1 in {
+    def PLA : FF<0x68, (outs ACC16:$dst), (ins), "PLA", []>;
+    def PLX : FF<0xfa, (outs IX16:$dst), (ins), "PLX", []>;
+    def PLY : FF<0x7a, (outs IY16:$dst), (ins), "PLY", []>;
   }
   let mayStore = 1 in {
-    def PHA : FF<0x48, (outs), (ins ACC16:$src), "PHA",
-                 []>;
-    def PHX : FF<0xda, (outs), (ins IX16:$src), "PHX",
-                 []>;
-    def PHY : FF<0x5a, (outs), (ins IY16:$src), "PHY",
-                 []>;
-    def PEA : FF<0xf4, (outs), (ins i16:$imm), "PEA $imm",
-                 []>;
-    def PEI : FF<0xd4, (outs), (ins MEMi:$addr), "pei $addr",
-                 []>;
-    def PER : FF<0x62, (outs), (ins brtarget8:$addr), "per $addr",
-                 []>;
+    def PHA : FF<0x48, (outs), (ins ACC16:$src), "PHA", []>;
+    def PHX : FF<0xda, (outs), (ins IX16:$src), "PHX", []>;
+    def PHY : FF<0x5a, (outs), (ins IY16:$src), "PHY", []>;
+    def PEA : FF<0xf4, (outs), (ins i16imm:$imm), "PEA $imm", []>;
+    def PER : FF<0x62, (outs), (ins brtarget8:$addr), "PER $addr", []>;
+  }
+  let mayLoad = 1, mayStore = 1 in {
+    def PEI : FF<0xd4, (outs), (ins MEMi:$addr), "PEI $addr", []>;
   }
 }
 
@@ -359,7 +387,7 @@ let Defs = [A, X, Y, SR], isCall = 1 in {
 // Return from subroutine
 let isReturn = 1, isTerminator = 1, isBarrier = 1,
      DecoderMethod = "DecodeReturn" in {
-  def RTS : FF<0x60, (outs), (ins), "RTS", []>;
+  def RTS : FF<0x60, (outs), (ins), "RTS", [(C65ret)]>;
 }
 
 // Transfer between registers
@@ -392,13 +420,12 @@ let Defs = [SR], Uses = [SR] in {
   def CLI : FF<0x58, (outs), (ins), "CLI", []>;
   def SEI : FF<0x78, (outs), (ins), "STI", []>;
   def CLV : FF<0xb8, (outs), (ins), "CLV", []>;
-  def REP : FF<0xc2, (outs), (ins i8:$imm), "REP #$imm", []>;
-  def SEP : FF<0xe2, (outs), (ins i8:$imm), "SEP #$imm", []>;
+  def REP : FF<0xc2, (outs), (ins i8imm:$imm), "REP #$imm", []>;
+  def SEP : FF<0xe2, (outs), (ins i8imm:$imm), "SEP #$imm", []>;
 }
 
-// Miscellaneous arithmetic instructions
-let Defs = [SR] in {
-let Constraints = "$src = $dst" in {
+// Increment and decrement instructions
+let Defs = [SR], Constraints = "$src = $dst" in {
   def INCa : FF<0x1a, (outs ACC16:$dst), (ins ACC16:$src), "INC A",
                 [(set ACC16:$dst, (add ACC16:$src, 1))]>;
 
@@ -417,4 +444,23 @@ let Constraints = "$src = $dst" in {
   def DEY  : FF<0x88, (outs IY16:$dst), (ins IY16:$src), "DEY",
                 [(set IY16:$dst, (sub IY16:$src, 1))]>;
 }
+
+//===----------------------------------------------------------------------===//
+// Pseudo-instructions
+//===----------------------------------------------------------------------===//
+
+class Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
+    : InstC65<outs, ins, asmstr, pattern> {
+  let isCodeGenOnly = 1;
+  let isPseudo = 1;
+}
+
+// ADJCALLSTACKDOWN, ADJCALLSTACKUP are mandatory pseudo-instructions
+let Defs = [SP], Uses = [SP] in {
+  def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt),
+                                 "!ADJCALLSTACKDOWN $amt",
+                                 [(callseq_start timm:$amt)]>;
+  def ADJCALLSTACKUP : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
+                              "!ADJCALLSTACKUP $amt1",
+                              [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
