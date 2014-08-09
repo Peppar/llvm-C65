@@ -54,6 +54,7 @@ public:
                             unsigned DestReg, int FrameIdx,
                             const TargetRegisterClass *RC,
                             const TargetRegisterInfo *TRI) const override;
+  const C65RegisterInfo &getRegisterInfo() const { return RI; }
 };
 } // end namespace llvm
 

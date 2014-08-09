@@ -26,6 +26,11 @@ class StringRef;
 
 class C65Subtarget : public C65GenSubtargetInfo {
   virtual void anchor();
+  bool Has65C02;
+  bool Has65C816;
+
+private:
+  Triple TargetTriple;
 
 public:
   C65Subtarget(const std::string &TT, const std::string &CPU,

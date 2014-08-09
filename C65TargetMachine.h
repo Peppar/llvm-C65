@@ -17,12 +17,21 @@
 
 #include "C65InstrInfo.h"
 #include "C65Subtarget.h"
+#include "C65ISelLowering.h"
+#include "C65FrameLowering.h"
+#include "C65SelectionDAGInfo.h"
 #include "llvm/Target/TargetMachine.h"
 
 namespace llvm {
 
 class C65TargetMachine : public LLVMTargetMachine {
   C65Subtarget Subtarget;
+  const DataLayout DL;
+  C65InstrInfo InstrInfo;
+  C65TargetLowering TLInfo;
+  C65SelectionDAGInfo TSInfo;
+  C65FrameLowering FrameLowering;
+
 public:
   C65TargetMachine(const Target &T, StringRef TT, StringRef CPU,
                    StringRef FS, const TargetOptions &Options,
@@ -33,26 +42,26 @@ public:
     return &Subtarget;
   }
   const C65InstrInfo *getInstrInfo() const override {
-    return getSubtargetImpl()->getInstrInfo();
+    return &InstrInfo;
   }
   const C65RegisterInfo *getRegisterInfo() const override {
-    return getSubtargetImpl()->getRegisterInfo();
+    return &InstrInfo.getRegisterInfo();
   }
   const C65TargetLowering *getTargetLowering() const override {
-    return getSubtargetImpl()->getTargetLowering();
+    return &TLInfo;
   }
   const TargetFrameLowering *getFrameLowering() const override {
-    return getSubtargetImpl()->getFrameLowering();
+    return &FrameLowering;
   }
   const DataLayout *getDataLayout() const override {
-    return getSubtargetImpl()->getDataLayout();
+    return &DL;
   }
   const TargetSelectionDAGInfo *getSelectionDAGInfo() const override {
-    return getSubtargetImpl()->getSelectionDAGInfo();
+    return &TSInfo;
   }
 
   // Override LLVMTargetMachine
-  //TargetPassConfig *createPassConfig(PassManagerBase &PM) override;
+  TargetPassConfig *createPassConfig(PassManagerBase &PM) override;
 };
 
 } // end namespace llvm

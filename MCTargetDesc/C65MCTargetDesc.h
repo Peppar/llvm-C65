@@ -17,6 +17,7 @@
 #include "llvm/Support/DataTypes.h"
 
 namespace llvm {
+
 class MCAsmBackend;
 class MCCodeEmitter;
 class MCContext;
@@ -30,17 +31,6 @@ class raw_ostream;
 
 extern Target The65C816Target;
 
-MCCodeEmitter *createC65MCCodeEmitter(const MCInstrInfo &MCII,
-                                      const MCRegisterInfo &MRI,
-                                      const MCSubtargetInfo &STI,
-                                      MCContext &Ctx);
-MCAsmBackend *createC65AsmBackend(const Target &T,
-                                  const MCRegisterInfo &MRI,
-                                  StringRef TT,
-                                  StringRef CPU);
-MCObjectWriter *createC65ELFObjectWriter(raw_ostream &OS,
-                                         bool Is64Bit,
-                                         uint8_t OSABI);
 } // End llvm namespace
 
 // Defines symbolic names for C65 registers.  This defines a mapping from
@@ -53,7 +43,6 @@ MCObjectWriter *createC65ELFObjectWriter(raw_ostream &OS,
 //
 #define GET_INSTRINFO_ENUM
 #include "C65GenInstrInfo.inc"
-
 #define GET_SUBTARGETINFO_ENUM
 #include "C65GenSubtargetInfo.inc"
 

@@ -16,17 +16,17 @@ using namespace llvm;
 
 extern "C" void LLVMInitializeC65Target() {
   // Register the target.
-  RegisterTargetMachine<C65TargetMachine> X(The65c816Target);
+  RegisterTargetMachine<C65TargetMachine> X(The65C816Target);
 }
 
 C65TargetMachine::C65TargetMachine(const Target &T, StringRef TT,
                                    StringRef CPU, StringRef FS,
                                    const TargetOptions &Options,
                                    Reloc::Model RM, CodeModel::Model CM,
-                                   CodeGenOpt::Level OL,
-                                   bool is64bit)
+                                   CodeGenOpt::Level OL)
   : LLVMTargetMachine(T, TT, CPU, FS, Options, RM, CM, OL),
-    Subtarget(TT, CPU, FS, *this, is64bit) {
+    Subtarget(TT, CPU, FS), DL("e-S8-n16"), InstrInfo(Subtarget),
+    TLInfo(*this), TSInfo(DL), FrameLowering(*this, Subtarget) {
   initAsmInfo();
 }
 
@@ -34,7 +34,7 @@ namespace {
 /// C65 Code Generator Pass Configuration Options.
 class C65PassConfig : public TargetPassConfig {
 public:
-  C65PassConfig(SystemZTargetMachine *TM, PassManagerBase &PM)
+  C65PassConfig(C65TargetMachine *TM, PassManagerBase &PM)
     : TargetPassConfig(TM, PM) {}
 
   C65TargetMachine &getC65TargetMachine() const {
@@ -46,7 +46,7 @@ public:
 } // end anonymous namespace
 
 bool C65PassConfig::addInstSelector() {
-  addPass(createC65ISelDag(getC65TargetMachine(), getOptLevel()));
+  addPass(createC65ISelDag(getC65TargetMachine()));
   return false;
 }
 

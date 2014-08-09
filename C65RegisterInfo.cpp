@@ -1,4 +1,4 @@
-//===-- C65RegisterInfo.cpp - SPARC Register Information ----------------===//
+//===-- C65RegisterInfo.cpp - C65 Register Information --------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,7 +7,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// This file contains the SPARC implementation of the TargetRegisterInfo class.
+// This file contains the C65 implementation of the TargetRegisterInfo class.
 //
 //===----------------------------------------------------------------------===//
 
@@ -35,17 +35,8 @@ C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
 
 const MCPhysReg*
 C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+  static const MCPhysReg CSR_SaveList[] = { 0 };
   return CSR_SaveList;
-}
-
-const uint32_t*
-C65RegisterInfo::getCallPreservedMask(CallingConv::ID CC) const {
-  return CSR_RegMask;
-}
-
-const uint32_t*
-C65RegisterInfo::getRTCallPreservedMask(CallingConv::ID CC) const {
-  return RTCSR_RegMask;
 }
 
 BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {

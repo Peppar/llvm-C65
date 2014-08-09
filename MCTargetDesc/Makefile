@@ -1,4 +1,4 @@
-##===- lib/Target/C65/TargetInfo/Makefile ------------------*- Makefile -*-===##
+##===- lib/Target/C65/TargetDesc/Makefile ------------------*- Makefile -*-===##
 #
 #                     The LLVM Compiler Infrastructure
 #
@@ -8,9 +8,9 @@
 ##===----------------------------------------------------------------------===##
 
 LEVEL = ../../../..
-LIBRARYNAME = LLVMC65Info
+LIBRARYNAME = LLVMC65Desc
 
 # Hack: we need to include 'main' target directory to grab private headers
-CPPFLAGS = -I$(PROJ_OBJ_DIR)/.. -I$(PROJ_SRC_DIR)/..
+CPP.Flags += -I$(PROJ_OBJ_DIR)/.. -I$(PROJ_SRC_DIR)/..
 
 include $(LEVEL)/Makefile.common

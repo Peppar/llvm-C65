@@ -6,6 +6,13 @@ class C65Reg<string n, bits<16> Enc, list<Register> subregs = []> : Register<n> 
   let SubRegs = subregs;
 }
 
+let Namespace = "C65" in {
+def sub_even : SubRegIndex<32>;
+def sub_odd  : SubRegIndex<32, 32>;
+def sub_even64 : SubRegIndex<64>;
+def sub_odd64  : SubRegIndex<64, 64>;
+}
+
 def A : C65Reg<"A", 0, []>, DwarfRegNum<[0]>;
 def X : C65Reg<"X", 1, []>, DwarfRegNum<[1]>;
 def Y : C65Reg<"Y", 2, []>, DwarfRegNum<[2]>;

@@ -28,8 +28,10 @@
 
 using namespace llvm;
 
-C65FrameLowering::C65FrameLowering(const C65Subtarget &ST)
-    : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 1, 0) {}
+C65FrameLowering::C65FrameLowering(const C65TargetMachine &TM,
+				   const C65Subtarget &ST)
+  : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 1, 0),
+    TM(TM), ST(ST) {}
 
 void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
   MachineBasicBlock &MBB = MF.front();

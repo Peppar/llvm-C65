@@ -1,4 +1,4 @@
-;===- ./lib/Target/C65/LLVMBuild.txt ---------------------------*- Conf -*--===;
+;===- ./lib/Target/C65/MCTargetDesc/LLVMBuild.txt --------------*- Conf -*--===;
 ;
 ;                     The LLVM Compiler Infrastructure
 ;
@@ -15,23 +15,10 @@
 ;
 ;===------------------------------------------------------------------------===;
 
-[common]
-subdirectories = MCTargetDesc TargetInfo
-;AsmParser Disassembler InstPrinter
-
 [component_0]
-type = TargetGroup
-name = C65
-parent = Target
-;has_asmparser = 1
-;has_asmprinter = 1
-;has_disassembler = 1
-;has_jit = 1
-
-[component_1]
 type = Library
-name = C65CodeGen
+name = C65Desc
 parent = C65
-required_libraries = AsmPrinter CodeGen Core MC Scalar SelectionDAG Support C65Desc C65Info Target
-; SystemZAsmPrinter SystemZDesc SystemZInfo Target
+required_libraries = MC C65Info Support
+;SparcAsmPrinter
 add_to_library_groups = C65

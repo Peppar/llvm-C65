@@ -33,9 +33,6 @@ struct C65RegisterInfo : public C65GenRegisterInfo {
   /// Code Generation virtual methods...
   const MCPhysReg *
   getCalleeSavedRegs(const MachineFunction *MF =nullptr) const override;
-  const uint32_t* getCallPreservedMask(CallingConv::ID CC) const override;
-
-  const uint32_t* getRTCallPreservedMask(CallingConv::ID CC) const;
 
   BitVector getReservedRegs(const MachineFunction &MF) const override;
 
@@ -45,9 +42,6 @@ struct C65RegisterInfo : public C65GenRegisterInfo {
   void eliminateFrameIndex(MachineBasicBlock::iterator II,
                            int SPAdj, unsigned FIOperandNum,
                            RegScavenger *RS = nullptr) const override;
-
-  void processFunctionBeforeFrameFinalized(MachineFunction &MF,
-                                       RegScavenger *RS = nullptr) const;
 
   // Debug information queries.
   unsigned getFrameRegister(const MachineFunction &MF) const override;
