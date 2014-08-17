@@ -42,19 +42,19 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator I, DebugLoc DL,
                                unsigned DestReg, unsigned SrcReg,
                                bool KillSrc) const {
-  if (SrcReg == C65::A && DestReg == C65::X)
+  if (SrcReg == C65::A && DestReg == C65::X) {
     BuildMI(MBB, I, DL, get(C65::TAX));
-  else if (SrcReg == C65::A && DestReg == C65::Y)
+  } else if (SrcReg == C65::A && DestReg == C65::Y) {
     BuildMI(MBB, I, DL, get(C65::TAY));
-  else if (SrcReg == C65::X && DestReg == C65::A)
+  } else if (SrcReg == C65::X && DestReg == C65::A) {
     BuildMI(MBB, I, DL, get(C65::TXA));
-  else if (SrcReg == C65::Y && DestReg == C65::A)
+  } else if (SrcReg == C65::Y && DestReg == C65::A) {
     BuildMI(MBB, I, DL, get(C65::TYA));
-  else if (SrcReg == C65::X && DestReg == C65::Y)
+  } else if (SrcReg == C65::X && DestReg == C65::Y) {
     BuildMI(MBB, I, DL, get(C65::TXY));
-  else if (SrcReg == C65::Y && DestReg == C65::X)
+  } else if (SrcReg == C65::Y && DestReg == C65::X) {
     BuildMI(MBB, I, DL, get(C65::TYX));
-  else {
+  } else {
     DEBUG(dbgs() << "Cannot copy " << RI.getName(SrcReg)
                  << " to " << RI.getName(DestReg) << '\n');
     llvm_unreachable("Impossible reg-to-reg copy");
@@ -62,19 +62,14 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
 }
 
 unsigned C65InstrInfo::isStoreToStackSlot(const MachineInstr *MI,
-                                            int &FrameIndex) const {
-  switch (MI->getOpcode()) {
-  default: break;
-  case C65::PLA:
-    FrameIndex = 0;
-    return C65::A;
-  case C65::PLX:
-    FrameIndex = 0;
-    return C65::X;
-  case C65::PLY:
-    FrameIndex = 0;
-    return C65::Y;
-  }
+                                          int &FrameIndex) const {
+  // if (MI->getOpcode() == C65::STAi ||
+  //     MI->getOpcode() == C65::STAix) {
+  //   if (MI->getOperand(0).isFI()) {
+  //     FrameIndex = MI->getOperand(0).getIndex();
+  //     return C65::A;
+  //   }
+  // }
   return 0;
 }
 
@@ -84,36 +79,32 @@ storeRegToStackSlot(MachineBasicBlock &MBB,
                     unsigned SrcReg, bool isKill, int FI,
                     const TargetRegisterClass *RC,
                     const TargetRegisterInfo *TRI) const {
-  DebugLoc DL;
-  if (I != MBB.end()) DL = I->getDebugLoc();
+  llvm_unreachable("Stack slot stores not supported.");
+  // DebugLoc DL;
+  // if (I != MBB.end()) DL = I->getDebugLoc();
 
-  if (SrcReg == C65::A)
-    BuildMI(MBB, I, DL, get(C65::PHA));
-  else if (SrcReg == C65::X)
-    BuildMI(MBB, I, DL, get(C65::PHX));
-  else if (SrcReg == C65::Y)
-    BuildMI(MBB, I, DL, get(C65::PHY));
-  else {
-    DEBUG(dbgs() << "Cannot store " << RI.getName(SrcReg)
-                 << " to stack slot\n");
-    llvm_unreachable("Cannot store register to stack slot");
-  }
+  // if (SrcReg == C65::A)
+  //   BuildMI(MBB, I, DL, get(C65::PHA));
+  // else if (SrcReg == C65::X)
+  //   BuildMI(MBB, I, DL, get(C65::PHX));
+  // else if (SrcReg == C65::Y)
+  //   BuildMI(MBB, I, DL, get(C65::PHY));
+  // else {
+  //   DEBUG(dbgs() << "Cannot store " << RI.getName(SrcReg)
+  //                << " to stack slot\n");
+  //   llvm_unreachable("Cannot store register to stack slot");
+  // }
 }
 
 unsigned C65InstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
                                            int &FrameIndex) const {
-  switch (MI->getOpcode()) {
-  default: break;
-  case C65::PLA:
-    FrameIndex = 0;
-    return C65::A;
-  case C65::PLX:
-    FrameIndex = 0;
-    return C65::X;
-  case C65::PLY:
-    FrameIndex = 0;
-    return C65::Y;
-  }
+  // if (MI->getOpcode() == C65::LDAi ||
+  //     MI->getOpcode() == C65::LDAix) {
+  //   if (MI->getOperand(0).isFI()) {
+  //     FrameIndex = MI->getOperand(0).getIndex();
+  //     return C65::A;
+  //   }
+  // }
   return 0;
 }
 
@@ -123,18 +114,19 @@ loadRegFromStackSlot(MachineBasicBlock &MBB,
                      unsigned DestReg, int FI,
                      const TargetRegisterClass *RC,
                      const TargetRegisterInfo *TRI) const {
-  DebugLoc DL;
-  if (I != MBB.end()) DL = I->getDebugLoc();
+  llvm_unreachable("Stack slot loads not supported.");
+  // DebugLoc DL;
+  // if (I != MBB.end()) DL = I->getDebugLoc();
 
-  if (DestReg == C65::A)
-    BuildMI(MBB, I, DL, get(C65::PLA));
-  else if (DestReg == C65::X)
-    BuildMI(MBB, I, DL, get(C65::PLX));
-  else if (DestReg == C65::Y)
-    BuildMI(MBB, I, DL, get(C65::PLY));
-  else {
-    DEBUG(dbgs() << "Cannot load " << RI.getName(DestReg)
-                 << " from stack slot\n");
-    llvm_unreachable("Cannot load this register from stack slot");
-  }
+  // if (DestReg == C65::A)
+  //   BuildMI(MBB, I, DL, get(C65::PLA));
+  // else if (DestReg == C65::X)
+  //   BuildMI(MBB, I, DL, get(C65::PLX));
+  // else if (DestReg == C65::Y)
+  //   BuildMI(MBB, I, DL, get(C65::PLY));
+  // else {
+  //   DEBUG(dbgs() << "Cannot load " << RI.getName(DestReg)
+  //                << " from stack slot\n");
+  //   llvm_unreachable("Cannot load this register from stack slot");
+  // }
 }

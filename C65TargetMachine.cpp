@@ -46,7 +46,7 @@ public:
 } // end anonymous namespace
 
 bool C65PassConfig::addInstSelector() {
-  addPass(createC65ISelDag(getC65TargetMachine()));
+  //addPass(createC65ISelDag(getC65TargetMachine()));
   return false;
 }
 
