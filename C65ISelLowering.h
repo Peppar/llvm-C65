@@ -55,20 +55,6 @@ namespace llvm {
 
     const char *getTargetNodeName(unsigned Opcode) const override;
 
-    ConstraintType getConstraintType(const std::string &Constraint) const override;
-
-    ConstraintWeight
-    getSingleConstraintMatchWeight(AsmOperandInfo &info,
-                                   const char *constraint) const override;
-
-    void LowerAsmOperandForConstraint(SDValue Op,
-                                      std::string &Constraint,
-                                      std::vector<SDValue> &Ops,
-                                      SelectionDAG &DAG) const override;
-
-    std::pair<unsigned, const TargetRegisterClass*>
-    getRegForInlineAsmConstraint(const std::string &Constraint,
-                                 MVT VT) const override;
 
     bool isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const override;
 
@@ -96,9 +82,27 @@ namespace llvm {
                   const SmallVectorImpl<SDValue> &OutVals,
                   SDLoc dl, SelectionDAG &DAG) const override;
 
-    void ReplaceNodeResults(SDNode *N,
-                            SmallVectorImpl<SDValue>& Results,
-                            SelectionDAG &DAG) const override;
+    // void ReplaceNodeResults(SDNode *N,
+    //                         SmallVectorImpl<SDValue>& Results,
+    //                         SelectionDAG &DAG) const override;
+
+    // Inline assembly
+
+    // ConstraintType getConstraintType(const std::string &Constraint) const override;
+
+    // ConstraintWeight
+    // getSingleConstraintMatchWeight(AsmOperandInfo &info,
+    //                                const char *constraint) const override;
+
+    // void LowerAsmOperandForConstraint(SDValue Op,
+    //                                   std::string &Constraint,
+    //                                   std::vector<SDValue> &Ops,
+    //                                   SelectionDAG &DAG) const override;
+
+    // std::pair<unsigned, const TargetRegisterClass*>
+    // getRegForInlineAsmConstraint(const std::string &Constraint,
+    //                              MVT VT) const override;
+
   };
 } // end namespace llvm
 
