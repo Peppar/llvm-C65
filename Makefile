@@ -12,7 +12,9 @@ LIBRARYNAME = LLVMC65CodeGen
 TARGET = C65
 
 # Make sure that tblgen is run, first thing.
-BUILT_SOURCES = C65GenCallingConv.inc \
+BUILT_SOURCES = C65GenAsmWriter.inc \
+		C65GenCallingConv.inc \
+		C65GenDAGISel.inc \
 		C65GenInstrInfo.inc \
 		C65GenRegisterInfo.inc \
 		C65GenSubtargetInfo.inc
@@ -25,7 +27,7 @@ BUILT_SOURCES = C65GenCallingConv.inc \
 #C65GenCodeEmitter.inc
 #C65GenDisassemblerTables.inc
 
-DIRS = TargetInfo MCTargetDesc
+DIRS = InstPrinter TargetInfo MCTargetDesc
 
 # InstPrinter AsmParser Disassembler TargetInfo MCTargetDesc
 

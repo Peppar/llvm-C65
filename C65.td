@@ -46,6 +46,7 @@ def : Proc<"65C816", [Feature65C816]>;
 
 include "C65RegisterInfo.td"
 include "C65CallingConv.td"
+
 include "C65InstrInfo.td"
 
 def C65InstrInfo : InstrInfo;

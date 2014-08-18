@@ -28,6 +28,7 @@ namespace llvm {
       PULL,
       CALL,
       RET,
+      CMP,
       BR,
       BRCOND
     };

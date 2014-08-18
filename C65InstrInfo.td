@@ -31,6 +31,25 @@ class Fcc<bits<3> op, bits<3> addrmode, bits<2> cc,
 }
 
 //===----------------------------------------------------------------------===//
+// C65-specific leaf kinds
+//===----------------------------------------------------------------------===//
+
+def immU8 : PatLeaf<(imm), [{
+  return (uint32_t)N->getZExtValue() < (1 << 8);
+}]>;
+def immU16 : PatLeaf<(imm), [{
+  return (uint32_t)N->getZExtValue() < (1 << 16);
+}]>;
+
+//===----------------------------------------------------------------------===//
+// C65 complex pattern definitions
+//===----------------------------------------------------------------------===//
+
+//def ADDRi : ComplexPattern<iPTR, 1, "SelectADDRi", [], []>;
+def ADDRix : ComplexPattern<iPTR, 2, "SelectADDRixy", [frameindex], []>;
+def ADDRiy : ComplexPattern<iPTR, 2, "SelectADDRixy", [frameindex], []>;
+
+//===----------------------------------------------------------------------===//
 // C65-specific node definitions
 //===----------------------------------------------------------------------===//
 
@@ -81,7 +100,7 @@ def MEMiyAsmOperand : AsmOperandClass {
 }
 
 //===----------------------------------------------------------------------===//
-// C65 operand definitions
+// C65 operand class definitions
 //===----------------------------------------------------------------------===//
 
 // 8-bit PC-relative branch target operand
@@ -117,14 +136,6 @@ def MEMiy : Operand<iPTR> {
 }
 
 //===----------------------------------------------------------------------===//
-// C65 complex pattern definitions
-//===----------------------------------------------------------------------===//
-
-def ADDRi : ComplexPattern<iPTR, 2, "SelectADDRi", [], []>;
-def ADDRix : ComplexPattern<iPTR, 2, "SelectADDRix", [frameindex], []>;
-def ADDRiy : ComplexPattern<iPTR, 2, "SelectADDRiy", [frameindex], []>;
-
-//===----------------------------------------------------------------------===//
 // Format 01 instructions : ora, and, eor, adc, sta, lda, cmp, sbc
 //===----------------------------------------------------------------------===//
 
@@ -136,12 +147,12 @@ multiclass F01_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
   // Binary operation on 16-bit accumulator
   def imm  : F01<op, 0b010, (outs ACC16:$dst), (ins ACC16:$src, i16imm:$imm),
                  !strconcat(asmstr, " #$imm"),
-                 [(set ACC16:$dst, (operator ACC16:$src, i16imm:$imm))]>;
+                 [(set ACC16:$dst, (operator ACC16:$src, immU16:$imm))]>;
 
   let mayLoad = 1 in {
     def i  : F01<op, 0b011, (outs ACC16:$dst), (ins ACC16:$src, MEMi:$addr),
                    !strconcat(asmstr, " $addr"),
-                   [(set ACC16:$dst, (operator ACC16:$src, (load ADDRi:$addr)))]>;
+                   [(set ACC16:$dst, (operator ACC16:$src, (load immU16:$addr)))]>;
 
     def ix : F01<op, 0b110, (outs ACC16:$dst), (ins ACC16:$src, MEMix:$addr),
                    !strconcat(asmstr, " $addr,X"),
@@ -162,7 +173,7 @@ let Defs = [SR], Constraints = "$src = $dst" in {
 let mayStore = 1 in {
   def STAi   : F01<0b100, 0b011, (outs), (ins ACC16:$src, MEMi:$addr),
                    "STA $addr",
-                   [(store ACC16:$src, ADDRi:$addr)]>;
+                   [(store ACC16:$src, immU16:$addr)]>;
 
   def STAix  : F01<0b100, 0b110, (outs), (ins ACC16:$src, MEMix:$addr),
                    "STA $addr,X",
@@ -172,16 +183,16 @@ let mayStore = 1 in {
 let Defs = [SR] in {
   def LDAimm : F01<0b101, 0b010, (outs ACC16:$dst), (ins i16imm:$imm),
                    "LDA #$imm",
-                   [(set ACC16:$dst, i16imm:$imm)]>;
+                   [(set ACC16:$dst, immU16:$imm)]>;
 
   def CMPimm : F01<0b110, 0b010, (outs), (ins ACC16:$src, i16imm:$imm),
                    "CMP #$imm",
-                   [(C65cmp ACC16:$src, i16imm:$imm)]>;
+                   [(C65cmp ACC16:$src, immU16:$imm)]>;
 
   let mayLoad = 1 in {
     def LDAi   : F01<0b101, 0b011, (outs ACC16:$dst), (ins MEMi:$addr),
                      "LDA $addr",
-                     [(set ACC16:$dst, (load ADDRi:$addr))]>;
+                     [(set ACC16:$dst, (load immU16:$addr))]>;
 
     def LDAix  : F01<0b101, 0b110, (outs ACC16:$dst), (ins MEMix:$addr),
                      "LDA $addr,X",
@@ -189,7 +200,7 @@ let Defs = [SR] in {
 
     def CMPi   : F01<0b110, 0b011, (outs), (ins ACC16:$src, MEMi:$addr),
                      "CMP $addr",
-                     [(C65cmp ACC16:$src, (load ADDRi:$addr))]>;
+                     [(C65cmp ACC16:$src, (load immU16:$addr))]>;
 
     def CMPix  : F01<0b110, 0b011, (outs), (ins ACC16:$src, MEMix:$addr),
                      "CMP $addr,X",
@@ -208,7 +219,7 @@ class F10<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 let mayStore = 1 in {
   def STXi   : F01<0b100, 0b011, (outs), (ins IX16:$src, MEMi:$addr),
                    "STX $addr",
-                   [(store IX16:$src, ADDRi:$addr)]>;
+                   [(store IX16:$src, immU16:$addr)]>;
 }
 
 let Defs = [SR], Uses = [SR], Constraints = "$src = $dst" in {
@@ -232,12 +243,12 @@ let Defs = [SR], Uses = [SR], Constraints = "$src = $dst" in {
 let Defs = [SR] in {
   def LDXimm : F10<0b101, 0b000, (outs IX16:$dst), (ins i16imm:$imm),
                    "LDX #$imm",
-                   [(set IX16:$dst, i16imm:$imm)]>;
+                   [(set IX16:$dst, immU16:$imm)]>;
 
   let mayLoad = 1 in {
     def LDXi  : F10<0b101, 0b011, (outs IX16:$dst), (ins MEMi:$addr),
                     "LDX $addr",
-                    [(set IX16:$dst, (load ADDRi:$addr))]>;
+                    [(set IX16:$dst, (load immU16:$addr))]>;
 
     def LDXiy : F10<0b101, 0b111, (outs IX16:$dst), (ins MEMiy:$addr),
                     "LDX $addr,Y",
@@ -256,18 +267,18 @@ class F00<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 let mayStore = 1 in {
   def STYi : F00<0b100, 0b011, (outs), (ins IY16:$src, MEMi:$addr),
                  "STY $addr",
-                 [(store IY16:$src, ADDRi:$addr)]>;
+                 [(store IY16:$src, immU16:$addr)]>;
 }
 
 let Defs = [SR] in {
   def LDYimm : F00<0b101, 0b000, (outs IY16:$dst), (ins i16imm:$imm),
                    "LDY #$imm",
-                   [(set IY16:$dst, i16imm:$imm)]>;
+                   [(set IY16:$dst, immU16:$imm)]>;
 
   let mayLoad = 1 in {
     def LDYi   : F00<0b101, 0b011, (outs IY16:$dst), (ins MEMi:$addr),
                      "LDY $addr",
-                     [(set IY16:$dst, (load ADDRi:$addr))]>;
+                     [(set IY16:$dst, (load immU16:$addr))]>;
 
     def LDYix  : F00<0b101, 0b111, (outs IY16:$dst), (ins MEMix:$addr),
                      "LDY $addr,X",
@@ -278,20 +289,20 @@ let Defs = [SR] in {
 let Defs = [SR] in {
   def CPYimm : F01<0b110, 0b000, (outs), (ins IY16:$src, i16imm:$imm),
                    "CPY #$imm",
-                   [(C65cmp IY16:$src, i16imm:$imm)]>;
+                   [(C65cmp IY16:$src, immU16:$imm)]>;
 
   def CPXimm : F01<0b111, 0b000, (outs), (ins IX16:$src, i16imm:$imm),
                    "CPX #$imm",
-                   [(C65cmp IX16:$src, i16imm:$imm)]>;
+                   [(C65cmp IX16:$src, immU16:$imm)]>;
 
   let mayLoad = 1 in {
     def CPYi   : F01<0b110, 0b011, (outs), (ins IY16:$src, MEMi:$addr),
                      "CPY $addr",
-                     [(C65cmp IY16:$src, (load ADDRi:$addr))]>;
+                     [(C65cmp IY16:$src, (load immU16:$addr))]>;
 
     def CPXi   : F01<0b111, 0b011, (outs), (ins IX16:$src, MEMi:$addr),
                      "CPX $addr",
-                     [(C65cmp IX16:$src, (load ADDRi:$addr))]>;
+                     [(C65cmp IX16:$src, (load immU16:$addr))]>;
   }
 }
 
@@ -370,11 +381,11 @@ let neverHasSideEffects = 1 in {
 let isBranch = 1, isTerminator = 1, isBarrier = 1 in {
   def BRA : FF<0x80, (outs), (ins brtarget8:$addr),
                "BRA $addr",
-               [(br brtarget8:$addr)]>;
+               [(br bb:$addr)]>;
 
   def JMP : FF<0x6c, (outs), (ins brtarget16:$addr),
                "JMP $addr",
-               [(br brtarget16:$addr)]>;
+               [(br bb:$addr)]>;
 }
 
 // Jump subroutine (call)

@@ -20,3 +20,7 @@ Removed other targets from
 
  LLVM_TARGET(R600) LLVM_TARGET(SystemZ) LLVM_TARGET(Hexagon) LLVM_TARGET(NVPTX) LLVM_TARGET(CppBackend) LLVM_TARGET(MSP430) LLVM_TARGET(XCore) LLVM_TARGET(Mips) LLVM_TARGET(AArch64) LLVM_TARGET(ARM) LLVM_TARGET(PowerPC) LLVM_TARGET(Sparc) 
 
+
+ISel is required for CLANG to work.
+
+Every directory needs a Makefile, CMakeLists.txt and LLVMBuild.txt

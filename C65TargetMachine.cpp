@@ -25,7 +25,7 @@ C65TargetMachine::C65TargetMachine(const Target &T, StringRef TT,
                                    Reloc::Model RM, CodeModel::Model CM,
                                    CodeGenOpt::Level OL)
   : LLVMTargetMachine(T, TT, CPU, FS, Options, RM, CM, OL),
-    Subtarget(TT, CPU, FS), DL("e-S8-n16"), InstrInfo(Subtarget),
+    Subtarget(TT, CPU, FS), DL("e-n16-S8"), InstrInfo(Subtarget),
     TLInfo(*this), TSInfo(DL), FrameLowering(*this, Subtarget) {
   initAsmInfo();
 }
@@ -46,7 +46,7 @@ public:
 } // end anonymous namespace
 
 bool C65PassConfig::addInstSelector() {
-  //addPass(createC65ISelDag(getC65TargetMachine()));
+  addPass(createC65ISelDag(getC65TargetMachine()));
   return false;
 }
 

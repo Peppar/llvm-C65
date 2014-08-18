@@ -221,6 +221,7 @@ const char *C65TargetLowering::getTargetNodeName(unsigned Opcode) const {
   case C65ISD::PULL:   return "C65ISD::PULL";
   case C65ISD::CALL:   return "C65ISD::CALL";
   case C65ISD::RET:    return "C65ISD::RET";
+  case C65ISD::CMP:    return "C65ISD::CMP";
   case C65ISD::BR:     return "C65ISD::BR";
   case C65ISD::BRCOND: return "C65ISD::BRCOND";
   }

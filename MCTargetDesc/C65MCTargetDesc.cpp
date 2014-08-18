@@ -11,7 +11,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "C65MCAsmInfo.h"
 #include "C65MCTargetDesc.h"
+#include "InstPrinter/C65InstPrinter.h"
+#include "llvm/MC/MCELFStreamer.h"
+#include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCAsmInfoELF.h"
 #include "llvm/MC/MCCodeGenInfo.h"
 #include "llvm/MC/MCInstrInfo.h"
@@ -34,27 +38,11 @@ using namespace llvm;
 static MCAsmInfo *createC65MCAsmInfo(const MCRegisterInfo &MRI,
                                      StringRef TT) {
   // TODO: Do this properly with own class
-  MCAsmInfo *MAI = new MCAsmInfoELF();
+  MCAsmInfo *MAI = new C65ELFMCAsmInfo(TT);
   unsigned Reg = MRI.getDwarfRegNum(C65::SP, true);
   MCCFIInstruction Inst = MCCFIInstruction::createDefCfa(nullptr, Reg, 0);
   MAI->addInitialFrameState(Inst);
   return MAI;
-}
-
-static MCInstrInfo *createC65MCInstrInfo() {
-  MCInstrInfo *X = new MCInstrInfo();
-  InitC65MCInstrInfo(X);
-  return X;
-}
-
-static MCSubtargetInfo *createC65MCSubtargetInfo(StringRef TT, StringRef CPU,
-                                                 StringRef FS) {
-  MCSubtargetInfo *X = new MCSubtargetInfo();
-  Triple TheTriple(TT);
-  //if (CPU.empty())
-  //  CPU = (TheTriple.getArch() == Triple::sparcv9) ? "v9" : "v8";
-  InitC65MCSubtargetInfo(X, TT, CPU, FS);
-  return X;
 }
 
 static MCCodeGenInfo *createC65MCCodeGenInfo(StringRef TT, Reloc::Model RM,
@@ -74,29 +62,65 @@ static MCCodeGenInfo *createC65MCCodeGenInfo(StringRef TT, Reloc::Model RM,
   return X;
 }
 
-static MCStreamer *createMCStreamer(const Target &T, StringRef TT,
-                                    MCContext &Context, MCAsmBackend &MAB,
-                                    raw_ostream &OS, MCCodeEmitter *Emitter,
-                                    const MCSubtargetInfo &STI, bool RelaxAll,
-                                    bool NoExecStack) {
+static MCInstrInfo *createC65MCInstrInfo() {
+  MCInstrInfo *X = new MCInstrInfo();
+  InitC65MCInstrInfo(X);
+  return X;
+}
+
+static MCRegisterInfo *createC65MCRegisterInfo(StringRef TT) {
+  MCRegisterInfo *X = new MCRegisterInfo();
+  InitC65MCRegisterInfo(X, C65::SP);
+  return X;
+}
+
+static MCSubtargetInfo *createC65MCSubtargetInfo(StringRef TT, StringRef CPU,
+                                                 StringRef FS) {
+  MCSubtargetInfo *X = new MCSubtargetInfo();
+  InitC65MCSubtargetInfo(X, TT, CPU, FS);
+  return X;
+}
+
+// createC65MCCodeEmitter
+// createC65MCAsmBackend
+// static MCAsmBackend *createC65AsmBackend(const Target &T,
+//                                          const MCRegisterInfo &MRI,
+//                                          StringRef TT,
+//                                          StringRef CPU) {
+//   return new ELFSparcAsmBackend(T, Triple(TT).getOS());
+// }
+
+static MCStreamer *createC65MCStreamer(const Target &T, StringRef TT,
+                                       MCContext &Context, MCAsmBackend &MAB,
+                                       raw_ostream &OS, MCCodeEmitter *Emitter,
+                                       const MCSubtargetInfo &STI, bool RelaxAll,
+                                       bool NoExecStack) {
   MCStreamer *S =
       createELFStreamer(Context, MAB, OS, Emitter, RelaxAll, NoExecStack);
-  //new C65TargetELFStreamer(*S);
+  //new MCTargetStreamer(*S);
   return S;
 }
 
 static MCStreamer *
-createMCAsmStreamer(MCContext &Ctx, formatted_raw_ostream &OS,
-                    bool isVerboseAsm, bool useDwarfDirectory,
-                    MCInstPrinter *InstPrint, MCCodeEmitter *CE,
-                    MCAsmBackend *TAB, bool ShowInst) {
+createC65MCAsmStreamer(MCContext &Ctx, formatted_raw_ostream &OS,
+                       bool isVerboseAsm, bool useDwarfDirectory,
+                       MCInstPrinter *InstPrint, MCCodeEmitter *CE,
+                       MCAsmBackend *TAB, bool ShowInst) {
 
   MCStreamer *S = llvm::createAsmStreamer(
       Ctx, OS, isVerboseAsm, useDwarfDirectory, InstPrint, CE, TAB, ShowInst);
-  new C65TargetAsmStreamer(*S, OS);
+  //new MCTargetStreamer(*S, OS);
   return S;
 }
 
+static MCInstPrinter *createC65MCInstPrinter(const Target &T,
+                                             unsigned SyntaxVariant,
+                                             const MCAsmInfo &MAI,
+                                             const MCInstrInfo &MII,
+                                             const MCRegisterInfo &MRI,
+                                             const MCSubtargetInfo &STI) {
+  return new C65InstPrinter(MAI, MII, MRI, STI);
+}
 
 extern "C" void LLVMInitializeC65TargetMC() {
   RegisterMCAsmInfoFn X(The65C816Target, createC65MCAsmInfo);
@@ -104,25 +128,25 @@ extern "C" void LLVMInitializeC65TargetMC() {
   TargetRegistry::RegisterMCCodeGenInfo(The65C816Target,
                                         createC65MCCodeGenInfo);
 
-  TargetRegistry::RegisterMCInstrInfo(The65C815Target, createC65MCInstrInfo);
+  TargetRegistry::RegisterMCInstrInfo(The65C816Target, createC65MCInstrInfo);
 
   TargetRegistry::RegisterMCRegInfo(The65C816Target, createC65MCRegisterInfo);
 
   TargetRegistry::RegisterMCSubtargetInfo(The65C816Target,
-                                          create65C816MCSubtargetInfo);
+                                          createC65MCSubtargetInfo);
 
-  TargetRegistry::RegisterMCCodeEmitter(The65C816Target,
-                                        create65C816MCCodeEmitter);
+  //  TargetRegistry::RegisterMCCodeEmitter(The65C816Target,
+  //                                        createC65MCCodeEmitter);
 
-  TargetRegistry::RegisterMCAsmBackend(The65C816Target,
-                                       create65C816AsmBackend);
+  //  TargetRegistry::RegisterMCAsmBackend(The65C816Target,
+  //                                       createC65AsmBackend);
 
-  TargetRegistry::RegisterMCObjectStreamer(TheC65Target,
-                                           createMCStreamer);
+  TargetRegistry::RegisterMCObjectStreamer(The65C816Target,
+                                           createC65MCStreamer);
 
-  TargetRegistry::RegisterAsmStreamer(TheC65Target,
-                                      createMCAsmStreamer);
+  TargetRegistry::RegisterAsmStreamer(The65C816Target,
+                                      createC65MCAsmStreamer);
 
-  TargetRegistry::RegisterMCInstPrinter(TheC65Target,
+  TargetRegistry::RegisterMCInstPrinter(The65C816Target,
                                         createC65MCInstPrinter);
 }
