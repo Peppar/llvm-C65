@@ -45,6 +45,7 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   addRegisterClass(MVT::i16, &C65::IX16RegClass);
   addRegisterClass(MVT::i16, &C65::IY16RegClass);
 
+  // C65 has no *EXTLOAD
   setLoadExtAction(ISD::EXTLOAD,  MVT::i1, Promote);
   setLoadExtAction(ISD::EXTLOAD,  MVT::i8, Promote);
   setLoadExtAction(ISD::ZEXTLOAD, MVT::i1, Promote);

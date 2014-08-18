@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef SPARC_ISELLOWERING_H
-#define SPARC_ISELLOWERING_H
+#ifndef C65_ISELLOWERING_H
+#define C65_ISELLOWERING_H
 
 #include "C65.h"
 #include "llvm/Target/TargetLowering.h"
