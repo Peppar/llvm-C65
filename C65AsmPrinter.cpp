@@ -1,4 +1,4 @@
-//===-- C65AsmPrinter.cpp - C65 LLVM assembly writer ------------------===//
+//===-- C65AsmPrinter.cpp - C65 LLVM assembly writer ----------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -8,7 +8,7 @@
 //===----------------------------------------------------------------------===//
 //
 // This file contains a printer that converts from our internal representation
-// of machine-dependent LLVM code to GAS-format SPARC assembly language.
+// of machine-dependent LLVM code to C65 assembly language.
 //
 //===----------------------------------------------------------------------===//
 
@@ -47,8 +47,8 @@ namespace {
     }
 
     void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
-    void printMemOperand(const MachineInstr *MI, int opNum, raw_ostream &OS,
-                         const char *Modifier = nullptr);
+    //void printMemOperand(const MachineInstr *MI, int opNum, raw_ostream &OS,
+    //                     const char *Modifier = nullptr);
 
     static const char *getRegisterName(unsigned RegNo) {
       return C65InstPrinter::getRegisterName(RegNo);
@@ -222,48 +222,56 @@ void C65AsmPrinter::EmitInstruction(const MachineInstr *MI)
 
 void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
                                  raw_ostream &O) {
-  //  if (CloseParen) O << ")";
+  const DataLayout *DL = TM.getDataLayout();
+  const MachineOperand &MO = MI->getOperand(opNum);
+
+  switch (MO.getType()) {
+  case MachineOperand::MO_Register:
+    O << StringRef(getRegisterName(MO.getReg()));
+    break;
+  case MachineOperand::MO_Immediate:
+    O << (int)MO.getImm();
+    break;
+  case MachineOperand::MO_MachineBasicBlock:
+    O << *MO.getMBB()->getSymbol();
+    return;
+  case MachineOperand::MO_GlobalAddress:
+    O << *getSymbol(MO.getGlobal());
+    break;
+  case MachineOperand::MO_BlockAddress:
+    O << GetBlockAddressSymbol(MO.getBlockAddress())->getName();
+    break;
+  case MachineOperand::MO_ExternalSymbol:
+    O << MO.getSymbolName();
+    break;
+  case MachineOperand::MO_ConstantPoolIndex:
+    O << DL->getPrivateGlobalPrefix() << "CPI" << getFunctionNumber() << "_"
+      << MO.getIndex();
+    break;
+  default:
+    llvm_unreachable("<unknown operand type>");
+  }
 }
 
-void C65AsmPrinter::printMemOperand(const MachineInstr *MI, int opNum,
-                                    raw_ostream &O, const char *Modifier) {
-  printOperand(MI, opNum, O);
-}
-
-/// PrintAsmOperand - Print out an operand for an inline asm expression.
-///
 bool C65AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                                     unsigned AsmVariant,
                                     const char *ExtraCode,
                                     raw_ostream &O) {
   if (ExtraCode && ExtraCode[0]) {
     if (ExtraCode[1] != 0) return true; // Unknown modifier.
-
-    switch (ExtraCode[0]) {
-    default:
-      // See if this is a generic print operand
-      return AsmPrinter::PrintAsmOperand(MI, OpNo, AsmVariant, ExtraCode, O);
-    case 'r':
-     break;
-    }
+    return AsmPrinter::PrintAsmOperand(MI, OpNo, AsmVariant, ExtraCode, O);
+  } else {
+    printOperand(MI, OpNo, O);
+    return false;
   }
-
-  printOperand(MI, OpNo, O);
-
-  return false;
 }
 
 bool C65AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
                                           unsigned OpNo, unsigned AsmVariant,
                                           const char *ExtraCode,
                                           raw_ostream &O) {
-  if (ExtraCode && ExtraCode[0])
-    return true;  // Unknown modifier
-
-  O << '[';
-  printMemOperand(MI, OpNo, O);
-  O << ']';
-
+  if (ExtraCode && ExtraCode[0]) return true; // Unknown modifier
+  printOperand(MI, OpNo, O);
   return false;
 }
 

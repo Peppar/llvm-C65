@@ -16,11 +16,23 @@ Added C65 to these files
 
 Removed other targets from 
 
-~/clang/build/include/llvm/Config/
+~/clang/build/include/llvm/Config/Targets.def
 
  LLVM_TARGET(R600) LLVM_TARGET(SystemZ) LLVM_TARGET(Hexagon) LLVM_TARGET(NVPTX) LLVM_TARGET(CppBackend) LLVM_TARGET(MSP430) LLVM_TARGET(XCore) LLVM_TARGET(Mips) LLVM_TARGET(AArch64) LLVM_TARGET(ARM) LLVM_TARGET(PowerPC) LLVM_TARGET(Sparc) 
 
-
 ISel is required for CLANG to work.
 
-Every directory needs a Makefile, CMakeLists.txt and LLVMBuild.txt
+Every directory needs a Makefile, CMakeLists.txt and
+LLVMBuild.txt. Changes to these files are taken into account without
+re-running config.
+
+These files need to be updated manually or by re-running config, if you
+added support for an AsmPrinter, AsmParser, Disassembler or if you
+want to change the targets to make:
+
+LLVM_ASM_PRINTER(C65)
+~/clang/build/include/llvm/Config/AsmPrinters.def
+AsmParsers.def
+Disassemblers.def
+Targets.def
+
