@@ -9,6 +9,7 @@ tablegen(LLVM C65GenSubtargetInfo.inc -gen-subtarget)
 add_public_tablegen_target(C65CommonTableGen)
 
 add_llvm_target(C65CodeGen
+  C65AsmPrinter.cpp
   C65FrameLowering.cpp
   C65InstrInfo.cpp
   C65ISelLowering.cpp

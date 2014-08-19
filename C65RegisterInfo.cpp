@@ -31,7 +31,7 @@ using namespace llvm;
 #include "C65GenRegisterInfo.inc"
 
 C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
-  : C65GenRegisterInfo(C65::PC), Subtarget(ST) {}
+C  : C65GenRegisterInfo(C65::PC), Subtarget(ST) {}
 
 const MCPhysReg*
 C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
