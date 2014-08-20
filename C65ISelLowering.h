@@ -65,6 +65,9 @@ namespace llvm {
     EVT getSetCCResultType(LLVMContext &Context, EVT VT) const override;
 
     SDValue
+      LowerGlobalAddress(GlobalAddressSDNode *Node, SelectionDAG &DAG) const;
+
+    SDValue
       LowerFormalArguments(SDValue Chain,
                            CallingConv::ID CallConv,
                            bool isVarArg,
@@ -83,9 +86,9 @@ namespace llvm {
                   const SmallVectorImpl<SDValue> &OutVals,
                   SDLoc dl, SelectionDAG &DAG) const override;
 
-    // void ReplaceNodeResults(SDNode *N,
-    //                         SmallVectorImpl<SDValue>& Results,
-    //                         SelectionDAG &DAG) const override;
+    void ReplaceNodeResults(SDNode *N,
+                            SmallVectorImpl<SDValue>& Results,
+                            SelectionDAG &DAG) const override;
 
     // Inline assembly
 

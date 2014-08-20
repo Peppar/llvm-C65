@@ -147,7 +147,7 @@ class F01<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 multiclass F01_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
   // Binary operation on 16-bit accumulator
   def imm  : F01<op, 0b010, (outs ACC16:$dst), (ins ACC16:$src, i16imm:$imm),
-                 !strconcat(asmstr, " #$imm"),
+                 !strconcat(asmstr, " $imm"),
                  [(set ACC16:$dst, (operator ACC16:$src, imm:$imm))]>;
 
   let mayLoad = 1 in {
@@ -182,12 +182,14 @@ let mayStore = 1 in {
 }
 
 let Defs = [SR] in {
-  def LDAimm : F01<0b101, 0b010, (outs ACC16:$dst), (ins i16imm:$imm),
-                   "LDA #$imm",
-                   [(set ACC16:$dst, imm:$imm)]>;
+  let isMoveImm = 1 in {
+    def LDAimm : F01<0b101, 0b010, (outs ACC16:$dst), (ins i16imm:$imm),
+                     "LDA $imm",
+                     [(set ACC16:$dst, imm:$imm)]>;
+  }
 
   def CMPimm : F01<0b110, 0b010, (outs), (ins ACC16:$src, i16imm:$imm),
-                   "CMP #$imm",
+                   "CMP $imm",
                    [(C65cmp ACC16:$src, imm:$imm)]>;
 
   let mayLoad = 1 in {
@@ -242,9 +244,11 @@ let Defs = [SR], Uses = [SR], Constraints = "$src = $dst" in {
 }
 
 let Defs = [SR] in {
-  def LDXimm : F10<0b101, 0b000, (outs IX16:$dst), (ins i16imm:$imm),
-                   "LDX #$imm",
-                   [(set IX16:$dst, imm:$imm)]>;
+  let isMoveImm = 1 in {
+    def LDXimm : F10<0b101, 0b000, (outs IX16:$dst), (ins i16imm:$imm),
+                     "LDX $imm",
+                     [(set IX16:$dst, imm:$imm)]>;
+  }
 
   let mayLoad = 1 in {
     def LDXi  : F10<0b101, 0b011, (outs IX16:$dst), (ins MEMi:$addr),
@@ -273,9 +277,11 @@ let mayStore = 1 in {
 }
 
 let Defs = [SR] in {
-  def LDYimm : F00<0b101, 0b000, (outs IY16:$dst), (ins i16imm:$imm),
-                   "LDY #$imm",
-                   [(set IY16:$dst, imm:$imm)]>;
+  let isMoveImm = 1 in {
+    def LDYimm : F00<0b101, 0b000, (outs IY16:$dst), (ins i16imm:$imm),
+                     "LDY $imm",
+                     [(set IY16:$dst, imm:$imm)]>;
+  }
 
   let mayLoad = 1 in {
     def LDYi   : F00<0b101, 0b011, (outs IY16:$dst), (ins MEMi:$addr),
@@ -290,11 +296,11 @@ let Defs = [SR] in {
 
 let Defs = [SR] in {
   def CPYimm : F01<0b110, 0b000, (outs), (ins IY16:$src, i16imm:$imm),
-                   "CPY #$imm",
+                   "CPY $imm",
                    [(C65cmp IY16:$src, imm:$imm)]>;
 
   def CPXimm : F01<0b111, 0b000, (outs), (ins IX16:$src, i16imm:$imm),
-                   "CPX #$imm",
+                   "CPX $imm",
                    [(C65cmp IX16:$src, imm:$imm)]>;
 
   let mayLoad = 1 in {
@@ -434,8 +440,8 @@ let Defs = [SR], Uses = [SR] in {
   def CLI : FF<0x58, (outs), (ins), "CLI", []>;
   def SEI : FF<0x78, (outs), (ins), "STI", []>;
   def CLV : FF<0xb8, (outs), (ins), "CLV", []>;
-  def REP : FF<0xc2, (outs), (ins i8imm:$imm), "REP #$imm", []>;
-  def SEP : FF<0xe2, (outs), (ins i8imm:$imm), "SEP #$imm", []>;
+  def REP : FF<0xc2, (outs), (ins i8imm:$imm), "REP $imm", []>;
+  def SEP : FF<0xe2, (outs), (ins i8imm:$imm), "SEP $imm", []>;
 }
 
 // Increment and decrement instructions

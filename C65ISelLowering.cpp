@@ -29,8 +29,11 @@
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Debug.h"
 
 using namespace llvm;
+
+#define DEBUG_TYPE "isel-lowering"
 
 //===----------------------------------------------------------------------===//
 // TargetLowering Implementation
@@ -65,11 +68,11 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
 
   // AddPromotedToType(ISD::SETCC, MVT::i1, MVT::i8);
 
-  // Custom legalize GlobalAddress nodes into LO/HI parts.
-  //  setOperationAction(ISD::GlobalAddress, getPointerTy(), Custom);
-  //  setOperationAction(ISD::GlobalTLSAddress, getPointerTy(), Custom);
-  //  setOperationAction(ISD::ConstantPool, getPointerTy(), Custom);
-  //  setOperationAction(ISD::BlockAddress, getPointerTy(), Custom);
+  // Custom legalize GlobalAddress nodes
+  setOperationAction(ISD::GlobalAddress, getPointerTy(), Custom);
+  setOperationAction(ISD::GlobalTLSAddress, getPointerTy(), Custom);
+  setOperationAction(ISD::ConstantPool, getPointerTy(), Custom);
+  setOperationAction(ISD::BlockAddress, getPointerTy(), Custom);
 
 
   // for (unsigned VT = (unsigned)FIRST_INTEGER_VALUETYPE;
@@ -216,7 +219,8 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
 
 const char *C65TargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
-  default: return nullptr;
+  default:
+    return TargetLowering::getTargetNodeName(Opcode);
   case C65ISD::PUSH:   return "C65ISD::PUSH";
   case C65ISD::PULL:   return "C65ISD::PULL";
   case C65ISD::CALL:   return "C65ISD::CALL";
@@ -233,11 +237,24 @@ EVT C65TargetLowering::getSetCCResultType(LLVMContext &, EVT VT) const {
   return VT.changeVectorElementTypeToInteger();
 }
 
+SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
+                                              SelectionDAG &DAG) const {
+  SDLoc DL(Node);
+  const GlobalValue *GV = Node->getGlobal();
+  int64_t Offset = Node->getOffset();
+  //  Reloc::Model RM = DAG.getTarget().getRelocationModel();
+  //  CodeModel::Model CM = DAG.getTarget().getCodeModel();
+
+  return DAG.getTargetGlobalAddress(GV, DL, getPointerTy(), Offset);
+}
+
 SDValue C65TargetLowering::
 LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   switch(Op.getOpcode()) {
   default:
     llvm_unreachable("Unexpected node to lower");
+  case ISD::GlobalAddress:
+    return LowerGlobalAddress(cast<GlobalAddressSDNode>(Op), DAG);
   case ISD::BR_CC:
     llvm_unreachable("BR_CC not implemented.");
   case ISD::SELECT_CC:
@@ -284,6 +301,7 @@ C65TargetLowering::LowerReturn(SDValue Chain,
                                SDLoc DL, SelectionDAG &DAG) const {
   SmallVector<CCValAssign, 16> RVLocs;
   SmallVector<SDValue, 4> RetOps(1, Chain);
+  SDValue Glue;
 
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
                  DAG.getTarget(), RVLocs, *DAG.getContext());
@@ -292,9 +310,21 @@ C65TargetLowering::LowerReturn(SDValue Chain,
   CCInfo.AnalyzeReturn(Outs, RetCC_65c816);
 
   assert(!IsVarArg && "Var args not supported.");
-  assert(RVLocs.size() == 0 && "Return values not supported.");
+  assert(RVLocs.size() <= 1 && "Maximum of 1 return value supported.");
+  if(RVLocs.size() == 1) {
+    CCValAssign &VA = RVLocs[0];
+    assert(VA.isRegLoc());
+    Chain = DAG.getCopyToReg(Chain, DL, VA.getLocReg(),
+                             OutVals[0], Glue);
+    Glue = Chain.getValue(1);
+    RetOps.push_back(DAG.getRegister(VA.getLocReg(), VA.getLocVT()));
+  }
 
   RetOps[0] = Chain;  // Update chain.
+
+  // Add the glue if we have it.
+  if (Glue.getNode())
+    RetOps.push_back(Glue);
 
   return DAG.getNode(C65ISD::RET, DL, MVT::Other, RetOps);
 }
@@ -344,3 +374,18 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   return DAG.getNode(C65ISD::CALL, DL, NodeTys, Ops);
 }
 
+void C65TargetLowering::ReplaceNodeResults(SDNode *N,
+                                           SmallVectorImpl<SDValue>& Results,
+                                           SelectionDAG &DAG) const {
+
+  SDLoc DL(N);
+
+  RTLIB::Libcall libCall = RTLIB::UNKNOWN_LIBCALL;
+
+  DEBUG(errs() << "Legalize operation " << getTargetNodeName(N->getOpcode()));
+
+  switch (N->getOpcode()) {
+  default:
+    llvm_unreachable("Do not know how to custom type legalize this operation!");
+  }
+}
