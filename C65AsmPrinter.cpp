@@ -66,15 +66,6 @@ namespace {
   };
 } // end of anonymous namespace
 
-// static MCOperand createC65MCOperand(C65MCExpr::VariantKind Kind,
-//                                     MCSymbol *Sym, MCContext &OutContext) {
-//   const MCSymbolRefExpr *MCSym = MCSymbolRefExpr::Create(Sym,
-//                                                          OutContext);
-//   const C65MCExpr *expr = C65MCExpr::Create(Kind, MCSym, OutContext);
-//   return MCOperand::CreateExpr(expr);
-
-// }
-
 // static void EmitCall(MCStreamer &OutStreamer,
 //                      MCOperand &Callee,
 //                      const MCSubtargetInfo &STI) {
@@ -203,21 +194,15 @@ static void LowerC65MachineInstrToMCInst(const MachineInstr *MI,
   }
 }
 
-void C65AsmPrinter::EmitInstruction(const MachineInstr *MI)
-{
-  switch (MI->getOpcode()) {
-  default: break;
-  case TargetOpcode::DBG_VALUE:
+void C65AsmPrinter::EmitInstruction(const MachineInstr *MI) {
+  if (MI->getOpcode() == TargetOpcode::DBG_VALUE) {
     // FIXME: Debug Value.
     return;
-  }
-  MachineBasicBlock::const_instr_iterator I = MI;
-  MachineBasicBlock::const_instr_iterator E = MI->getParent()->instr_end();
-  do {
+  } else {
     MCInst TmpInst;
-    LowerC65MachineInstrToMCInst(I, TmpInst, *this);
+    LowerC65MachineInstrToMCInst(MI, TmpInst, *this);
     EmitToStreamer(OutStreamer, TmpInst);
-  } while (++I != E);
+  }
 }
 
 void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
@@ -258,8 +243,12 @@ bool C65AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                                     const char *ExtraCode,
                                     raw_ostream &O) {
   if (ExtraCode && ExtraCode[0]) {
-    if (ExtraCode[1] != 0) return true; // Unknown modifier.
-    return AsmPrinter::PrintAsmOperand(MI, OpNo, AsmVariant, ExtraCode, O);
+    if (ExtraCode[1] != 0) {
+      // Unknown modifier.
+      return true;
+    } else {
+      return AsmPrinter::PrintAsmOperand(MI, OpNo, AsmVariant, ExtraCode, O);
+    }
   } else {
     printOperand(MI, OpNo, O);
     return false;
@@ -270,9 +259,13 @@ bool C65AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
                                           unsigned OpNo, unsigned AsmVariant,
                                           const char *ExtraCode,
                                           raw_ostream &O) {
-  if (ExtraCode && ExtraCode[0]) return true; // Unknown modifier
-  printOperand(MI, OpNo, O);
-  return false;
+  if (ExtraCode && ExtraCode[0]) {
+    // Unknown modifier
+    return true;
+  } else {
+    printOperand(MI, OpNo, O);
+    return false;
+  }
 }
 
 // Force static initialization.

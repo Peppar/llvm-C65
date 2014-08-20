@@ -66,6 +66,9 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   setOperationAction(ISD::BR_CC, MVT::i32, Custom);
   setOperationAction(ISD::SELECT_CC, MVT::i32, Custom);
 
+  setOperationAction(ISD::SHL, MVT::i16, Custom);
+
+
   // AddPromotedToType(ISD::SETCC, MVT::i1, MVT::i8);
 
   // Custom legalize GlobalAddress nodes
@@ -250,11 +253,14 @@ SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
 
 SDValue C65TargetLowering::
 LowerOperation(SDValue Op, SelectionDAG &DAG) const {
+  SDLoc DL(Op);
   switch(Op.getOpcode()) {
   default:
     llvm_unreachable("Unexpected node to lower");
   case ISD::GlobalAddress:
     return LowerGlobalAddress(cast<GlobalAddressSDNode>(Op), DAG);
+  case ISD::SHL:
+    return DAG.getNode(C65::ASLa, DL, MVT::i16, Op.getOperand(0));
   case ISD::BR_CC:
     llvm_unreachable("BR_CC not implemented.");
   case ISD::SELECT_CC:

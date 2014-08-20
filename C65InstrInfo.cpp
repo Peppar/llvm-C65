@@ -79,7 +79,7 @@ storeRegToStackSlot(MachineBasicBlock &MBB,
                     unsigned SrcReg, bool isKill, int FI,
                     const TargetRegisterClass *RC,
                     const TargetRegisterInfo *TRI) const {
-  llvm_unreachable("Stack slot stores not supported.");
+  //llvm_unreachable("Stack slot stores not supported.");
   // DebugLoc DL;
   // if (I != MBB.end()) DL = I->getDebugLoc();
 

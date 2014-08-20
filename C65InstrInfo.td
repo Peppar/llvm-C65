@@ -55,12 +55,12 @@ def ADDRiy : ComplexPattern<iPTR, 2, "SelectADDRixy", [frameindex], []>;
 //===----------------------------------------------------------------------===//
 
 def SDT_C65cmp : SDTypeProfile<0, 2, [SDTCisInt<0>, SDTCisSameAs<0, 1>]>;
-def SDT_C65ret : SDTypeProfile<0, 0, []>;
+//def SDT_C65ret : SDTypeProfile<0, 0, []>;
 
 def C65cmp : SDNode<"C65ISD::CMP", SDT_C65cmp,
                     [SDNPOutGlue]>;
-def C65ret : SDNode<"C65ISD::RET", SDT_C65ret,
-                    [SDNPHasChain, SDNPOptInGlue]>;
+def C65ret : SDNode<"C65ISD::RET", SDTNone, //SDT_C65ret,
+                    [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
 //  These are target-independent nodes, but have target-specific formats.
 def SDT_C65CallSeqStart : SDCallSeqStart<[SDTCisVT<0, i32>]>;
@@ -166,8 +166,8 @@ let Defs = [SR], Constraints = "$src = $dst" in {
   defm AND : F01_binary<0b001, "AND", and>;
   defm EOR : F01_binary<0b010, "EOR", xor>;
   let Uses = [SR] in {
-    defm ADC : F01_binary<0b011, "ADC", adde>;
-    defm SBC : F01_binary<0b111, "SBC", sube>;
+    defm ADC : F01_binary<0b011, "ADC", add>; //TODO: Change to adde!
+    defm SBC : F01_binary<0b111, "SBC", sub>; // sube
   }
 }
 
@@ -471,16 +471,27 @@ let Defs = [SR], Constraints = "$src = $dst" in {
 
 class Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
     : InstC65<outs, ins, asmstr, pattern> {
-  let isCodeGenOnly = 1;
   let isPseudo = 1;
 }
 
 // ADJCALLSTACKDOWN, ADJCALLSTACKUP are mandatory pseudo-instructions
-let Defs = [SP, SR], Uses = [SP] in {
+let Defs = [SP, SR], Uses = [SP], isCodeGenOnly = 1 in {
   def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt),
-                                 "!ADJCALLSTACKDOWN $amt",
+                                 ";!ADJCALLSTACKDOWN $amt",
                                  [(callseq_start timm:$amt)]>;
   def ADJCALLSTACKUP : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
-                              "!ADJCALLSTACKUP $amt1",
+                              ";!ADJCALLSTACKUP $amt1",
                               [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
+
+// let Defs = [SR], Constraints = "$src = $dst" in {
+//   def SHLimm  : Pseudo<(outs ACC16:$dst), (ins ACC16:$src, i16imm:$amt),
+//                        ";!SHL A, $amt",
+//                        [(set ACC16:$dst, (shl ACC16:$src, imm:$amt))]>;
+//   def LSHRimm : Pseudo<(outs ACC16:$dst), (ins ACC16:$src, i16imm:$amt),
+//                        ";!LSHR A, $amt",
+//                        [(set ACC16:$dst, (lshr ACC16:$src, imm:$amt))]>;
+//   def ASHRimm : Pseudo<(outs ACC16:$dst), (ins ACC16:$src, i16imm:$amt),
+//                        ";!ASHR A, $amt",
+//                        [(set ACC16:$dst, (ashr ACC16:$src, imm:$amt))]>;
+// }
