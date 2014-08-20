@@ -12,17 +12,27 @@
 //===----------------------------------------------------------------------===//
 
 
-#ifndef C65TARGETMACHINE_H
-#define C65TARGETMACHINE_H
+#ifndef LLVM_TARGET_C65TARGETMACHINE_H
+#define LLVM_TARGET_C65TARGETMACHINE_H
 
 #include "C65InstrInfo.h"
 #include "C65Subtarget.h"
 #include "C65ISelLowering.h"
 #include "C65FrameLowering.h"
-#include "C65SelectionDAGInfo.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetSelectionDAGInfo.h"
 
 namespace llvm {
+
+class C65TargetMachine;
+
+class C65SelectionDAGInfo : public TargetSelectionDAGInfo {
+public:
+  explicit C65SelectionDAGInfo(const DataLayout &DL)
+    : TargetSelectionDAGInfo(&DL) {};
+
+  ~C65SelectionDAGInfo() {};
+};
 
 class C65TargetMachine : public LLVMTargetMachine {
   C65Subtarget Subtarget;

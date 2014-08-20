@@ -24,7 +24,7 @@ ISel is required for CLANG to work.
 
 Every directory needs a Makefile, CMakeLists.txt and
 LLVMBuild.txt. Changes to these files are taken into account without
-re-running config.
+re-running config
 
 These files need to be updated manually or by re-running config, if you
 added support for an AsmPrinter, AsmParser, Disassembler or if you

@@ -36,7 +36,7 @@ using namespace llvm;
 #define DEBUG_TYPE "isel-lowering"
 
 //===----------------------------------------------------------------------===//
-// TargetLowering Implementation
+// TargetLowering implementation
 //===----------------------------------------------------------------------===//
 
 C65TargetLowering::C65TargetLowering(TargetMachine &TM)
@@ -45,37 +45,39 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
 
   // Set up the register classes.
   addRegisterClass(MVT::i16, &C65::ACC16RegClass);
+  // TODO: Remove X and Y for bare-bones?
   addRegisterClass(MVT::i16, &C65::IX16RegClass);
   addRegisterClass(MVT::i16, &C65::IY16RegClass);
 
   // TODO: Remove these for bare-bones?
   // C65 has no *EXTLOAD
-  setLoadExtAction(ISD::EXTLOAD,  MVT::i1, Promote);
-  setLoadExtAction(ISD::EXTLOAD,  MVT::i8, Promote);
-  setLoadExtAction(ISD::ZEXTLOAD, MVT::i1, Promote);
-  setLoadExtAction(ISD::ZEXTLOAD, MVT::i8, Promote);
-  setLoadExtAction(ISD::SEXTLOAD, MVT::i1, Promote);
-  setLoadExtAction(ISD::SEXTLOAD, MVT::i8, Promote);
+  // setLoadExtAction(ISD::EXTLOAD,  MVT::i1, Promote);
+  // setLoadExtAction(ISD::EXTLOAD,  MVT::i8, Promote);
+  // setLoadExtAction(ISD::ZEXTLOAD, MVT::i1, Promote);
+  // setLoadExtAction(ISD::ZEXTLOAD, MVT::i8, Promote);
+  // setLoadExtAction(ISD::SEXTLOAD, MVT::i1, Promote);
+  // setLoadExtAction(ISD::SEXTLOAD, MVT::i8, Promote);
 
   // TODO: Remove these for bare-bones?
-  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Expand);
-  setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Expand);
+  // setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Expand);
+  // setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Expand);
 
   // TODO: Remove these for bare-bones?
   // C65 doesn't have BRCOND either, it has BR_CC.
-  setOperationAction(ISD::BRCOND, MVT::Other, Expand);
-  setOperationAction(ISD::BRIND, MVT::Other, Expand);
-  setOperationAction(ISD::BR_JT, MVT::Other, Expand);
-  setOperationAction(ISD::BR_CC, MVT::i32, Custom);
-  setOperationAction(ISD::SELECT_CC, MVT::i32, Custom);
+  // setOperationAction(ISD::BRCOND, MVT::Other, Expand);
+  // setOperationAction(ISD::BRIND, MVT::Other, Expand);
+  // setOperationAction(ISD::BR_JT, MVT::Other, Expand);
+  // setOperationAction(ISD::BR_CC, MVT::i32, Custom);
+  // setOperationAction(ISD::SELECT_CC, MVT::i32, Custom);
 
   //setOperationAction(ISD::SHL, MVT::i16, Custom);
 
   // Custom legalize GlobalAddress nodes
   setOperationAction(ISD::GlobalAddress, getPointerTy(), Custom);
-  setOperationAction(ISD::GlobalTLSAddress, getPointerTy(), Custom);
-  setOperationAction(ISD::ConstantPool, getPointerTy(), Custom);
-  setOperationAction(ISD::BlockAddress, getPointerTy(), Custom);
+  // TODO: Remove these three?
+  // setOperationAction(ISD::GlobalTLSAddress, getPointerTy(), Custom);
+  // setOperationAction(ISD::ConstantPool, getPointerTy(), Custom);
+  // setOperationAction(ISD::BlockAddress, getPointerTy(), Custom);
 
   // TODO: Remove this for bare-bones?
   setStackPointerRegisterToSaveRestore(C65::SP);
@@ -118,18 +120,19 @@ SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
                                               SelectionDAG &DAG) const {
   SDLoc DL(Node);
   const GlobalValue *GV = Node->getGlobal();
-  int64_t Offset = Node->getOffset();
+  return DAG.getTargetGlobalAddress(GV, DL, getPointerTy());
+  //  int64_t Offset = Node->getOffset();
   //  Reloc::Model RM = DAG.getTarget().getRelocationModel();
   //  CodeModel::Model CM = DAG.getTarget().getCodeModel();
 
-  DEBUG(errs() << "LowerGlobalAddress offset "
-	<< Offset << '\n');
-  DEBUG(Node->dump());
-  DEBUG(GV->dump());
+  // DEBUG(errs() << "LowerGlobalAddress offset "
+  // 	<< Offset << '\n');
+  // DEBUG(Node->dump());
+  // DEBUG(GV->dump());
 
-  SDValue OutNode = DAG.getTargetGlobalAddress(GV, DL, getPointerTy(), Offset);
-  DEBUG(OutNode->dump());
-  return OutNode;
+  //  SDValue OutNode = DAG.getTargetGlobalAddress(GV, DL, getPointerTy(), Offset);
+  //  DEBUG(OutNode->dump());
+  //  return OutNode;
 }
 
 SDValue C65TargetLowering::
@@ -140,15 +143,15 @@ LowerOperation(SDValue Op, SelectionDAG &DAG) const {
     llvm_unreachable("Unexpected node to lower");
   case ISD::GlobalAddress:
     return LowerGlobalAddress(cast<GlobalAddressSDNode>(Op), DAG);
-  case ISD::SHL:
-    // TODO
-    return DAG.getNode(C65::ASLa, DL, MVT::i16, Op.getOperand(0));
-  case ISD::BR_CC:
-    // TODO
-    llvm_unreachable("BR_CC not implemented.");
-  case ISD::SELECT_CC:
-    // TODO
-    llvm_unreachable("SELECT_CC not implemented.");
+  // case ISD::SHL:
+  //   // TODO
+  //   return DAG.getNode(C65::ASLa, DL, MVT::i16, Op.getOperand(0));
+  // case ISD::BR_CC:
+  //   // TODO
+  //   llvm_unreachable("BR_CC not implemented.");
+  // case ISD::SELECT_CC:
+  //   // TODO
+  //   llvm_unreachable("SELECT_CC not implemented.");
   }
 }
 

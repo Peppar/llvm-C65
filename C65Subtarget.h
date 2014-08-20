@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef C65SUBTARGET_H
-#define C65SUBTARGET_H
+#ifndef LLVM_TARGET_C65SUBTARGET_H
+#define LLVM_TARGET_C65SUBTARGET_H
 
 //#include "llvm/ADT/Triple.h"
 #include "llvm/Target/TargetSubtargetInfo.h"

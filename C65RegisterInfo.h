@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef C65REGISTERINFO_H
-#define C65REGISTERINFO_H
+#ifndef LLVM_TARGET_C65REGISTERINFO_H
+#define LLVM_TARGET_C65REGISTERINFO_H
 
 #include "llvm/Target/TargetRegisterInfo.h"
 

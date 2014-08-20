@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef C65_ISELLOWERING_H
-#define C65_ISELLOWERING_H
+#ifndef LLVM_TARGET_C65_ISELLOWERING_H
+#define LLVM_TARGET_C65_ISELLOWERING_H
 
 #include "C65.h"
 #include "llvm/Target/TargetLowering.h"
