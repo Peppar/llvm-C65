@@ -338,13 +338,22 @@ LowerFormalArguments(SDValue Chain,
                      SelectionDAG &DAG,
                      SmallVectorImpl<SDValue> &InVals) const {
 
+  MachineFunction &MF = DAG.getMachineFunction();
+  MachineRegisterInfo &RegInfo = MF.getRegInfo();
   SmallVector<CCValAssign, 16> ArgLocs;
-
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
                  getTargetMachine(), ArgLocs, *DAG.getContext());
-
   CCInfo.AnalyzeFormalArguments(Ins, CC_65c816);
-  assert(ArgLocs.size() == 0 && "Formal arguments not supported.");
+  assert(ArgLocs.size() <= 1 && "Max 1 formal argument supported");
+
+  if (ArgLocs.size() == 1) {
+    CCValAssign &VA = ArgLocs[0];
+    assert(VA.isRegLoc() && "The argument must fit in a register");
+    unsigned VReg = RegInfo.createVirtualRegister(&C65::ACC16RegClass);
+    RegInfo.addLiveIn(VA.getLocReg(), VReg);
+    SDValue Arg = DAG.getCopyFromReg(Chain, DL, VReg, MVT::i16);
+    InVals.push_back(Arg);
+  }
 
   return Chain;
 }
