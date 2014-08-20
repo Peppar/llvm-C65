@@ -153,11 +153,13 @@ multiclass F01_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
   let mayLoad = 1 in {
     def i  : F01<op, 0b011, (outs ACC16:$dst), (ins ACC16:$src, MEMi:$addr),
                    !strconcat(asmstr, " $addr"),
-                   [(set ACC16:$dst, (operator ACC16:$src, (load imm:$addr)))]>;
+                   [(set ACC16:$dst,
+                      (operator ACC16:$src, (load tglobaladdr:$addr)))]>;
 
     def ix : F01<op, 0b110, (outs ACC16:$dst), (ins ACC16:$src, MEMix:$addr),
                    !strconcat(asmstr, " $addr,X"),
-                   [(set ACC16:$dst, (operator ACC16:$src, (load ADDRix:$addr)))]>;
+                   [(set ACC16:$dst,
+                      (operator ACC16:$src, (load ADDRix:$addr)))]>;
   }
 }
 
@@ -174,7 +176,7 @@ let Defs = [SR], Constraints = "$src = $dst" in {
 let mayStore = 1 in {
   def STAi   : F01<0b100, 0b011, (outs), (ins ACC16:$src, MEMi:$addr),
                    "STA $addr",
-                   [(store ACC16:$src, imm:$addr)]>;
+                   [(store ACC16:$src, tglobaladdr:$addr)]>;
 
   def STAix  : F01<0b100, 0b110, (outs), (ins ACC16:$src, MEMix:$addr),
                    "STA $addr,X",
@@ -195,7 +197,7 @@ let Defs = [SR] in {
   let mayLoad = 1 in {
     def LDAi   : F01<0b101, 0b011, (outs ACC16:$dst), (ins MEMi:$addr),
                      "LDA $addr",
-                     [(set ACC16:$dst, (load imm:$addr))]>;
+                     [(set ACC16:$dst, (load tglobaladdr:$addr))]>;
 
     def LDAix  : F01<0b101, 0b110, (outs ACC16:$dst), (ins MEMix:$addr),
                      "LDA $addr,X",
@@ -203,7 +205,7 @@ let Defs = [SR] in {
 
     def CMPi   : F01<0b110, 0b011, (outs), (ins ACC16:$src, MEMi:$addr),
                      "CMP $addr",
-                     [(C65cmp ACC16:$src, (load imm:$addr))]>;
+                     [(C65cmp ACC16:$src, (load tglobaladdr:$addr))]>;
 
     def CMPix  : F01<0b110, 0b011, (outs), (ins ACC16:$src, MEMix:$addr),
                      "CMP $addr,X",
@@ -222,7 +224,7 @@ class F10<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 let mayStore = 1 in {
   def STXi   : F01<0b100, 0b011, (outs), (ins IX16:$src, MEMi:$addr),
                    "STX $addr",
-                   [(store IX16:$src, imm:$addr)]>;
+                   [(store IX16:$src, tglobaladdr:$addr)]>;
 }
 
 let Defs = [SR], Uses = [SR], Constraints = "$src = $dst" in {
@@ -253,7 +255,7 @@ let Defs = [SR] in {
   let mayLoad = 1 in {
     def LDXi  : F10<0b101, 0b011, (outs IX16:$dst), (ins MEMi:$addr),
                     "LDX $addr",
-                    [(set IX16:$dst, (load imm:$addr))]>;
+                    [(set IX16:$dst, (load tglobaladdr:$addr))]>;
 
     def LDXiy : F10<0b101, 0b111, (outs IX16:$dst), (ins MEMiy:$addr),
                     "LDX $addr,Y",
@@ -273,7 +275,7 @@ class F00<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 let mayStore = 1 in {
   def STYi : F00<0b100, 0b011, (outs), (ins IY16:$src, MEMi:$addr),
                  "STY $addr",
-                 [(store IY16:$src, imm:$addr)]>;
+                 [(store IY16:$src, tglobaladdr:$addr)]>;
 }
 
 let Defs = [SR] in {
@@ -286,7 +288,7 @@ let Defs = [SR] in {
   let mayLoad = 1 in {
     def LDYi   : F00<0b101, 0b011, (outs IY16:$dst), (ins MEMi:$addr),
                      "LDY $addr",
-                     [(set IY16:$dst, (load imm:$addr))]>;
+                     [(set IY16:$dst, (load tglobaladdr:$addr))]>;
 
     def LDYix  : F00<0b101, 0b111, (outs IY16:$dst), (ins MEMix:$addr),
                      "LDY $addr,X",
@@ -306,11 +308,11 @@ let Defs = [SR] in {
   let mayLoad = 1 in {
     def CPYi   : F01<0b110, 0b011, (outs), (ins IY16:$src, MEMi:$addr),
                      "CPY $addr",
-                     [(C65cmp IY16:$src, (load imm:$addr))]>;
+                     [(C65cmp IY16:$src, (load tglobaladdr:$addr))]>;
 
     def CPXi   : F01<0b111, 0b011, (outs), (ins IX16:$src, MEMi:$addr),
                      "CPX $addr",
-                     [(C65cmp IX16:$src, (load imm:$addr))]>;
+                     [(C65cmp IX16:$src, (load tglobaladdr:$addr))]>;
   }
 }
 

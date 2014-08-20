@@ -48,6 +48,7 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   addRegisterClass(MVT::i16, &C65::IX16RegClass);
   addRegisterClass(MVT::i16, &C65::IY16RegClass);
 
+  // TODO: Remove these for bare-bones?
   // C65 has no *EXTLOAD
   setLoadExtAction(ISD::EXTLOAD,  MVT::i1, Promote);
   setLoadExtAction(ISD::EXTLOAD,  MVT::i8, Promote);
@@ -56,9 +57,11 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   setLoadExtAction(ISD::SEXTLOAD, MVT::i1, Promote);
   setLoadExtAction(ISD::SEXTLOAD, MVT::i8, Promote);
 
+  // TODO: Remove these for bare-bones?
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Expand);
   setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Expand);
 
+  // TODO: Remove these for bare-bones?
   // C65 doesn't have BRCOND either, it has BR_CC.
   setOperationAction(ISD::BRCOND, MVT::Other, Expand);
   setOperationAction(ISD::BRIND, MVT::Other, Expand);
@@ -66,10 +69,7 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   setOperationAction(ISD::BR_CC, MVT::i32, Custom);
   setOperationAction(ISD::SELECT_CC, MVT::i32, Custom);
 
-  setOperationAction(ISD::SHL, MVT::i16, Custom);
-
-
-  // AddPromotedToType(ISD::SETCC, MVT::i1, MVT::i8);
+  //setOperationAction(ISD::SHL, MVT::i16, Custom);
 
   // Custom legalize GlobalAddress nodes
   setOperationAction(ISD::GlobalAddress, getPointerTy(), Custom);
@@ -77,145 +77,8 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   setOperationAction(ISD::ConstantPool, getPointerTy(), Custom);
   setOperationAction(ISD::BlockAddress, getPointerTy(), Custom);
 
-
-  // for (unsigned VT = (unsigned)FIRST_INTEGER_VALUETYPE;
-  //      VT <= (unsigned)LAST_INTEGER_VALUETYPE; ++VT) {
-  //   setOperationAction(ISD::ADD, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::ADDC, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::ADDE, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::SUB, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::SUBC, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::SUBE, (MVT::SimpleValueType)VT, Expand);
-
-  //   // C65 has no MUL, SDIV, UDIV, SREM, UREM
-  //   setOperationAction(ISD::MUL, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::SDIV, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::UDIV, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::SREM, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::UREM, (MVT::SimpleValueType)VT, Expand);
-
-  //   // C65 has no REM or DIVREM operations.
-  //   setOperationAction(ISD::UREM, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::UREM, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::SREM, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::SDIVREM, (MVT::SimpleValueType)VT, Expand);
-  //   setOperationAction(ISD::UDIVREM, (MVT::SimpleValueType)VT, Expand);
-  // }
-
-  // // Custom expand fp<->sint
-  // setOperationAction(ISD::FP_TO_SINT, MVT::i32, Expand);
-  // setOperationAction(ISD::SINT_TO_FP, MVT::i32, Expand);
-  // setOperationAction(ISD::FP_TO_SINT, MVT::i64, Expand);
-  // setOperationAction(ISD::SINT_TO_FP, MVT::i64, Expand);
-
-  // // Custom Expand fp<->uint
-  // setOperationAction(ISD::FP_TO_UINT, MVT::i32, Exa);
-  // setOperationAction(ISD::UINT_TO_FP, MVT::i32, Custom);
-  // setOperationAction(ISD::FP_TO_UINT, MVT::i64, Custom);
-  // setOperationAction(ISD::UINT_TO_FP, MVT::i64, Custom);
-
-  // setOperationAction(ISD::BITCAST, MVT::f32, Expand);
-  // setOperationAction(ISD::BITCAST, MVT::i32, Expand);
-
-  // // C65 has no select or setcc: expand to SELECT_CC.
-  // setOperationAction(ISD::SELECT, MVT::i32, Expand);
-  // setOperationAction(ISD::SELECT, MVT::f32, Expand);
-  // setOperationAction(ISD::SELECT, MVT::f64, Expand);
-  // setOperationAction(ISD::SELECT, MVT::f128, Expand);
-
-  // setOperationAction(ISD::SETCC, MVT::i32, Expand);
-  // setOperationAction(ISD::SETCC, MVT::f32, Expand);
-  // setOperationAction(ISD::SETCC, MVT::f64, Expand);
-  // setOperationAction(ISD::SETCC, MVT::f128, Expand);
-
-
-  // ATOMICs.
-  // FIXME: We insert fences for each atomics and generate sub-optimal code
-  // for PSO/TSO. Also, implement other atomicrmw operations.
-
-  // setInsertFencesForAtomic(true);
-
-  // setOperationAction(ISD::ATOMIC_SWAP, MVT::i32, Expand);
-  // setOperationAction(ISD::ATOMIC_CMP_SWAP, MVT::i32, Expand);
-  // setOperationAction(ISD::ATOMIC_FENCE, MVT::Other, Legal);
-
-  // // Custom Lower Atomic LOAD/STORE
-  // setOperationAction(ISD::ATOMIC_LOAD, MVT::i32, Custom);
-  // setOperationAction(ISD::ATOMIC_STORE, MVT::i32, Custom);
-
-  // if (Subtarget->is64Bit()) {
-  //   setOperationAction(ISD::ATOMIC_CMP_SWAP, MVT::i64, Legal);
-  //   setOperationAction(ISD::ATOMIC_SWAP, MVT::i64, Legal);
-  //   setOperationAction(ISD::ATOMIC_LOAD, MVT::i64, Custom);
-  //   setOperationAction(ISD::ATOMIC_STORE, MVT::i64, Custom);
-  // }
-
-  // if (!Subtarget->isV9()) {
-  //   // C65V8 does not have FNEGD and FABSD.
-  //   setOperationAction(ISD::FNEG, MVT::f64, Custom);
-  //   setOperationAction(ISD::FABS, MVT::f64, Custom);
-  // }
-
-  // setOperationAction(ISD::FSIN , MVT::f128, Expand);
-  // setOperationAction(ISD::FCOS , MVT::f128, Expand);
-  // setOperationAction(ISD::FSINCOS, MVT::f128, Expand);
-  // setOperationAction(ISD::FREM , MVT::f128, Expand);
-  // setOperationAction(ISD::FMA  , MVT::f128, Expand);
-  // setOperationAction(ISD::FSIN , MVT::f64, Expand);
-  // setOperationAction(ISD::FCOS , MVT::f64, Expand);
-  // setOperationAction(ISD::FSINCOS, MVT::f64, Expand);
-  // setOperationAction(ISD::FREM , MVT::f64, Expand);
-  // setOperationAction(ISD::FMA  , MVT::f64, Expand);
-  // setOperationAction(ISD::FSIN , MVT::f32, Expand);
-  // setOperationAction(ISD::FCOS , MVT::f32, Expand);
-  // setOperationAction(ISD::FSINCOS, MVT::f32, Expand);
-  // setOperationAction(ISD::FREM , MVT::f32, Expand);
-  // setOperationAction(ISD::FMA  , MVT::f32, Expand);
-  // setOperationAction(ISD::CTTZ , MVT::i32, Expand);
-  // setOperationAction(ISD::CTTZ_ZERO_UNDEF, MVT::i32, Expand);
-  // setOperationAction(ISD::CTLZ , MVT::i32, Expand);
-  // setOperationAction(ISD::CTLZ_ZERO_UNDEF, MVT::i32, Expand);
-  // setOperationAction(ISD::ROTL , MVT::i32, Expand);
-  // setOperationAction(ISD::ROTR , MVT::i32, Expand);
-  // setOperationAction(ISD::BSWAP, MVT::i32, Expand);
-  // setOperationAction(ISD::FCOPYSIGN, MVT::f128, Expand);
-  // setOperationAction(ISD::FCOPYSIGN, MVT::f64, Expand);
-  // setOperationAction(ISD::FCOPYSIGN, MVT::f32, Expand);
-  // setOperationAction(ISD::FPOW , MVT::f128, Expand);
-  // setOperationAction(ISD::FPOW , MVT::f64, Expand);
-  // setOperationAction(ISD::FPOW , MVT::f32, Expand);
-
-  //setOperationAction(ISD::SHL_PARTS, MVT::i32, Expand);
-  //setOperationAction(ISD::SRA_PARTS, MVT::i32, Expand);
-  //setOperationAction(ISD::SRL_PARTS, MVT::i32, Expand);
-
-  // VASTART needs to be custom lowered to use the VarArgsFrameIndex.
-  //  setOperationAction(ISD::VASTART           , MVT::Other, Custom);
-  //  // VAARG needs to be lowered to not do unaligned accesses for doubles.
-  //  setOperationAction(ISD::VAARG             , MVT::Other, Custom);
-  //  setOperationAction(ISD::TRAP              , MVT::Other, Legal);
-
-  // Use the default implementation.
-  //  setOperationAction(ISD::VACOPY            , MVT::Other, Expand);
-  //  setOperationAction(ISD::VAEND             , MVT::Other, Expand);
-  //setOperationAction(ISD::STACKSAVE         , MVT::Other, Expand);
-  //setOperationAction(ISD::STACKRESTORE      , MVT::Other, Expand);
-  //  setOperationAction(ISD::DYNAMIC_STACKALLOC, MVT::i32  , Custom);
-
+  // TODO: Remove this for bare-bones?
   setStackPointerRegisterToSaveRestore(C65::SP);
-
-  //  setOperationAction(ISD::CTPOP, MVT::i32,
-  //                     Subtarget->usePopc() ? Legal : Expand);
-
-  // if (Subtarget->isV9() && Subtarget->hasHardQuad()) {
-  //   setOperationAction(ISD::LOAD, MVT::f128, Legal);
-  //   setOperationAction(ISD::STORE, MVT::f128, Legal);
-  // } else {
-  //   setOperationAction(ISD::LOAD, MVT::f128, Custom);
-  //   setOperationAction(ISD::STORE, MVT::f128, Custom);
-  // }
-
-  //setMinFunctionAlignment(1);
 
   computeRegisterProperties();
 }
@@ -234,12 +97,23 @@ const char *C65TargetLowering::getTargetNodeName(unsigned Opcode) const {
   }
 }
 
+// TODO: Remove this for bare-bones?
 EVT C65TargetLowering::getSetCCResultType(LLVMContext &, EVT VT) const {
   if (!VT.isVector())
     return MVT::i8;
   return VT.changeVectorElementTypeToInteger();
 }
 
+// SDValue
+// BlackfinTargetLowering::LowerGlobalAddress(SDValue Op, SelectionDAG  
+// &DAG)
+// {
+//    DebugLoc DL = Op.getDebugLoc();
+//    GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
+
+//    Op = DAG.getTargetGlobalAddress(GV, MVT::i32);
+//    return DAG.getNode(BfinISD::Wrapper, DL, MVT::i32, Op);
+// }
 SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
                                               SelectionDAG &DAG) const {
   SDLoc DL(Node);
@@ -248,7 +122,14 @@ SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
   //  Reloc::Model RM = DAG.getTarget().getRelocationModel();
   //  CodeModel::Model CM = DAG.getTarget().getCodeModel();
 
-  return DAG.getTargetGlobalAddress(GV, DL, getPointerTy(), Offset);
+  DEBUG(errs() << "LowerGlobalAddress offset "
+	<< Offset << '\n');
+  DEBUG(Node->dump());
+  DEBUG(GV->dump());
+
+  SDValue OutNode = DAG.getTargetGlobalAddress(GV, DL, getPointerTy(), Offset);
+  DEBUG(OutNode->dump());
+  return OutNode;
 }
 
 SDValue C65TargetLowering::
@@ -260,10 +141,13 @@ LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::GlobalAddress:
     return LowerGlobalAddress(cast<GlobalAddressSDNode>(Op), DAG);
   case ISD::SHL:
+    // TODO
     return DAG.getNode(C65::ASLa, DL, MVT::i16, Op.getOperand(0));
   case ISD::BR_CC:
+    // TODO
     llvm_unreachable("BR_CC not implemented.");
   case ISD::SELECT_CC:
+    // TODO
     llvm_unreachable("SELECT_CC not implemented.");
   }
 }
@@ -273,12 +157,14 @@ C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                MachineBasicBlock *BB) const {
   switch (MI->getOpcode()) {
   default:
+    // TODO
     llvm_unreachable("Unknown SELECT_CC!");
   }
 }
 
 bool
 C65TargetLowering::isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const {
+  // TODO
   return false;
 }
 
@@ -290,6 +176,7 @@ computeKnownBitsForTargetNode(const SDValue Op,
                               APInt &KnownOne,
                               const SelectionDAG &DAG,
                               unsigned Depth) const {
+  // TODO
   KnownZero = KnownOne = APInt(KnownZero.getBitWidth(), 0);
 }
 
@@ -397,7 +284,8 @@ void C65TargetLowering::ReplaceNodeResults(SDNode *N,
 
   RTLIB::Libcall libCall = RTLIB::UNKNOWN_LIBCALL;
 
-  DEBUG(errs() << "Legalize operation " << getTargetNodeName(N->getOpcode()));
+  DEBUG(errs() << "Legalize operation " << N->getOpcode());
+  N->dump();
 
   switch (N->getOpcode()) {
   default:

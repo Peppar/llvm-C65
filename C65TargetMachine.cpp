@@ -25,7 +25,7 @@ C65TargetMachine::C65TargetMachine(const Target &T, StringRef TT,
                                    Reloc::Model RM, CodeModel::Model CM,
                                    CodeGenOpt::Level OL)
   : LLVMTargetMachine(T, TT, CPU, FS, Options, RM, CM, OL),
-    Subtarget(TT, CPU, FS), DL("e-n16-S8"), InstrInfo(Subtarget),
+    Subtarget(TT, CPU, FS), DL("e-p:16:16-n16-S8"), InstrInfo(Subtarget),
     TLInfo(*this), TSInfo(DL), FrameLowering(*this, Subtarget) {
   initAsmInfo();
 }

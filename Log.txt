@@ -36,3 +36,12 @@ AsmParsers.def
 Disassemblers.def
 Targets.def
 
+Added -p:16:16- to data layout, default is 64-bits, and this generated
+i64 = GlobalAddress i16, which didn't really work!
+
+
+http://lists.cs.uiuc.edu/pipermail/llvmdev/2009-April/021831.html
+
+Pat<A,B> simply means "replace A by B" in the DAG. It is useful if you
+have more than one pattern for a single instruction, or if you want to
+use multiple instructions in a pattern replacement.
