@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef C65MCTARGETDESC_H
-#define C65MCTARGETDESC_H
+#ifndef LLVM_TARGET_C65MCTARGETDESC_H
+#define LLVM_TARGET_C65MCTARGETDESC_H
 
 #include "llvm/Support/DataTypes.h"
 

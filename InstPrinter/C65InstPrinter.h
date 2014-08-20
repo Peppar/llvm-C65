@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef C65INSTPRINTER_H
-#define C65INSTPRINTER_H
+#ifndef LLVM_TARGET_C65INSTPRINTER_H
+#define LLVM_TARGET_C65INSTPRINTER_H
 
 #include "llvm/MC/MCInstPrinter.h"
 #include "llvm/MC/MCSubtargetInfo.h"

@@ -45,3 +45,19 @@ http://lists.cs.uiuc.edu/pipermail/llvmdev/2009-April/021831.html
 Pat<A,B> simply means "replace A by B" in the DAG. It is useful if you
 have more than one pattern for a single instruction, or if you want to
 use multiple instructions in a pattern replacement.
+
+C65TargetLowering was changed to use TargetLoweringObjectFileELF()
+purely, and not through its own class that didn't implement any
+new functionality anyway...
+
+TODO: Add DEBUG_TYPE to all files
+TODO: Make consistent "header comments"
+TODO: Make consistent all other comments...
+TODO: Define what "bare-bones" means...
+* No jumps, no parameters, no return values
+* no stack frame
+* global variables
+* no X, no Y
+* only boolean functions ORA, EOR, AND...
+* no push, pull
+* no awareness of stack pointer, PC

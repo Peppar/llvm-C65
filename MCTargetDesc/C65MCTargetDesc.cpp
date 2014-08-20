@@ -11,15 +11,14 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "C65MCAsmInfo.h"
 #include "C65MCTargetDesc.h"
 #include "InstPrinter/C65InstPrinter.h"
-#include "llvm/MC/MCELFStreamer.h"
-#include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCAsmInfoELF.h"
 #include "llvm/MC/MCCodeGenInfo.h"
+#include "llvm/MC/MCELFStreamer.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
+#include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -35,14 +34,37 @@ using namespace llvm;
 #define GET_REGINFO_MC_DESC
 #include "C65GenRegisterInfo.inc"
 
+namespace llvm {
+  class C65MCAsmInfo : public MCAsmInfo {
+  public:
+    explicit C65MCAsmInfo(StringRef TT) {
+      // TODO: Make use of TT (triple string)
+      PointerSize = 2;
+      CalleeSaveStackSlotSize = 1;
+      IsLittleEndian = false;
+
+      Data8bitsDirective = "\t.db\t";
+      Data16bitsDirective = "\t.dw\t";
+      Data32bitsDirective = nullptr;
+      Data64bitsDirective = nullptr;
+
+      AsciiDirective = "\t.db\t";
+      AscizDirective = nullptr;
+      ZeroDirective = nullptr;
+      CommentString = ";";
+
+      InlineAsmStart = ";APP\n";
+      InlineAsmEnd = ";NO_APP\n";
+
+      HasSetDirective = false;
+    }
+  };
+}
+
 static MCAsmInfo *createC65MCAsmInfo(const MCRegisterInfo &MRI,
                                      StringRef TT) {
-  // TODO: Do this properly with own class
-  MCAsmInfo *MAI = new C65ELFMCAsmInfo(TT);
-  unsigned Reg = MRI.getDwarfRegNum(C65::SP, true);
-  MCCFIInstruction Inst = MCCFIInstruction::createDefCfa(nullptr, Reg, 0);
-  MAI->addInitialFrameState(Inst);
-  return MAI;
+  // TODO: Add initial frame state information
+  return new C65MCAsmInfo(TT);
 }
 
 static MCCodeGenInfo *createC65MCCodeGenInfo(StringRef TT, Reloc::Model RM,
@@ -50,9 +72,7 @@ static MCCodeGenInfo *createC65MCCodeGenInfo(StringRef TT, Reloc::Model RM,
                                              CodeGenOpt::Level OL) {
   MCCodeGenInfo *X = new MCCodeGenInfo();
 
-  // The default 32-bit code model is abs32/pic32 and the default 32-bit
-  // code model for JIT is abs32.
-  // TODO: Understand the codemodel
+  // TODO: Understand how the code model system works
   switch (CM) {
   default: break;
   case CodeModel::Default:
@@ -81,38 +101,6 @@ static MCSubtargetInfo *createC65MCSubtargetInfo(StringRef TT, StringRef CPU,
   return X;
 }
 
-// createC65MCCodeEmitter
-// createC65MCAsmBackend
-// static MCAsmBackend *createC65AsmBackend(const Target &T,
-//                                          const MCRegisterInfo &MRI,
-//                                          StringRef TT,
-//                                          StringRef CPU) {
-//   return new ELFSparcAsmBackend(T, Triple(TT).getOS());
-// }
-
-static MCStreamer *createC65MCStreamer(const Target &T, StringRef TT,
-                                       MCContext &Context, MCAsmBackend &MAB,
-                                       raw_ostream &OS, MCCodeEmitter *Emitter,
-                                       const MCSubtargetInfo &STI, bool RelaxAll,
-                                       bool NoExecStack) {
-  MCStreamer *S =
-      createELFStreamer(Context, MAB, OS, Emitter, RelaxAll, NoExecStack);
-  //new MCTargetStreamer(*S);
-  return S;
-}
-
-static MCStreamer *
-createC65MCAsmStreamer(MCContext &Ctx, formatted_raw_ostream &OS,
-                       bool isVerboseAsm, bool useDwarfDirectory,
-                       MCInstPrinter *InstPrint, MCCodeEmitter *CE,
-                       MCAsmBackend *TAB, bool ShowInst) {
-
-  MCStreamer *S = llvm::createAsmStreamer(
-      Ctx, OS, isVerboseAsm, useDwarfDirectory, InstPrint, CE, TAB, ShowInst);
-  //new MCTargetStreamer(*S, OS);
-  return S;
-}
-
 static MCInstPrinter *createC65MCInstPrinter(const Target &T,
                                              unsigned SyntaxVariant,
                                              const MCAsmInfo &MAI,
@@ -134,18 +122,6 @@ extern "C" void LLVMInitializeC65TargetMC() {
 
   TargetRegistry::RegisterMCSubtargetInfo(The65C816Target,
                                           createC65MCSubtargetInfo);
-
-  //  TargetRegistry::RegisterMCCodeEmitter(The65C816Target,
-  //                                        createC65MCCodeEmitter);
-
-  //  TargetRegistry::RegisterMCAsmBackend(The65C816Target,
-  //                                       createC65AsmBackend);
-
-  TargetRegistry::RegisterMCObjectStreamer(The65C816Target,
-                                           createC65MCStreamer);
-
-  TargetRegistry::RegisterAsmStreamer(The65C816Target,
-                                      createC65MCAsmStreamer);
 
   TargetRegistry::RegisterMCInstPrinter(The65C816Target,
                                         createC65MCInstPrinter);

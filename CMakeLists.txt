@@ -16,7 +16,6 @@ add_llvm_target(C65CodeGen
   C65RegisterInfo.cpp
   C65Subtarget.cpp
   C65TargetMachine.cpp
-  C65TargetObjectFile.cpp
   )
 
 add_subdirectory(InstPrinter)

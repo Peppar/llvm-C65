@@ -13,11 +13,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "C65ISelLowering.h"
-//#include "MCTargetDesc/C65MCExpr.h"
-//#include "C65MachineFunctionInfo.h"
 #include "C65RegisterInfo.h"
 #include "C65TargetMachine.h"
-#include "C65TargetObjectFile.h"
 #include "llvm/CodeGen/CallingConvLower.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -28,8 +25,8 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "llvm/IR/Function.h"
 #include "llvm/IR/Module.h"
-#include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/ErrorHandling.h"
 
 using namespace llvm;
 
@@ -40,7 +37,7 @@ using namespace llvm;
 //===----------------------------------------------------------------------===//
 
 C65TargetLowering::C65TargetLowering(TargetMachine &TM)
-    : TargetLowering(TM, new C65ELFTargetObjectFile()) {
+    : TargetLowering(TM, new TargetLoweringObjectFileELF()) {
   Subtarget = &TM.getSubtarget<C65Subtarget>();
 
   // Set up the register classes.
@@ -195,6 +192,8 @@ C65TargetLowering::LowerReturn(SDValue Chain,
                                const SmallVectorImpl<ISD::OutputArg> &Outs,
                                const SmallVectorImpl<SDValue> &OutVals,
                                SDLoc DL, SelectionDAG &DAG) const {
+
+  // TODO: Clean this up or remove for bare-bones functionality
   SmallVector<CCValAssign, 16> RVLocs;
   SmallVector<SDValue, 4> RetOps(1, Chain);
   SDValue Glue;
@@ -234,6 +233,8 @@ LowerFormalArguments(SDValue Chain,
                      SelectionDAG &DAG,
                      SmallVectorImpl<SDValue> &InVals) const {
 
+  // TODO: Clean this up!
+  // OR remove it for bare-bones functionality
   MachineFunction &MF = DAG.getMachineFunction();
   MachineRegisterInfo &RegInfo = MF.getRegInfo();
   SmallVector<CCValAssign, 16> ArgLocs;
@@ -283,15 +284,16 @@ void C65TargetLowering::ReplaceNodeResults(SDNode *N,
                                            SmallVectorImpl<SDValue>& Results,
                                            SelectionDAG &DAG) const {
 
-  SDLoc DL(N);
+  llvm_unreachable("Do not know how to custom type legalize this operation!");
 
-  RTLIB::Libcall libCall = RTLIB::UNKNOWN_LIBCALL;
+  // SDLoc DL(N);
 
-  DEBUG(errs() << "Legalize operation " << N->getOpcode());
-  N->dump();
+  // RTLIB::Libcall libCall = RTLIB::UNKNOWN_LIBCALL;
 
-  switch (N->getOpcode()) {
-  default:
-    llvm_unreachable("Do not know how to custom type legalize this operation!");
-  }
+  // DEBUG(errs() << "Legalize operation " << N->getOpcode());
+  // N->dump();
+
+  // switch (N->getOpcode()) {
+  // default:
+  // }
 }

@@ -32,8 +32,9 @@ void C65InstPrinter::printRegName(raw_ostream &OS, unsigned RegNo) const {
 
 void C65InstPrinter::printInst(const MCInst *MI, raw_ostream &O,
                                StringRef Annot) {
-  if (!printAliasInstr(MI, O))
+  if (!printAliasInstr(MI, O)) {
     printInstruction(MI, O);
+  }
   printAnnotation(O, Annot);
 }
 
