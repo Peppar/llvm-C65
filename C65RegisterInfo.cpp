@@ -30,15 +30,18 @@ using namespace llvm;
 #include "C65GenRegisterInfo.inc"
 
 C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
-  : C65GenRegisterInfo(C65::A), Subtarget(ST) {}
+  : C65GenRegisterInfo(C65::PC), Subtarget(ST) {}
 
 const MCPhysReg*
 C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+  // TODO: Add registers that are to be saved by the callee
   static const MCPhysReg CSR_SaveList[] = { 0 };
   return CSR_SaveList;
 }
 
 BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
+  // TODO: Mark which registers are reserved and cannot be used
+  // by the LLVM register allocation algorithms
   BitVector Reserved(getNumRegs());
   return Reserved;
 }
@@ -46,7 +49,7 @@ BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
 const TargetRegisterClass*
 C65RegisterInfo::getPointerRegClass(const MachineFunction &MF,
                                     unsigned Kind) const {
-  // FIXME: Not true, but we haven't defined any pointer register class!
+  // TODO: Add the remaining pointer classes
   return &C65::IX16RegClass;
 }
 
@@ -54,10 +57,11 @@ void
 C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                      int SPAdj, unsigned FIOperandNum,
                                      RegScavenger *RS) const {
+  // TODO: Add frame index support
   assert(SPAdj == 0 && "Unexpected");
 }
 
 unsigned C65RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
-  // FIXME: Not true, but we haven't defined any pointer registers!
+  // TODO: Add full frame register support
   return C65::X;
 }

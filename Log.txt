@@ -61,3 +61,6 @@ TODO: Define what "bare-bones" means...
 * only boolean functions ORA, EOR, AND...
 * no push, pull
 * no awareness of stack pointer, PC
+
+TODO: Check if the i8, i16 GlobalAddress stuff is necessary now that
+  I found out that MEMi was actually i8imm!

@@ -91,8 +91,8 @@ static MCOperand LowerSymbolOperand(const MachineInstr *MI,
     break;
   }
 
-  const MCSymbolRefExpr *MCSym = MCSymbolRefExpr::Create(Symbol,
-                                                         AP.OutContext);
+  const MCSymbolRefExpr *MCSym =
+    MCSymbolRefExpr::Create(Symbol, AP.OutContext);
   return MCOperand::CreateExpr(MCSym);
 }
 
@@ -100,7 +100,7 @@ static MCOperand LowerOperand(const MachineInstr *MI,
                               const MachineOperand &MO,
                               AsmPrinter &AP) {
   switch(MO.getType()) {
-  default: llvm_unreachable("unknown operand type"); break;
+  default: llvm_unreachable("Unknown operand type in LowerOperand");
   case MachineOperand::MO_Register:
     if (MO.isImplicit())
       break;
@@ -116,8 +116,7 @@ static MCOperand LowerOperand(const MachineInstr *MI,
   case MachineOperand::MO_ConstantPoolIndex:
     return LowerSymbolOperand(MI, MO, AP);
 
-  case MachineOperand::MO_RegisterMask:   break;
-
+  case MachineOperand::MO_RegisterMask: break;
   }
   return MCOperand();
 }
@@ -132,14 +131,15 @@ static void LowerC65MachineInstrToMCInst(const MachineInstr *MI,
     const MachineOperand &MO = MI->getOperand(i);
     MCOperand MCOp = LowerOperand(MI, MO, AP);
 
-    if (MCOp.isValid())
+    if (MCOp.isValid()) {
       OutMI.addOperand(MCOp);
+    }
   }
 }
 
 void C65AsmPrinter::EmitInstruction(const MachineInstr *MI) {
   if (MI->getOpcode() == TargetOpcode::DBG_VALUE) {
-    // FIXME: Debug Value.
+    // TODO: Debug value support
     return;
   } else {
     MCInst TmpInst;
@@ -154,6 +154,7 @@ void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
   const MachineOperand &MO = MI->getOperand(opNum);
 
   switch (MO.getType()) {
+  default: llvm_unreachable("Unknown operand type in printOperand");
   case MachineOperand::MO_Register:
     O << StringRef(getRegisterName(MO.getReg()));
     break;
@@ -176,8 +177,6 @@ void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
     O << DL->getPrivateGlobalPrefix() << "CPI" << getFunctionNumber() << "_"
       << MO.getIndex();
     break;
-  default:
-    llvm_unreachable("<unknown operand type>");
   }
 }
 
@@ -187,7 +186,7 @@ bool C65AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                                     raw_ostream &O) {
   if (ExtraCode && ExtraCode[0]) {
     if (ExtraCode[1] != 0) {
-      // Unknown modifier.
+      // Unknown modifier
       return true;
     } else {
       return AsmPrinter::PrintAsmOperand(MI, OpNo, AsmVariant, ExtraCode, O);

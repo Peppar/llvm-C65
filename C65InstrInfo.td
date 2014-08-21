@@ -49,10 +49,10 @@ def callseq_end   : SDNode<"ISD::CALLSEQ_END",   SDT_C65CallSeqEnd,
 // C65 operand class definitions
 //===----------------------------------------------------------------------===//
 
-// 8-bit address operand class
+// 8-bit memory operand class
 def MEMi : Operand<iPTR> {
   let PrintMethod = "printMemOperand";
-  let MIOperandInfo = (ops i8imm);
+  let MIOperandInfo = (ops i16imm);
 }
 
 //===----------------------------------------------------------------------===//

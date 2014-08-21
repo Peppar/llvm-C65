@@ -30,7 +30,7 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "isel-lowering"
+#define DEBUG_TYPE "c65-isel-lowering"
 
 //===----------------------------------------------------------------------===//
 // TargetLowering implementation
@@ -40,36 +40,32 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
     : TargetLowering(TM, new TargetLoweringObjectFileELF()) {
   Subtarget = &TM.getSubtarget<C65Subtarget>();
 
-  // Set up the accumulator register class
+  // Set up the register classes
   addRegisterClass(MVT::i8, &C65::ACC8RegClass);
   addRegisterClass(MVT::i16, &C65::IX16RegClass);
 
+  // Custom lowering of 8 and 16-bit global addresses
   setOperationAction(ISD::GlobalAddress, MVT::i8, Custom);
-  //  setOperationAction(ISD::GlobalAddress, MVT::i16, Custom);
+  setOperationAction(ISD::GlobalAddress, MVT::i16, Custom);
 
-  //TODO:REMOve this
-  //  setStackPointerRegisterToSaveRestore(C65::SP);
-  // TODO: Remove this..?
   computeRegisterProperties();
 }
 
 const char *C65TargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
-  default:
-    return TargetLowering::getTargetNodeName(Opcode);
+  default: return nullptr;
   case C65ISD::RET: return "C65ISD::RET";
   }
 }
 
 SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
                                               SelectionDAG &DAG) const {
-  SDLoc DL(Node);
-  return DAG.getTargetGlobalAddress(Node->getGlobal(), DL, getPointerTy());
+  return DAG.getTargetGlobalAddress(Node->getGlobal(), SDLoc(Node),
+                                    getPointerTy());
 }
 
 SDValue C65TargetLowering::
 LowerOperation(SDValue Op, SelectionDAG &DAG) const {
-  SDLoc DL(Op);
   switch(Op.getOpcode()) {
   default:
     llvm_unreachable("Unexpected node to lower");
@@ -89,7 +85,6 @@ computeKnownBitsForTargetNode(const SDValue Op,
                               APInt &KnownOne,
                               const SelectionDAG &DAG,
                               unsigned Depth) const {
-  // TODO
   KnownZero = KnownOne = APInt(KnownZero.getBitWidth(), 0);
 }
 
@@ -134,6 +129,5 @@ void C65TargetLowering::ReplaceNodeResults(SDNode *N,
                                            SmallVectorImpl<SDValue>& Results,
                                            SelectionDAG &DAG) const {
 
-  N->dump();
   llvm_unreachable("Do not know how to custom type legalize this operation!");
 }

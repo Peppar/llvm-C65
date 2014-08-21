@@ -54,7 +54,7 @@ storeRegToStackSlot(MachineBasicBlock &MBB,
                     unsigned SrcReg, bool isKill, int FI,
                     const TargetRegisterClass *RC,
                     const TargetRegisterInfo *TRI) const {
-  llvm_unreachable("Stack slot stores not supported.");
+  llvm_unreachable("Stack slot stores not supported");
 }
 
 unsigned C65InstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
@@ -68,5 +68,5 @@ loadRegFromStackSlot(MachineBasicBlock &MBB,
                      unsigned DestReg, int FI,
                      const TargetRegisterClass *RC,
                      const TargetRegisterInfo *TRI) const {
-  llvm_unreachable("Stack slot loads not supported.");
+  llvm_unreachable("Stack slot loads not supported");
 }

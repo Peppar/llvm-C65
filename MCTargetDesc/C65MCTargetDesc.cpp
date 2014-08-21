@@ -25,6 +25,8 @@
 
 using namespace llvm;
 
+#define DEBUG_TYPE "c65-mc-target-desc"
+
 #define GET_INSTRINFO_MC_DESC
 #include "C65GenInstrInfo.inc"
 

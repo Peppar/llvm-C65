@@ -18,7 +18,10 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
+
 using namespace llvm;
+
+#define DEBUG_TYPE "c65-isel-dag-to-dag"
 
 //===----------------------------------------------------------------------===//
 // Instruction Selector Implementation
@@ -47,6 +50,7 @@ public:
 
   /// SelectInlineAsmMemoryOperand - Implement addressing mode selection for
   /// inline asm expressions.
+  ///
   bool SelectInlineAsmMemoryOperand(const SDValue &Op,
                                     char ConstraintCode,
                                     std::vector<SDValue> &OutOps) override;
@@ -62,20 +66,17 @@ public:
 
 SDNode *C65DAGToDAGISel::Select(SDNode *N) {
   if (N->isMachineOpcode()) {
+    // Already selected
     N->setNodeId(-1);
-    return nullptr;   // Already selected.
+    return nullptr;
+  } else {
+    return SelectCode(N);
   }
-
-  switch (N->getOpcode()) {
-  default: break;
-  }
-
-  return SelectCode(N);
 }
-
 
 /// SelectInlineAsmMemoryOperand - Implement addressing mode selection for
 /// inline asm expressions.
+///
 bool
 C65DAGToDAGISel::SelectInlineAsmMemoryOperand(const SDValue &Op,
                                               char ConstraintCode,
