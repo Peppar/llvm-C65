@@ -2,7 +2,7 @@
 
 Roadmap:
 
-1. Create a 16-bit only (65C816) bare-bones support just to get
+1. Create a 8-bit only (6502) bare-bones support just to get
    things working.
 
 2. Add support for everything else.

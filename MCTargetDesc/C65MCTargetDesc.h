@@ -29,7 +29,7 @@ class Target;
 class StringRef;
 class raw_ostream;
 
-extern Target The65C816Target;
+extern Target The6502Target;
 
 } // End llvm namespace
 
@@ -43,6 +43,7 @@ extern Target The65C816Target;
 //
 #define GET_INSTRINFO_ENUM
 #include "C65GenInstrInfo.inc"
+
 #define GET_SUBTARGETINFO_ENUM
 #include "C65GenSubtargetInfo.inc"
 

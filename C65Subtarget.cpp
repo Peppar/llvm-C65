@@ -27,7 +27,6 @@ C65Subtarget::C65Subtarget(const std::string &TT,
                            const std::string &CPU,
                            const std::string &FS)
   : C65GenSubtargetInfo(TT, CPU, FS),
-    Has65C02(false), Has65C816(false),
     TargetTriple(TT) {
   std::string CPUName = CPU;
   if (CPUName.empty())

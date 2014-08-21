@@ -26,8 +26,6 @@ class StringRef;
 
 class C65Subtarget : public C65GenSubtargetInfo {
   virtual void anchor();
-  bool Has65C02;
-  bool Has65C816;
 
 private:
   Triple TargetTriple;

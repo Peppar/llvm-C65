@@ -90,7 +90,7 @@ static MCInstrInfo *createC65MCInstrInfo() {
 
 static MCRegisterInfo *createC65MCRegisterInfo(StringRef TT) {
   MCRegisterInfo *X = new MCRegisterInfo();
-  InitC65MCRegisterInfo(X, C65::SP);
+  InitC65MCRegisterInfo(X, C65::A);
   return X;
 }
 
@@ -111,18 +111,18 @@ static MCInstPrinter *createC65MCInstPrinter(const Target &T,
 }
 
 extern "C" void LLVMInitializeC65TargetMC() {
-  RegisterMCAsmInfoFn X(The65C816Target, createC65MCAsmInfo);
+  RegisterMCAsmInfoFn X(The6502Target, createC65MCAsmInfo);
 
-  TargetRegistry::RegisterMCCodeGenInfo(The65C816Target,
+  TargetRegistry::RegisterMCCodeGenInfo(The6502Target,
                                         createC65MCCodeGenInfo);
 
-  TargetRegistry::RegisterMCInstrInfo(The65C816Target, createC65MCInstrInfo);
+  TargetRegistry::RegisterMCInstrInfo(The6502Target, createC65MCInstrInfo);
 
-  TargetRegistry::RegisterMCRegInfo(The65C816Target, createC65MCRegisterInfo);
+  TargetRegistry::RegisterMCRegInfo(The6502Target, createC65MCRegisterInfo);
 
-  TargetRegistry::RegisterMCSubtargetInfo(The65C816Target,
+  TargetRegistry::RegisterMCSubtargetInfo(The6502Target,
                                           createC65MCSubtargetInfo);
 
-  TargetRegistry::RegisterMCInstPrinter(The65C816Target,
+  TargetRegistry::RegisterMCInstPrinter(The6502Target,
                                         createC65MCInstPrinter);
 }

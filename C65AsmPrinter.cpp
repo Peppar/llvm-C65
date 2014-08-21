@@ -14,10 +14,8 @@
 
 #include "C65.h"
 #include "InstPrinter/C65InstPrinter.h"
-//#include "MCTargetDesc/C65MCExpr.h"
 #include "C65InstrInfo.h"
 #include "C65TargetMachine.h"
-//#include "C65TargetStreamer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -34,7 +32,7 @@
 #include "llvm/Support/raw_ostream.h"
 using namespace llvm;
 
-#define DEBUG_TYPE "asm-printer"
+#define DEBUG_TYPE "c65-asm-printer"
 
 namespace {
   class C65AsmPrinter : public AsmPrinter {
@@ -47,8 +45,6 @@ namespace {
     }
 
     void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
-    //void printMemOperand(const MachineInstr *MI, int opNum, raw_ostream &OS,
-    //                     const char *Modifier = nullptr);
 
     static const char *getRegisterName(unsigned RegNo) {
       return C65InstPrinter::getRegisterName(RegNo);
@@ -65,59 +61,6 @@ namespace {
                                raw_ostream &O) override;
   };
 } // end of anonymous namespace
-
-// static void EmitCall(MCStreamer &OutStreamer,
-//                      MCOperand &Callee,
-//                      const MCSubtargetInfo &STI) {
-//   MCInst CallInst;
-//   CallInst.setOpcode(C65::CALL);
-//   CallInst.addOperand(Callee);
-//   OutStreamer.EmitInstruction(CallInst, STI);
-// }
-
-// static void EmitBinary(MCStreamer &OutStreamer, unsigned Opcode,
-//                        MCOperand &RS1, MCOperand &Src2, MCOperand &RD,
-//                        const MCSubtargetInfo &STI)
-// {
-//   MCInst Inst;
-//   Inst.setOpcode(Opcode);
-//   Inst.addOperand(RD);
-//   Inst.addOperand(RS1);
-//   Inst.addOperand(Src2);
-//   OutStreamer.EmitInstruction(Inst, STI);
-// }
-
-// static void EmitOR(MCStreamer &OutStreamer,
-//                    MCOperand &RS1, MCOperand &Imm, MCOperand &RD,
-//                    const MCSubtargetInfo &STI) {
-//   EmitBinary(OutStreamer, SP::ORri, RS1, Imm, RD, STI);
-// }
-
-// static void EmitADD(MCStreamer &OutStreamer,
-//                     MCOperand &RS1, MCOperand &RS2, MCOperand &RD,
-//                     const MCSubtargetInfo &STI) {
-//   EmitBinary(OutStreamer, SP::ADDrr, RS1, RS2, RD, STI);
-// }
-
-// static void EmitSHL(MCStreamer &OutStreamer,
-//                     MCOperand &RS1, MCOperand &Imm, MCOperand &RD,
-//                     const MCSubtargetInfo &STI) {
-//   EmitBinary(OutStreamer, SP::SLLri, RS1, Imm, RD, STI);
-// }
-
-
-// static void EmitHiLo(MCStreamer &OutStreamer,  MCSymbol *GOTSym,
-//                      C65MCExpr::VariantKind HiKind,
-//                      C65MCExpr::VariantKind LoKind,
-//                      MCOperand &RD,
-//                      MCContext &OutContext,
-//                      const MCSubtargetInfo &STI) {
-
-//   MCOperand hi = createC65MCOperand(HiKind, GOTSym, OutContext);
-//   MCOperand lo = createC65MCOperand(LoKind, GOTSym, OutContext);
-//   EmitSETHI(OutStreamer, hi, RD, STI);
-//   EmitOR(OutStreamer, RD, lo, RD, STI);
-// }
 
 static MCOperand LowerSymbolOperand(const MachineInstr *MI,
                                     const MachineOperand &MO,
@@ -270,5 +213,5 @@ bool C65AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
 
 // Force static initialization.
 extern "C" void LLVMInitializeC65AsmPrinter() {
-  RegisterAsmPrinter<C65AsmPrinter> X(The65C816Target);
+  RegisterAsmPrinter<C65AsmPrinter> X(The6502Target);
 }

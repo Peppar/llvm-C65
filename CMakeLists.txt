@@ -1,7 +1,6 @@
 set(LLVM_TARGET_DEFINITIONS C65.td)
 
 tablegen(LLVM C65GenAsmWriter.inc -gen-asm-writer)
-tablegen(LLVM C65GenCallingConv.inc -gen-callingconv)
 tablegen(LLVM C65GenDAGISel.inc -gen-dag-isel)
 tablegen(LLVM C65GenInstrInfo.inc -gen-instr-info)
 tablegen(LLVM C65GenRegisterInfo.inc -gen-register-info)

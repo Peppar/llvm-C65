@@ -39,7 +39,16 @@ namespace llvm {
   public:
     C65TargetLowering(TargetMachine &TM);
 
+    /// LowerOperation - Provide custom lowering hooks for some operations.
+    ///
     SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
+
+    /// ReplaceNodeResults - Replace the results of node with an illegal result
+    /// type with new values built out of custom code.
+    ///
+    void ReplaceNodeResults(SDNode *N,
+                            SmallVectorImpl<SDValue>& Results,
+                            SelectionDAG &DAG) const override;
 
     /// computeKnownBitsForTargetNode - Determine which of the bits specified
     /// in Mask are known to be either zero or one and return them in the
@@ -50,19 +59,11 @@ namespace llvm {
                                        const SelectionDAG &DAG,
                                        unsigned Depth = 0) const override;
 
-    MachineBasicBlock *
-      EmitInstrWithCustomInserter(MachineInstr *MI,
-                                  MachineBasicBlock *MBB) const override;
-
+    /// getTargetNodeName - This method returns the name of a target specific
+    /// DAG node.
     const char *getTargetNodeName(unsigned Opcode) const override;
 
-
     bool isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const override;
-
-    MVT getScalarShiftAmountTy(EVT LHSTy) const override { return MVT::i32; }
-
-    /// getSetCCResultType - Return the ISD::SETCC ValueType
-    EVT getSetCCResultType(LLVMContext &Context, EVT VT) const override;
 
     SDValue
       LowerGlobalAddress(GlobalAddressSDNode *Node, SelectionDAG &DAG) const;
@@ -85,27 +86,6 @@ namespace llvm {
                   const SmallVectorImpl<ISD::OutputArg> &Outs,
                   const SmallVectorImpl<SDValue> &OutVals,
                   SDLoc dl, SelectionDAG &DAG) const override;
-
-    void ReplaceNodeResults(SDNode *N,
-                            SmallVectorImpl<SDValue>& Results,
-                            SelectionDAG &DAG) const override;
-
-    // Inline assembly
-
-    // ConstraintType getConstraintType(const std::string &Constraint) const override;
-
-    // ConstraintWeight
-    // getSingleConstraintMatchWeight(AsmOperandInfo &info,
-    //                                const char *constraint) const override;
-
-    // void LowerAsmOperandForConstraint(SDValue Op,
-    //                                   std::string &Constraint,
-    //                                   std::vector<SDValue> &Ops,
-    //                                   SelectionDAG &DAG) const override;
-
-    // std::pair<unsigned, const TargetRegisterClass*>
-    // getRegForInlineAsmConstraint(const std::string &Constraint,
-    //                              MVT VT) const override;
 
   };
 } // end namespace llvm
