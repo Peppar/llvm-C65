@@ -61,3 +61,7 @@ TODO: Define what "bare-bones" means...
 * only boolean functions ORA, EOR, AND...
 * no push, pull
 * no awareness of stack pointer, PC
+
+IMPORTANT: tried to use timm: class instead of imm: class, and then
+the compiler didn't make use of my immediate instructions anymore..!!
+
