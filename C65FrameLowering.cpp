@@ -12,9 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "C65FrameLowering.h"
-#include "C65RegisterInfo.h"
 #include "C65InstrInfo.h"
-//#include "C65MachineFunctionInfo.h"
+#include "C65RegisterInfo.h"
 #include "C65Subtarget.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -34,77 +33,40 @@ C65FrameLowering::C65FrameLowering(const C65TargetMachine &TM,
     TM(TM), ST(ST) {}
 
 void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
-  //MachineBasicBlock &MBB = MF.front();
-  MachineFrameInfo *MFI = MF.getFrameInfo();
-  uint64_t NumBytes = MFI->getStackSize();
-  assert(NumBytes == 0 && "Non-null stack frame not supported.");
-  // const C65InstrInfo &TII =
-  //   *static_cast<const C65InstrInfo *>(MF.getTarget().getInstrInfo());
-  // MachineBasicBlock::iterator MBBI = MBB.begin();
-  // DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  const TargetInstrInfo &TII = *MF.getTarget().getInstrInfo();
+  MachineBasicBlock &MBB = MF.front();
+  MachineBasicBlock::iterator MBBI = MBB.begin();
+  //  MachineModuleInfo &MMI = MF.getMMI();
+  //  const MCRegisterInfo *MRI = MMI.getContext().getRegisterInfo();
+  //  const std::vector<CalleeSavedInfo> &CSI = MFFrame->getCalleeSavedInfo();
+  //  bool HasFP = hasFP(MF);
+  DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
 
-  // // Get the number of bytes to allocate from the FrameInfo
-  // uint64_t NumBytes = MFI->getStackSize();
+  int NumBytes = (int)MFI->getStackSize();
 
-  // MachineInstr *MI;
-
-  // assert(!hasFP(MF) && "Frame pointer not supported");
-
-  // // Push to the stack to move the stack pointer NumBytes down
-  // while (NumBytes) {
-  //   if (NumBytes == 1) {
-  //     // Set 8-bit accumulator, then push 1 byte,
-  //     // then set 16-bit accumulator. This doesn't modify
-  //     // the accumulator value.
-  //     MI = BuildMI(MBB, MBBI, DL, TII.get(C65::REP))
-  // 	.addImm(0x20);
-  //     MI = BuildMI(MBB, MBBI, DL, TII.get(C65::PHA));
-  //     MI = BuildMI(MBB, MBBI, DL, TII.get(C65::SEP))
-  // 	.addImm(0x20);
-  //     NumBytes -= 1;
-  //   } else {
-  //     // Push 2 bytes
-  //     MI = BuildMI(MBB, MBBI, DL, TII.get(C65::PHA));
-  //     NumBytes -= 2;
-  //   }
-  // }
+  while (NumBytes > 0) {
+    // Push 2 bytes
+    BuildMI(MBB, MBBI, DL, TII.get(C65::PHA));
+    NumBytes -= 2;
+  }
 }
 
 void C65FrameLowering::emitEpilogue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
-  MachineFrameInfo *MFI = MF.getFrameInfo();
-  uint64_t NumBytes = MFI->getStackSize();
-  assert(NumBytes == 0 && "Non-null stack frame not supported.");
-  // MachineFrameInfo *MFI = MF.getFrameInfo();
-  // MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
-  // const C65InstrInfo &TII =
-  //   *static_cast<const C65InstrInfo *>(MF.getTarget().getInstrInfo());
-  // DebugLoc DL = MBBI->getDebugLoc();
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  const TargetInstrInfo &TII = *MF.getTarget().getInstrInfo();
+  MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
+  assert(MBBI != MBB.end() && "Returning block has no instructions");
+  DebugLoc DL = MBBI->getDebugLoc();
 
-  // // Get the number of bytes to allocate from the FrameInfo
-  // uint64_t NumBytes = MFI->getStackSize();
+  int NumBytes = (int)MFI->getStackSize();
 
-  // MachineInstr *MI;
-
-  // assert(!hasFP(MF) && "Frame pointer not supported");
-
-  // // Pull (pop) from the stack to move the stack pointer NumBytes up
-  // while (NumBytes) {
-  //   if (NumBytes == 1) {
-  //     // Set 8-bit accumulator, then pull 1 byte,
-  //     // then set 16-bit accumulator.
-  //     MI = BuildMI(MBB, MBBI, DL, TII.get(C65::REP))
-  // 	.addImm(0x20);
-  //     MI = BuildMI(MBB, MBBI, DL, TII.get(C65::PLA));
-  //     MI = BuildMI(MBB, MBBI, DL, TII.get(C65::SEP))
-  // 	.addImm(0x20);
-  //     NumBytes -= 1;
-  //   } else {
-  //     // Push 2 bytes
-  //     MI = BuildMI(MBB, MBBI, DL, TII.get(C65::PLA));
-  //     NumBytes -= 2;
-  //   }
-  // }
+  while (NumBytes > 0) {
+    // Pull 2 bytes
+    BuildMI(MBB, MBBI, DL, TII.get(C65::PLA));
+    NumBytes -= 2;
+  }
 }
 
 // hasFP - Return true if the specified function should have a dedicated frame

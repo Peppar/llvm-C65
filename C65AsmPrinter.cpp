@@ -14,10 +14,8 @@
 
 #include "C65.h"
 #include "InstPrinter/C65InstPrinter.h"
-//#include "MCTargetDesc/C65MCExpr.h"
 #include "C65InstrInfo.h"
 #include "C65TargetMachine.h"
-//#include "C65TargetStreamer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -47,8 +45,11 @@ namespace {
     }
 
     void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
-    //void printMemOperand(const MachineInstr *MI, int opNum, raw_ostream &OS,
-    //                     const char *Modifier = nullptr);
+
+    void printMemOperandAbs(const MachineInstr *MI, int opNum,
+                            raw_ostream &OS, const char *Modifier = nullptr);
+    void printMemOperandIndex(const MachineInstr *MI, int opNum,
+                              raw_ostream &OS, const char *Modifier = nullptr);
 
     static const char *getRegisterName(unsigned RegNo) {
       return C65InstPrinter::getRegisterName(RegNo);
@@ -237,6 +238,7 @@ void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
     llvm_unreachable("<unknown operand type>");
   }
 }
+
 
 bool C65AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                                     unsigned AsmVariant,

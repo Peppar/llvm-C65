@@ -90,7 +90,7 @@ static MCInstrInfo *createC65MCInstrInfo() {
 
 static MCRegisterInfo *createC65MCRegisterInfo(StringRef TT) {
   MCRegisterInfo *X = new MCRegisterInfo();
-  InitC65MCRegisterInfo(X, C65::SP);
+  InitC65MCRegisterInfo(X, C65::S);
   return X;
 }
 

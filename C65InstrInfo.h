@@ -40,6 +40,10 @@ public:
                                int &FrameIndex) const override;
   unsigned isStoreToStackSlot(const MachineInstr *MI,
                               int &FrameIndex) const override;
+  void buildPushReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
+                    DebugLoc DL, unsigned Reg) const;
+  void buildPullReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
+                    DebugLoc DL, unsigned Reg) const;
   void copyPhysReg(MachineBasicBlock &MBB,
                    MachineBasicBlock::iterator MBBI,
                    DebugLoc DL, unsigned DestReg, unsigned SrcReg,

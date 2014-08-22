@@ -13,7 +13,6 @@
 
 #include "C65.h"
 #include "C65RegisterInfo.h"
-//#include "C65MachineFunctionInfo.h"
 #include "C65Subtarget.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/STLExtras.h"
@@ -23,7 +22,10 @@
 #include "llvm/IR/Type.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/Support/Debug.h"
+#include "llvm/Target/TargetFrameLowering.h"
 #include "llvm/Target/TargetInstrInfo.h"
+#include "llvm/Target/TargetMachine.h"
 
 using namespace llvm;
 
@@ -41,12 +43,14 @@ C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
 
 BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   BitVector Reserved(getNumRegs());
-  Reserved.set(C65::SP);
-  Reserved.set(C65::DP);
+  Reserved.set(C65::X);
+  Reserved.set(C65::Y);
+  Reserved.set(C65::S);
+  Reserved.set(C65::D);
   Reserved.set(C65::PC);
-  Reserved.set(C65::SR);
-  Reserved.set(C65::PB);
-  Reserved.set(C65::DB);
+  Reserved.set(C65::P);
+  Reserved.set(C65::PBR);
+  Reserved.set(C65::DBR);
   return Reserved;
 }
 
@@ -65,24 +69,31 @@ C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                      RegScavenger *RS) const {
   assert(SPAdj == 0 && "Unexpected");
 
-  // // Get the instruction.
-  // MachineInstr &MI = *II;
-  // // Get the instruction's basic block.
-  // MachineBasicBlock &MBB = *MI.getParent();
-  // // Get the basic block's function.
-  // MachineFunction &MF = *MBB.getParent();
-  // // Get the instruction info.
-  // const TargetInstrInfo &TII = *MF.getTarget().getInstrInfo();
-  // // Get the frame info.
-  // MachineFrameInfo *MFI = MF.getFrameInfo();
-  // DebugLoc dl = MI.getDebugLoc();
-  // int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
-  // MachineFunction &MF = *MI.getParent()->getParent();
-  // int64_t Offset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
-  // uint64_t StackSize = MF.getFrameInfo()->getStackSize();
+  MachineInstr &MI = *II;
+  MachineFunction &MF = *MI.getParent()->getParent();
+  const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
+  int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
+  unsigned BasePtr = C65::S;
+
+  unsigned Opc = MI.getOpcode();
+
+  MI.getOperand(FIOperandNum).ChangeToRegister(C65::S, false);
+
+  int FIOffset = TFI->getFrameIndexOffset(MF, FrameIndex);
+
+  if (MI.getOperand(FIOperandNum + 1).isImm()) {
+    // Offset is a 16-bit integer.
+    int Offset = FIOffset +
+      (int)(MI.getOperand(FIOperandNum + 1).getImm());
+    MI.getOperand(FIOperandNum + 1).ChangeToImmediate(Offset);
+  } else {
+    // Offset is symbolic. This is extremely rare.
+    uint64_t Offset = FIOffset +
+      (uint64_t)MI.getOperand(FIOperandNum + 1).getOffset();
+    MI.getOperand(FIOperandNum + 1).setOffset(Offset);
+  }
 }
 
 unsigned C65RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
-  return C65::X;
+  return C65::S;
 }
-
