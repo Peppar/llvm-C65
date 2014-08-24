@@ -30,7 +30,8 @@ namespace llvm {
       RET,
       CMP,
       BR,
-      BRCOND
+      BRCOND,
+      SPILL
     };
   }
 

@@ -34,13 +34,16 @@ class Fcc<bits<3> op, bits<3> addrmode, bits<2> cc,
 // C65-specific node definitions
 //===----------------------------------------------------------------------===//
 
-def SDT_C65cmp : SDTypeProfile<0, 2, [SDTCisInt<0>, SDTCisSameAs<0, 1>]>;
-def SDT_C65ret : SDTypeProfile<0, 0, []>;
+def SDT_C65cmp   : SDTypeProfile<0, 2, [SDTCisInt<0>, SDTCisSameAs<0, 1>]>;
+def SDT_C65spill : SDTypeProfile<0, 1, [SDTCisInt<0>]>;
 
-def C65cmp : SDNode<"C65ISD::CMP", SDT_C65cmp,
-                    [SDNPOutGlue]>;
-def C65ret : SDNode<"C65ISD::RET", SDTNone,
-                    [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
+def C65cmp   : SDNode<"C65ISD::CMP", SDT_C65cmp,
+                      [SDNPOutGlue]>;
+def C65ret   : SDNode<"C65ISD::RET", SDTNone,
+                      [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
+def C65spill : SDNode<"C65ISD::SPILL", SDT_C65spill,
+                      [SDNPHasChain, SDNPMayStore,
+                       SDNPMayLoad, SDNPMemOperand]>;
 
 //  These are target-independent nodes, but have target-specific formats.
 def SDT_C65CallSeqStart : SDCallSeqStart<[SDTCisVT<0, i32>]>;
@@ -60,6 +63,12 @@ def PCRelAsmOperand : AsmOperandClass {
   let Name = "PCRel";
   let RenderMethod = "addImmOperands";
   let ParserMethod = "parsePCRel";
+}
+
+// 16-bit zero page assembler operand
+def MEM16zpAsmOperand : AsmOperandClass {
+  let Name = "MEM16zp";
+  let ParserMethod = "parseMEMOperand";
 }
 
 // 16-bit address assembler operand
@@ -90,6 +99,7 @@ def MEM16is16AsmOperand : AsmOperandClass {
 // C65 complex pattern definitions
 //===----------------------------------------------------------------------===//
 
+def addr_zp : ComplexPattern<iPTR, 1, "SelectAddrZP", [], []>;
 def addr_ix : ComplexPattern<iPTR, 2, "SelectAddrXY", [], []>;
 def addr_iy : ComplexPattern<iPTR, 2, "SelectAddrXY", [], []>;
 def addr_is : ComplexPattern<iPTR, 2, "SelectAddrS", [frameindex], []>;
@@ -114,6 +124,9 @@ def brtarget16 : Operand<OtherVT> {
 
 multiclass C65AddressingMode {
   let PrintMethod = "printMemOperandAbs" in {
+    def _zp : Operand<iPTR> {
+      let MIOperandInfo = (ops i8imm);
+    }
     def _a16 : Operand<iPTR> {
       let MIOperandInfo = (ops i16imm);
     }
@@ -150,6 +163,12 @@ multiclass F01_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
                  [(set ACC16:$dst, (operator ACC16:$src, imm:$imm))]>;
 
   let mayLoad = 1 in {
+    def zp : F01<op, 0b001, (outs ACC16:$dst),
+                 (ins ACC16:$src, i16mem_zp:$addr),
+                 !strconcat(asmstr, " $addr"),
+                 [(set ACC16:$dst,
+                    (operator ACC16:$src, (load addr_zp:$addr)))]>;
+
     def i  : F01<op, 0b011, (outs ACC16:$dst),
                  (ins ACC16:$src, i16mem_a16:$addr),
                  !strconcat(asmstr, " $addr"),
@@ -164,7 +183,7 @@ multiclass F01_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
   }
 }
 
-let Defs = [P], Constraints = "$src = $dst" in {
+let Defs = [P] in {
   defm ORA : F01_binary<0b000, "ORA", or>;
   defm AND : F01_binary<0b001, "AND", and>;
   defm EOR : F01_binary<0b010, "EOR", xor>;
@@ -175,6 +194,10 @@ let Defs = [P], Constraints = "$src = $dst" in {
 }
 
 let mayStore = 1 in {
+  def STAzp  : F01<0b100, 0b001, (outs), (ins ACC16:$src, i16mem_zp:$addr),
+                   "STA $addr",
+                   [(store ACC16:$src, addr_zp:$addr)]>;
+
   def STAi   : F01<0b100, 0b011, (outs), (ins ACC16:$src, i16mem_a16:$addr),
                    "STA $addr",
                    [(store ACC16:$src, tglobaladdr:$addr)]>;
@@ -196,6 +219,10 @@ let Defs = [P] in {
                      [(C65cmp ACC16:$src, imm:$imm)]>;
 
   let mayLoad = 1 in {
+    def LDAzp  : F01<0b101, 0b011, (outs ACC16:$dst), (ins i16mem_zp:$addr),
+                     "LDA $addr",
+                     [(set ACC16:$dst, (load addr_zp:$addr))]>;
+
     def LDAi   : F01<0b101, 0b011, (outs ACC16:$dst), (ins i16mem_a16:$addr),
                      "LDA $addr",
                      [(set ACC16:$dst, (load tglobaladdr:$addr))]>;
@@ -203,6 +230,10 @@ let Defs = [P] in {
     def LDAix  : F01<0b101, 0b110, (outs ACC16:$dst), (ins i16mem_ix16:$addr),
                      "LDA $addr",
                      [(set ACC16:$dst, (load addr_ix:$addr))]>;
+
+    def CMPzp  : F01<0b110, 0b001, (outs), (ins ACC16:$src, i16mem_zp:$addr),
+                     "CMP $addr",
+                     [(C65cmp ACC16:$src, (load addr_zp:$addr))]>;
 
     def CMPi   : F01<0b110, 0b011, (outs), (ins ACC16:$src, i16mem_a16:$addr),
                      "CMP $addr",
@@ -225,6 +256,11 @@ class F10<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 multiclass F10_unary<bits<3> op, string asmstr, SDPatternOperator operator> {
   // Unary operator on 16-bit memory
   let mayLoad = 1, mayStore = 1 in {
+    def zp : F10<op, 0b001, (outs), (ins i16mem_zp:$addr),
+                 !strconcat(asmstr, " $addr"),
+                 [(store (operator (i16 (load addr_zp:$addr)), (i16 1)),
+                     addr_zp:$addr)]>;
+
     def i  : F10<op, 0b011, (outs), (ins i16mem_a16:$addr),
                  !strconcat(asmstr, " $addr"),
                  [(store (operator (i16 (load tglobaladdr:$addr)), (i16 1)),
@@ -247,6 +283,10 @@ let Defs = [P] in {
 }
 
 let mayStore = 1 in {
+  def STXzp  : F01<0b100, 0b001, (outs), (ins IX16:$src, i16mem_zp:$addr),
+                   "STX $addr",
+                   [(store IX16:$src, addr_zp:$addr)]>;
+
   def STXi   : F01<0b100, 0b011, (outs), (ins IX16:$src, i16mem_a16:$addr),
                    "STX $addr",
                    [(store IX16:$src, tglobaladdr:$addr)]>;
@@ -278,6 +318,10 @@ let Defs = [P] in {
   }
 
   let mayLoad = 1 in {
+    def LDXzp : F10<0b101, 0b001, (outs IX16:$dst), (ins i16mem_zp:$addr),
+                    "LDX $addr",
+                    [(set IX16:$dst, (load addr_zp:$addr))]>;
+
     def LDXi  : F10<0b101, 0b011, (outs IX16:$dst), (ins i16mem_a16:$addr),
                     "LDX $addr",
                     [(set IX16:$dst, (load tglobaladdr:$addr))]>;
@@ -311,6 +355,10 @@ let Defs = [P] in {
   }
 
   let mayLoad = 1 in {
+    def LDYzp  : F00<0b101, 0b001, (outs IY16:$dst), (ins i16mem_zp:$addr),
+                     "LDY $addr",
+                     [(set IY16:$dst, (load addr_zp:$addr))]>;
+
     def LDYi   : F00<0b101, 0b011, (outs IY16:$dst), (ins i16mem_a16:$addr),
                      "LDY $addr",
                      [(set IY16:$dst, (load tglobaladdr:$addr))]>;
@@ -331,9 +379,17 @@ let Defs = [P] in {
                    [(C65cmp IX16:$src, imm:$imm)]>;
 
   let mayLoad = 1 in {
+    def CPYzp  : F01<0b110, 0b001, (outs), (ins IY16:$src, i16mem_zp:$addr),
+                     "CPY $addr",
+                     [(C65cmp IY16:$src, (load addr_zp:$addr))]>;
+
     def CPYi   : F01<0b110, 0b011, (outs), (ins IY16:$src, i16mem_a16:$addr),
                      "CPY $addr",
                      [(C65cmp IY16:$src, (load tglobaladdr:$addr))]>;
+
+    def CPXiz  : F01<0b111, 0b001, (outs), (ins IX16:$src, i16mem_zp:$addr),
+                     "CPX $addr",
+                     [(C65cmp IX16:$src, (load addr_zp:$addr))]>;
 
     def CPXi   : F01<0b111, 0b011, (outs), (ins IX16:$src, i16mem_a16:$addr),
                      "CPX $addr",
@@ -451,6 +507,8 @@ let Defs = [P] in {
                   []>;
 }
 
+def STZzp : FF<0x64, (outs), (ins i16mem_zp:$addr), "STZ $addr",
+               [(store (i16 0), addr_zp:$addr)]>;
 def STZi  : FF<0x9c, (outs), (ins i16mem_a16:$addr), "STZ $addr",
                [(store (i16 0), tglobaladdr:$addr)]>;
 def STZix : FF<0x9e, (outs), (ins i16mem_ix16:$addr), "STZ $addr",
@@ -504,30 +562,31 @@ let isReturn = 1, isTerminator = 1, isBarrier = 1,
 }
 
 // Transfer between registers
-let Defs = [P], neverHasSideEffects = 1, isCodeGenOnly = 1 in {
-  def TAX : FF<0xaa, (outs IX16:$dst), (ins ACC16:$src), "TAX",
-               [(set IX16:$dst, ACC16:$src)]>;
+//neverHasSideEffects = 1, Defs = [P],
+let isCodeGenOnly = 1, isPseudo = 1 in {
+  def TAX : FF<0xaa, (outs IX16:$dst), (ins ACC16:$src), "TAX", []>;
+//               [(set IX16:$dst, ACC16:$src)]>;
 
-  def TAY : FF<0xa8, (outs IY16:$dst), (ins ACC16:$src), "TAY",
-               [(set IY16:$dst, ACC16:$src)]>;
+  def TAY : FF<0xa8, (outs IY16:$dst), (ins ACC16:$src), "TAY", []>;
+//               [(set IY16:$dst, ACC16:$src)]>;
 
-  def TXA : FF<0x8a, (outs ACC16:$dst), (ins IX16:$src), "TXA",
-               [(set ACC16:$dst, IX16:$src)]>;
+  def TXA : FF<0x8a, (outs ACC16:$dst), (ins IX16:$src), "TXA", []>;
+//               [(set ACC16:$dst, IX16:$src)]>;
 
-  def TYA : FF<0xa8, (outs ACC16:$dst), (ins IY16:$src), "TYA",
-               [(set ACC16:$dst, IY16:$src)]>;
+  def TYA : FF<0xa8, (outs ACC16:$dst), (ins IY16:$src), "TYA", []>;
+//               [(set ACC16:$dst, IY16:$src)]>;
 
-  def TXY : FF<0x9b, (outs IY16:$dst), (ins IX16:$src), "TXY",
-               [(set IY16:$dst, IX16:$src)]>;
+  def TXY : FF<0x9b, (outs IY16:$dst), (ins IX16:$src), "TXY", []>;
+//               [(set IY16:$dst, IX16:$src)]>;
 
-  def TYX : FF<0xbb, (outs IX16:$dst), (ins IY16:$src), "TYX",
-               [(set IX16:$dst, IY16:$src)]>;
+  def TYX : FF<0xbb, (outs IX16:$dst), (ins IY16:$src), "TYX", []>;
+//               [(set IX16:$dst, IY16:$src)]>;
 
-  def TXS : FF<0x9b, (outs IS16:$dst), (ins IX16:$src), "TXS",
-               [(set IS16:$dst, IX16:$src)]>;
+  def TXS : FF<0x9b, (outs IS16:$dst), (ins IX16:$src), "TXS", []>;
+//               [(set IS16:$dst, IX16:$src)]>;
 
-  def TSX : FF<0xbb, (outs IX16:$dst), (ins IS16:$src), "TSX",
-               [(set IX16:$dst, IS16:$src)]>;
+  def TSX : FF<0xbb, (outs IX16:$dst), (ins IS16:$src), "TSX", []>;
+//               [(set IX16:$dst, IS16:$src)]>;
 }
 
 // Clear and set flag instructions
@@ -594,3 +653,59 @@ let Defs = [S, P], Uses = [S], isCodeGenOnly = 1 in {
 //                        ";!ASHR A, $amt",
 //                        [(set ACC16:$dst, (ashr ACC16:$src, timm:$amt))]>;
 // }
+
+//===----------------------------------------------------------------------===//
+// Register spill patterns
+//===----------------------------------------------------------------------===//
+
+//def : Pat<(and ACC16:$src, ACC16:$dst),
+//          (and ACC16:$src, (C65spill ACC16:$dst))>;
+//def : Pat<(or ACC16:$src, ACC16:$dst),
+//          (or ACC16:$src, (C65spill ACC16:$dst))>;
+
+//===----------------------------------------------------------------------===//
+// Zero-page register operations
+//===----------------------------------------------------------------------===//
+
+class ZPInstr<dag outs, dag ins, string asmstr, list<dag> pattern>
+    : InstC65<outs, ins, asmstr, pattern> {
+  let isPseudo = 1;
+  let isCodeGenOnly = 1;
+}
+
+// let Defs = [A, P], mayLoad = 1 in {
+//   def ZP_LOAD16_a16  : ZPInst<(out), (ins ZP16:$reg, imem16_a16:$mem),
+//                               ";ZPLOAD %reg,$mem",
+//                               [(load ZP16:$reg, (load tglobaladdr:$mem))]>;
+//   def ZP_LOAD16_ix16 : ZPInst<(out), (ins ZP16:$reg, imem16_ix16:$mem),
+//                               ";ZPLOAD %reg,$mem",
+//                               [(load ZP16:$reg, (load addr_ix16:$mem))]>;
+// }
+
+let Defs = [A, P] in {
+  def ZP_ADD16a  : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
+                          ";ZPADD %dst,$src1,$src2",
+                          [(set ZP16:dst, (add ZP16:$src1, ZP16:$src2))]>;
+
+  def ZP_STORE16 : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
+                          ";ZPADD %dst,$src1,$src2",
+                          [(set ZP16:$dst, (add ZP16:$src1, ZP16:$src2))]>;
+  def ZP_ADD16   : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
+                          ";ZPADD %dst,$src1,$src2",
+                          [(set ZP16:dst, (add ZP16:$src1, ZP16:$src2))]>;
+  def ZP_SUB16   : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
+                          ";ZPSUB %dst,$src1,$src2",
+                          [(set ZP16:dst, (sub ZP16:$src1, ZP16:$src2))]>;
+  def ZP_AND16   : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
+                          ";ZPAND %dst,$src1,$src2",
+                          [(set ZP16:dst, (and ZP16:$src1, ZP16:$src2))]>;
+  def ZP_XOR16   : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
+                          ";ZPXOR %dst,$src1,$src2",
+                          [(set ZP16:dst, (xor ZP16:$src1, ZP16:$src2))]>;
+  def ZP_OR16    : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
+                          ";ZPOR %dst,$src1,$src2",
+                          [(set ZP16:dst, (or ZP16:$src1, ZP16:$src2))]>;
+  def ZP_SHL16   : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
+                          ";ZPSHL %dst,$src1,$src2",
+                          [(set ZP16:dst, (or ZP16:$src, ZP16:$amt))]>;
+}

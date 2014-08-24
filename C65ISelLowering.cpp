@@ -128,6 +128,9 @@ LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   switch(Op.getOpcode()) {
   default:
     llvm_unreachable("Unexpected node to lower");
+  case C65ISD::SPILL:
+    Op.dump();
+    llvm_unreachable("Trying to spill!");
   case ISD::GlobalAddress:
     return LowerGlobalAddress(cast<GlobalAddressSDNode>(Op), DAG);
   }

@@ -79,6 +79,10 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator MI, DebugLoc DL,
                                unsigned DestReg, unsigned SrcReg,
                                bool KillSrc) const {
+  DEBUG(dbgs() << "CopyPhysReg from "
+               << RI.getName(DestReg)
+               << " to " << RI.getName(SrcReg) << '\n');
+  MBB.dump();
   if (SrcReg == C65::A && DestReg == C65::X) {
     BuildMI(MBB, MI, DL, get(C65::TAX));
   } else if (SrcReg == C65::A && DestReg == C65::Y) {

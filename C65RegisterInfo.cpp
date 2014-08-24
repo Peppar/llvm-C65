@@ -59,8 +59,12 @@ C65RegisterInfo::getPointerRegClass(const MachineFunction &MF,
                                     unsigned Kind) const {
   if (Kind == 0)
     return &C65::IX16RegClass;
-  else
+  else if (Kind == 1)
     return &C65::IY16RegClass;
+  else if (Kind == 2)
+    return &C65::IS16RegClass;
+  else
+    return &C65::ID16RegClass;
 }
 
 void
