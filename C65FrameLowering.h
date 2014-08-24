@@ -18,20 +18,21 @@
 #include "llvm/Target/TargetFrameLowering.h"
 
 namespace llvm {
+
 class C65Subtarget;
+
 class C65FrameLowering : public TargetFrameLowering {
 protected:
-  const C65TargetMachine &TM;
   const C65Subtarget &ST;
 public:
-  explicit C65FrameLowering(const C65TargetMachine &TM,
-			    const C65Subtarget &ST);
+  explicit C65FrameLowering(const C65Subtarget &ST);
 
   void emitPrologue(MachineFunction &MF) const override;
   void emitEpilogue(MachineFunction &MF, MachineBasicBlock &MBB) const override;
 
   bool hasFP(const MachineFunction &MF) const override;
 };
+
 } // end llvm namespace
 
 #endif

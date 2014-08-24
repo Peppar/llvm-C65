@@ -77,7 +77,7 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   // setOperationAction(ISD::BlockAddress, getPointerTy(), Custom);
 
   // TODO: Remove this for bare-bones?
-  setStackPointerRegisterToSaveRestore(C65::SP);
+  setStackPointerRegisterToSaveRestore(C65::S);
 
   computeRegisterProperties();
 }
@@ -199,7 +199,7 @@ C65TargetLowering::LowerReturn(SDValue Chain,
   SDValue Glue;
 
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
-                 DAG.getTarget(), RVLocs, *DAG.getContext());
+                 RVLocs, *DAG.getContext());
 
   // Analyze return values.
   CCInfo.AnalyzeReturn(Outs, RetCC_65c816);
@@ -239,7 +239,7 @@ LowerFormalArguments(SDValue Chain,
   MachineRegisterInfo &RegInfo = MF.getRegInfo();
   SmallVector<CCValAssign, 16> ArgLocs;
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
-                 getTargetMachine(), ArgLocs, *DAG.getContext());
+                 ArgLocs, *DAG.getContext());
   CCInfo.AnalyzeFormalArguments(Ins, CC_65c816);
   assert(ArgLocs.size() <= 1 && "Max 1 formal argument supported");
 
@@ -268,7 +268,7 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   SmallVector<CCValAssign, 16> ArgLocs;
 
   CCState CCInfo(CLI.CallConv, CLI.IsVarArg, DAG.getMachineFunction(),
-                 DAG.getTarget(), ArgLocs, *DAG.getContext());
+                 ArgLocs, *DAG.getContext());
 
   CCInfo.AnalyzeCallOperands(CLI.Outs, CC_65c816);
 

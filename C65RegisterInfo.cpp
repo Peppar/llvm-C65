@@ -41,12 +41,12 @@ C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
 
 BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   BitVector Reserved(getNumRegs());
-  Reserved.set(C65::SP);
-  Reserved.set(C65::DP);
+  Reserved.set(C65::S);
+  Reserved.set(C65::D);
   Reserved.set(C65::PC);
-  Reserved.set(C65::SR);
-  Reserved.set(C65::PB);
-  Reserved.set(C65::DB);
+  Reserved.set(C65::S);
+  Reserved.set(C65::PBR);
+  Reserved.set(C65::DBR);
   return Reserved;
 }
 

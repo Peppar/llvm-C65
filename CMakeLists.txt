@@ -14,6 +14,7 @@ add_llvm_target(C65CodeGen
   C65InstrInfo.cpp
   C65ISelLowering.cpp
   C65RegisterInfo.cpp
+  C65SelectionDAGInfo.cpp
   C65Subtarget.cpp
   C65TargetMachine.cpp
   )

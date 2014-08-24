@@ -55,11 +55,11 @@ def ADDRiy : ComplexPattern<iPTR, 2, "SelectADDRixy", [frameindex], []>;
 //===----------------------------------------------------------------------===//
 
 def SDT_C65cmp : SDTypeProfile<0, 2, [SDTCisInt<0>, SDTCisSameAs<0, 1>]>;
-//def SDT_C65ret : SDTypeProfile<0, 0, []>;
+def SDT_C65ret : SDTypeProfile<0, 0, []>;
 
 def C65cmp : SDNode<"C65ISD::CMP", SDT_C65cmp,
                     [SDNPOutGlue]>;
-def C65ret : SDNode<"C65ISD::RET", SDTNone, //SDT_C65ret,
+def C65ret : SDNode<"C65ISD::RET", SDTNone,
                     [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 
 //  These are target-independent nodes, but have target-specific formats.
@@ -163,11 +163,11 @@ multiclass F01_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
   }
 }
 
-let Defs = [SR], Constraints = "$src = $dst" in {
+let Defs = [P], Constraints = "$src = $dst" in {
   defm ORA : F01_binary<0b000, "ORA", or>;
   defm AND : F01_binary<0b001, "AND", and>;
   defm EOR : F01_binary<0b010, "EOR", xor>;
-  let Uses = [SR] in {
+  let Uses = [P] in {
     defm ADC : F01_binary<0b011, "ADC", add>; //TODO: Change to adde!
     defm SBC : F01_binary<0b111, "SBC", sub>; // sube
   }
@@ -183,7 +183,7 @@ let mayStore = 1 in {
                    [(store ACC16:$src, ADDRix:$addr)]>;
 }
 
-let Defs = [SR] in {
+let Defs = [P] in {
   let isMoveImm = 1 in {
     def LDAimm : F01<0b101, 0b010, (outs ACC16:$dst), (ins i16imm:$imm),
                      "LDA $imm",
@@ -227,7 +227,7 @@ let mayStore = 1 in {
                    [(store IX16:$src, tglobaladdr:$addr)]>;
 }
 
-let Defs = [SR], Uses = [SR], Constraints = "$src = $dst" in {
+let Defs = [P], Uses = [P], Constraints = "$src = $dst" in {
   def ASLa : F10<0b000, 0b010, (outs ACC16:$dst), (ins ACC16:$src),
                  "ASL A",
                  [(set ACC16:$dst, (shl ACC16:$src, (i8 1)))]>;
@@ -245,7 +245,7 @@ let Defs = [SR], Uses = [SR], Constraints = "$src = $dst" in {
                  [(set ACC16:$dst, (rotl ACC16:$src, (i8 1)))]>;
 }
 
-let Defs = [SR] in {
+let Defs = [P] in {
   let isMoveImm = 1 in {
     def LDXimm : F10<0b101, 0b000, (outs IX16:$dst), (ins i16imm:$imm),
                      "LDX $imm",
@@ -278,7 +278,7 @@ let mayStore = 1 in {
                  [(store IY16:$src, tglobaladdr:$addr)]>;
 }
 
-let Defs = [SR] in {
+let Defs = [P] in {
   let isMoveImm = 1 in {
     def LDYimm : F00<0b101, 0b000, (outs IY16:$dst), (ins i16imm:$imm),
                      "LDY $imm",
@@ -296,7 +296,7 @@ let Defs = [SR] in {
   }
 }
 
-let Defs = [SR] in {
+let Defs = [P] in {
   def CPYimm : F01<0b110, 0b000, (outs), (ins IY16:$src, i16imm:$imm),
                    "CPY $imm",
                    [(C65cmp IY16:$src, imm:$imm)]>;
@@ -342,7 +342,7 @@ class FC<CondFlag cf, bit value, string asmstr>
   let Inst{4-0} = 0b10000;
 }
 
-let Uses = [SR], isBranch = 1, isTerminator = 1 in {
+let Uses = [P], isBranch = 1, isTerminator = 1 in {
   def BPL : FC<CondNegative, 0, "BPL">;
   def BMI : FC<CondNegative, 1, "BMI">;
   def BVC : FC<CondOverflow, 0, "BVC">;
@@ -371,7 +371,7 @@ let neverHasSideEffects = 1 in {
 
 // Push and pull stack operations
 let neverHasSideEffects = 1 in {
-  let Defs = [SR], mayLoad = 1 in {
+  let Defs = [P], mayLoad = 1 in {
     def PLA : FF<0x68, (outs ACC16:$dst), (ins), "PLA", []>;
     def PLX : FF<0xfa, (outs IX16:$dst), (ins), "PLX", []>;
     def PLY : FF<0x7a, (outs IY16:$dst), (ins), "PLY", []>;
@@ -400,7 +400,7 @@ let isBranch = 1, isTerminator = 1, isBarrier = 1 in {
 }
 
 // Jump subroutine (call)
-let Defs = [A, X, Y, SR], isCall = 1 in {
+let Defs = [A, X, Y, P], isCall = 1 in {
   def JSR : FF<0x20, (outs), (ins MEMi:$addr),
                "JSR $addr",
                []>;
@@ -413,7 +413,7 @@ let isReturn = 1, isTerminator = 1, isBarrier = 1,
 }
 
 // Transfer between registers
-let Defs = [SR], neverHasSideEffects = 1 in {
+let Defs = [P], neverHasSideEffects = 1 in {
   def TAX : FF<0xaa, (outs IX16:$dst), (ins ACC16:$src), "TAX",
                [(set IX16:$dst, ACC16:$src)]>;
 
@@ -434,7 +434,7 @@ let Defs = [SR], neverHasSideEffects = 1 in {
 }
 
 // Clear and set flag instructions
-let Defs = [SR], Uses = [SR] in {
+let Defs = [P], Uses = [P] in {
   def CLC : FF<0x18, (outs), (ins), "CLC", []>;
   def SEC : FF<0x38, (outs), (ins), "STC", []>;
   def CLD : FF<0xd8, (outs), (ins), "CLD", []>;
@@ -447,7 +447,7 @@ let Defs = [SR], Uses = [SR] in {
 }
 
 // Increment and decrement instructions
-let Defs = [SR], Constraints = "$src = $dst" in {
+let Defs = [P], Constraints = "$src = $dst" in {
   def INCa : FF<0x1a, (outs ACC16:$dst), (ins ACC16:$src), "INC A",
                 [(set ACC16:$dst, (add ACC16:$src, 1))]>;
 
@@ -477,7 +477,7 @@ class Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
 }
 
 // ADJCALLSTACKDOWN, ADJCALLSTACKUP are mandatory pseudo-instructions
-let Defs = [SP, SR], Uses = [SP], isCodeGenOnly = 1 in {
+let Defs = [S, P], Uses = [S], isCodeGenOnly = 1 in {
   def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt),
                                  ";!ADJCALLSTACKDOWN $amt",
                                  [(callseq_start timm:$amt)]>;
@@ -486,7 +486,7 @@ let Defs = [SP, SR], Uses = [SP], isCodeGenOnly = 1 in {
                               [(callseq_end timm:$amt1, timm:$amt2)]>;
 }
 
-// let Defs = [SR], Constraints = "$src = $dst" in {
+// let Defs = [P], Constraints = "$src = $dst" in {
 //   def SHLimm  : Pseudo<(outs ACC16:$dst), (ins ACC16:$src, i16imm:$amt),
 //                        ";!SHL A, $amt",
 //                        [(set ACC16:$dst, (shl ACC16:$src, imm:$amt))]>;

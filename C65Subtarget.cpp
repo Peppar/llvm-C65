@@ -23,16 +23,32 @@ using namespace llvm;
 // Pin the vtable to this file.
 void C65Subtarget::anchor() {}
 
-C65Subtarget::C65Subtarget(const std::string &TT,
-                           const std::string &CPU,
-                           const std::string &FS)
-  : C65GenSubtargetInfo(TT, CPU, FS),
-    Has65C02(false), Has65C816(false),
-    TargetTriple(TT) {
-  std::string CPUName = CPU;
-  if (CPUName.empty())
-    CPUName = "generic";
+static std::string computeDataLayout(const C65Subtarget &ST) {
+  if (ST.has65C816()) {
+    // 65C816 has native 16-bit capabilities
+    return "e-p:16:8-n16-S8";
+  } else {
+    // 6502 and 65C02 have only native 8-bit capabilities, but still a
+    // 16-bit address space
+    return "e-p:16:8-n8-S8";
+  }
+}
 
+C65Subtarget &
+C65Subtarget::initializeSubtargetDependencies(StringRef CPU, StringRef FS) {
+  std::string CPUName = CPU;
+  if (CPUName.empty()) {
+    CPUName = "generic";
+  }
   // Parse features string.
   ParseSubtargetFeatures(CPUName, FS);
+  return *this;
 }
+
+C65Subtarget::C65Subtarget(const std::string &TT,
+                           const std::string &CPU,
+                           const std::string &FS,
+                           TargetMachine &TM)
+  : C65GenSubtargetInfo(TT, CPU, FS),
+    DL(computeDataLayout(initializeSubtargetDependencies(CPU, FS))),
+    InstrInfo(*this), TLInfo(TM), TSInfo(DL), FrameLowering(*this) {}

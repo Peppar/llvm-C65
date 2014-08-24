@@ -14,10 +14,8 @@
 
 #include "C65.h"
 #include "InstPrinter/C65InstPrinter.h"
-//#include "MCTargetDesc/C65MCExpr.h"
 #include "C65InstrInfo.h"
 #include "C65TargetMachine.h"
-//#include "C65TargetStreamer.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -207,7 +205,7 @@ void C65AsmPrinter::EmitInstruction(const MachineInstr *MI) {
 
 void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
                                  raw_ostream &O) {
-  const DataLayout *DL = TM.getDataLayout();
+  const DataLayout *DL = TM.getSubtargetImpl()->getDataLayout();
   const MachineOperand &MO = MI->getOperand(opNum);
 
   switch (MO.getType()) {

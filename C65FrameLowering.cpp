@@ -12,9 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "C65FrameLowering.h"
-#include "C65RegisterInfo.h"
 #include "C65InstrInfo.h"
-//#include "C65MachineFunctionInfo.h"
+#include "C65RegisterInfo.h"
 #include "C65Subtarget.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -28,10 +27,9 @@
 
 using namespace llvm;
 
-C65FrameLowering::C65FrameLowering(const C65TargetMachine &TM,
-				   const C65Subtarget &ST)
+C65FrameLowering::C65FrameLowering(const C65Subtarget &ST)
   : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 1, 0),
-    TM(TM), ST(ST) {}
+    ST(ST) {}
 
 void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
   //MachineBasicBlock &MBB = MF.front();
