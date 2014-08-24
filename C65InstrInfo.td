@@ -99,10 +99,11 @@ def MEM16is16AsmOperand : AsmOperandClass {
 // C65 complex pattern definitions
 //===----------------------------------------------------------------------===//
 
-def addr_zp : ComplexPattern<iPTR, 1, "SelectAddrZP", [], []>;
-def addr_ix : ComplexPattern<iPTR, 2, "SelectAddrXY", [], []>;
-def addr_iy : ComplexPattern<iPTR, 2, "SelectAddrXY", [], []>;
-def addr_is : ComplexPattern<iPTR, 2, "SelectAddrS", [frameindex], []>;
+def addr_zp  : ComplexPattern<iPTR, 1, "SelectAddrZP", [], []>;
+def addr_izy : ComplexPattern<iPTR, 2, "SelectAddrZY", [], []>;
+def addr_ix  : ComplexPattern<iPTR, 2, "SelectAddrXY", [], []>;
+def addr_iy  : ComplexPattern<iPTR, 2, "SelectAddrXY", [], []>;
+def addr_is  : ComplexPattern<iPTR, 2, "SelectAddrS", [frameindex], []>;
 
 //===----------------------------------------------------------------------===//
 // C65 operand class definitions
@@ -132,6 +133,9 @@ multiclass C65AddressingMode {
     }
   }
   let PrintMethod = "printMemOperandIndex" in {
+    def _izy16 : Operand<iPTR> {
+      let MIOperandInfo = (ops ZR16, IY16);
+    }
     def _ix16 : Operand<iPTR> {
       let MIOperandInfo = (ops IX16, i16imm);
     }
@@ -146,6 +150,8 @@ multiclass C65AddressingMode {
 
 defm i8mem : C65AddressingMode;
 defm i16mem : C65AddressingMode;
+defm i32mem : C65AddressingMode;
+defm i64mem : C65AddressingMode;
 
 //===----------------------------------------------------------------------===//
 // Format 01 instructions : ora, and, eor, adc, sta, lda, cmp, sbc
@@ -180,6 +186,12 @@ multiclass F01_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
                  !strconcat(asmstr, " $addr"),
                  [(set ACC16:$dst,
                     (operator ACC16:$src, (load addr_ix:$addr)))]>;
+
+    def izy : F01<op, 0b110, (outs ACC16:$dst),
+                  (ins ACC16:$src, i16mem_izy16:$addr),
+                  !strconcat(asmstr, " $addr"),
+                  [(set ACC16:$dst,
+                     (operator ACC16:$src, (load addr_izy:$addr)))]>;
   }
 }
 
@@ -520,15 +532,17 @@ let neverHasSideEffects = 1 in {
     def PLA : FF<0x68, (outs ACC16:$dst), (ins), "PLA", []>;
     def PLX : FF<0xfa, (outs IX16:$dst), (ins), "PLX", []>;
     def PLY : FF<0x7a, (outs IY16:$dst), (ins), "PLY", []>;
-    def PLD : FF<0x2b, (outs ID16:$dst), (ins), "PLD", []>;
+    // 65C816-only instructions
     def PLP : FF<0x08, (outs CCR:$dst), (ins), "PLP", []>;
+    def PLD : FF<0x2b, (outs ID16:$dst), (ins), "PLD", []>;
   }
   let mayStore = 1 in {
     def PHA : FF<0x48, (outs), (ins ACC16:$src), "PHA", []>;
     def PHX : FF<0xda, (outs), (ins IX16:$src), "PHX", []>;
     def PHY : FF<0x5a, (outs), (ins IY16:$src), "PHY", []>;
-    def PHD : FF<0x0b, (outs), (ins ID16:$src), "PLD", []>;
     def PHP : FF<0x28, (outs), (ins CCR:$src), "PLP", []>;
+    // 65C816-only instructions
+    def PHD : FF<0x0b, (outs), (ins ID16:$src), "PLD", []>;
     def PEA : FF<0xf4, (outs), (ins i16mem_a16:$addr), "PEA $addr", []>;
     def PER : FF<0x62, (outs), (ins brtarget8:$addr), "PER $addr", []>;
   }
@@ -563,36 +577,63 @@ let isReturn = 1, isTerminator = 1, isBarrier = 1,
 
 // Transfer between registers
 
-let isCodeGenOnly = 1, isPseudo = 1 in {
-let Defs = [P], neverHasSideEffects = 1 in {
-  def TAX : FF<0xaa, (outs IX16:$dst), (ins ACC16:$src), "TAX", []>;
-//               [(set IX16:$dst, ACC16:$src)]>;
+let Defs = [P], neverHasSideEffects = 1, isCodeGenOnly = 1 in {
+  def TAX : FF<0xaa, (outs IX16:$dst), (ins ACC16:$src), "TAX",
+               [(set IX16:$dst, ACC16:$src)]>;
 
-  def TAX : FF<0xaa, (outs IX16:$dst), (ins ACC16:$src), "TAX", []>;
-//               [(set IX16:$dst, ACC16:$src)]>;
+  def TAX : FF<0xaa, (outs IX16:$dst), (ins ACC16:$src), "TAX",
+               [(set IX16:$dst, ACC16:$src)]>;
 
-  def TAY : FF<0xa8, (outs IY16:$dst), (ins ACC16:$src), "TAY", []>;
-//               [(set IY16:$dst, ACC16:$src)]>;
+  def TAY : FF<0xa8, (outs IY16:$dst), (ins ACC16:$src), "TAY",
+               [(set IY16:$dst, ACC16:$src)]>;
 
-  def TXA : FF<0x8a, (outs ACC16:$dst), (ins IX16:$src), "TXA", []>;
-//               [(set ACC16:$dst, IX16:$src)]>;
+  def TXA : FF<0x8a, (outs ACC16:$dst), (ins IX16:$src), "TXA",
+               [(set ACC16:$dst, IX16:$src)]>;
 
-  def TYA : FF<0xa8, (outs ACC16:$dst), (ins IY16:$src), "TYA", []>;
-//               [(set ACC16:$dst, IY16:$src)]>;
+  def TYA : FF<0xa8, (outs ACC16:$dst), (ins IY16:$src), "TYA",
+               [(set ACC16:$dst, IY16:$src)]>;
 
-  def TXY : FF<0x9b, (outs IY16:$dst), (ins IX16:$src), "TXY", []>;
-//               [(set IY16:$dst, IX16:$src)]>;
+  def TXS : FF<0x9b, (outs IS16:$dst), (ins IX16:$src), "TXS",
+               [(set IS16:$dst, IX16:$src)]>;
 
-  def TYX : FF<0xbb, (outs IX16:$dst), (ins IY16:$src), "TYX", []>;
-//               [(set IX16:$dst, IY16:$src)]>;
+  def TSX : FF<0xbb, (outs IX16:$dst), (ins IS16:$src), "TSX",
+               [(set IX16:$dst, IS16:$src)]>;
 
-  def TXS : FF<0x9b, (outs IS16:$dst), (ins IX16:$src), "TXS", []>;
-//               [(set IS16:$dst, IX16:$src)]>;
+  // 65C816-only instructions
+  def TXY : FF<0x9b, (outs IY16:$dst), (ins IX16:$src), "TXY",
+               [(set IY16:$dst, IX16:$src)]>;
 
-  def TSX : FF<0xbb, (outs IX16:$dst), (ins IS16:$src), "TSX", []>;
-//               [(set IX16:$dst, IS16:$src)]>;
+  def TYX : FF<0xbb, (outs IX16:$dst), (ins IY16:$src), "TYX",
+               [(set IX16:$dst, IY16:$src)]>;
+
+  def TCS : FF<0x1b, (outs IS16:$dst), (ins ACC16:$src), "TCS",
+               [(set IS16:$dst, ACC16:$src)]>;
+
+  def TSC : FF<0x3b, (outs ACC16:$dst), (ins IS16:$src), "TSC",
+               [(set ACC16:$dst, IS16:$src)]>;
+
+  def TCD : FF<0x5b, (outs ACC16:$dst), (ins ID16:$src), "TCD",
+               [(set ACC16:$dst, ID16:$src)]>;
+
+  def TDC : FF<0x7b, (outs ID16:$dst), (ins ACC16:$src), "TDC",
+               [(set ID16:$dst, ACC16:$src)]>;
 }
+
+// 65C816-only instructions
+
+let Constraints = "$src = $dst" in {
+  def XBA : FF<0xeb, (outs ACC16:$dst), (ins ACC16:$src), "XBA",
+               [(set ACC16:$dst, (bswap ACC16:$src))]>;
 }
+let Uses = [P] in {
+  def XCE : FF<0xfb, (outs), (ins), "XCE", []>;
+}
+def WAI : FF<0xcb, (outs), (ins), "WAI", []>;
+def STP : FF<0xfb, (outs), (ins), "STP", []>;
+def COP : FF<0x02, (outs), (ins imm8:$sig), "COP $sig", []>;
+def WDM : FF<0x42, (outs), (ins), "WDM", []>;
+def MVP : FF<0x44, (outs), (ins imm8:$srcbank, imm8:$dstbank), "MVP", []>;
+def MVN : FF<0x54, (outs), (ins imm8:$srcbank, imm8:$dstbank), "WDM", []>;
 
 // Clear and set flag instructions
 let Defs = [P], Uses = [P] in {
@@ -675,42 +716,105 @@ let Defs = [S, P], Uses = [S], isCodeGenOnly = 1 in {
 class ZPInstr<dag outs, dag ins, string asmstr, list<dag> pattern>
     : InstC65<outs, ins, asmstr, pattern> {
   let isPseudo = 1;
-  let isCodeGenOnly = 1;
 }
 
-// let Defs = [A, P], mayLoad = 1 in {
-//   def ZP_LOAD16_a16  : ZPInst<(out), (ins ZP16:$reg, imem16_a16:$mem),
-//                               ";ZPLOAD %reg,$mem",
-//                               [(load ZP16:$reg, (load tglobaladdr:$mem))]>;
-//   def ZP_LOAD16_ix16 : ZPInst<(out), (ins ZP16:$reg, imem16_ix16:$mem),
-//                               ";ZPLOAD %reg,$mem",
-//                               [(load ZP16:$reg, (load addr_ix16:$mem))]>;
+def STZz  : ZPInst<(out ZR16:$dst), (ins),
+                   ";STZ %dst",
+                   [(set ZR16:dst, (i16 0))]>;
+
+let Defs = [P], mayLoad = 1 in {
+  def MOVza  : ZPInst<(out ZR16:$dst), (ins ACC16:$src),
+                      ";MOV %dst,$src",
+                      [(set ZR16:dst, ACC16:$src)]>;
+  def MOVzx  : ZPInst<(out ZR16:$dst), (ins IX16:$src),
+                      ";MOV %dst,$src",
+                      [(set ZR16:dst, IX16:$src)]>;
+  def MOVzy  : ZPInst<(out ZR16:$dst), (ins IY16:$src),
+                      ";MOV %dst,$src",
+                      [(set ZR16:dst, IX16:$src)]>;
+}
+
+let mayStore = 1 in {
+  def MOVaz  : ZPInst<(out ACC16:$dst), (ins ZR16:$src),
+                      ";MOV %dst,$src",
+                      [(set ACC16:dst, ZR16:$src)]>;
+  def MOVxz  : ZPInst<(out IX16:$dst), (ins ZR16:$src),
+                      ";MOV %dst,$src",
+                      [(set IX16:dst, ZR16:$src)]>;
+  def MOVyz  : ZPInst<(out IY16:$dst), (ins ZR16:$src),
+                      ";MOV %dst,$src",
+                      [(set IY16:dst, ZR16:$src)]>;
+}
+
+let Defs = [P], Constraints = "$src = $dst" in {
+  def INCz : ZPInst<(out ZR16:$dst), (ins ZR16:$src),
+                    ";ADD %dst,$src,#1",
+                    [(set ACC16:dst, (add ACC16:$src1, (i16 1)))]>;
+  def DECz : ZPInst<(out ZR16:$dst), (ins ZR16:$src),
+                    ";SUB %dst,$src,#1",
+                    [(set ACC16:dst, (sub ACC16:$src1, (i16 1)))]>;
+}
+
+let Defs = [P, A] in {
+  let mayLoad = 1, mayStore = 1 in {
+    def MOV32zz  : ZPInst<(out ZR32:$dst), (ins ZR32:$src),
+                          ";MOV $dst,$src",
+                          [(set ZR32:$dst, ZR32:$src)]>;
+    def ADD32zzz : ZPInst<(out ZR32:$dst), (ins ZR32:$src1, ZR32:$src2),
+                          ";ADD $dst,$src1,$src2",
+                          [(set ZR32:$dst, (add ZR32:$src1, ZR32:$src2))]>;
+    def SUB32zzz : ZPInst<(out ZR32:$dst), (ins ZR32:$src1, ZR32:$src2),
+                          ";SUB $dst,$src1,$src2",
+                          [(set ZR32:$dst, (sub ZR32:$src1, ZR32:$src2))]>;
+    def AND32zzz : ZPInst<(out ZR32:$dst), (ins ZR32:$src1, ZR32:$src2),
+                          ";AND $dst,$src1,$src2",
+                          [(set ZR32:$dst, (and ZR32:$src1, ZR32:$src2))]>;
+    def OR32zzz  : ZPInst<(out ZR32:$dst), (ins ZR32:$src1, ZR32:$src2),
+                          ";OR $dst,$src1,$src2",
+                          [(set ZR32:$dst, (or ZR32:$src1, ZR32:$src2))]>;
+    def XOR32zzz : ZPInst<(out ZR32:$dst), (ins ZR32:$src1, ZR32:$src2),
+                          ";XOR $dst,$src1,$src2",
+                          [(set ZR32:$dst, (xor ZR32:$src1, ZR32:$src2))]>;
+  }
+}
+
+let Defs = [P] in {
+  let mayLoad = 1, Constraints = "$src1 = $dst" in {
+    def ADDaz : ZPInst<(out ACC16:$dst), (ins ACC16:$src1, ZR16:$src2),
+                       ";ADD $dst,$src1,$src2",
+                       [(set ACC16:$dst, (add ACC16:$src1, ZR16:$src2))]>;
+    def SUBaz : ZPInst<(out ACC16:$dst), (ins ACC16:$src1, ZR16:$src2),
+                       ";SUB $dst,$src1,$src2",
+                       [(set ACC16:$dst, (sub ACC16:$src1, ZR16:$src2))]>;
+    def ANDaz : ZPInst<(out ACC16:$dst), (ins ACC16:$src1, ZR16:$src2),
+                       ";AND $dst,$src1,$src2",
+                       [(set ACC16:$dst, (and ACC16:$src1, ZR16:$src2))]>;
+    def ORaz  : ZPInst<(out ACC16:$dst), (ins ACC16:$src1, ZR16:$src2),
+                       ";OR $dst,$src1,$src2",
+                       [(set ACC16:$dst, (or ACC16:$src1, ZR16:$src2))]>;
+    def XORaz : ZPInst<(out ACC16:$dst), (ins ACC16:$src1, ZR16:$src2),
+                       ";XOR $dst,$src1,$src2",
+                       [(set ACC16:$dst, (or ACC16:$src1, ZR16:$src2))]>;
+  }
+}
+
+
+// multiclass F11_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
+//   // Binary operation on 16-bit accumulator
+//   let mayLoad = 1 in {
+//     def is : F11<op, 0b000, (outs ACC16:$dst),
+//                  (ins ACC16:$src, i16mem_is16:$addr),
+//                  !strconcat(asmstr, " $addr"),
+//                  [(set ACC16:$dst,
+//                     (operator ACC16:$src, (load addr_is:$addr)))]>;
+//   }
 // }
 
-let Defs = [A, P] in {
-  def ZP_ADD16a  : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
-                          ";ZPADD %dst,$src1,$src2",
-                          [(set ZP16:dst, (add ZP16:$src1, ZP16:$src2))]>;
-
-  def ZP_STORE16 : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
-                          ";ZPADD %dst,$src1,$src2",
-                          [(set ZP16:$dst, (add ZP16:$src1, ZP16:$src2))]>;
-  def ZP_ADD16   : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
-                          ";ZPADD %dst,$src1,$src2",
-                          [(set ZP16:dst, (add ZP16:$src1, ZP16:$src2))]>;
-  def ZP_SUB16   : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
-                          ";ZPSUB %dst,$src1,$src2",
-                          [(set ZP16:dst, (sub ZP16:$src1, ZP16:$src2))]>;
-  def ZP_AND16   : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
-                          ";ZPAND %dst,$src1,$src2",
-                          [(set ZP16:dst, (and ZP16:$src1, ZP16:$src2))]>;
-  def ZP_XOR16   : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
-                          ";ZPXOR %dst,$src1,$src2",
-                          [(set ZP16:dst, (xor ZP16:$src1, ZP16:$src2))]>;
-  def ZP_OR16    : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
-                          ";ZPOR %dst,$src1,$src2",
-                          [(set ZP16:dst, (or ZP16:$src1, ZP16:$src2))]>;
-  def ZP_SHL16   : ZPInst<(out ZP16:$dst), (ins ZP16:$src1, ZP16:$src2),
-                          ";ZPSHL %dst,$src1,$src2",
-                          [(set ZP16:dst, (or ZP16:$src, ZP16:$amt))]>;
-}
+// let Defs = [P], Constraints = "$src = $dst" in {
+//   def ORAzpr : F11_binary<0b000, "ORA", or>;
+//   def ANDzpr : F11_binary<0b001, "AND", and>;
+//   def EORzpr : F11_binary<0b010, "EOR", xor>;
+//   def ADCzpr : F11_binary<0b011, "ADC", add>; //TODO: Change to adde!
+//   def SBCzpr : F11_binary<0b111, "SBC", sub>; // sube
+//   }
+// }

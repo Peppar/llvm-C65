@@ -49,6 +49,13 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   addRegisterClass(MVT::i8, &C65::BANK_REGRegClass);
   addRegisterClass(MVT::i8, &C65::CCRRegClass);
 
+  // Zero-page registers
+  addRegisterClass(MVT::i8, &C65::ZR8RegClass);
+  addRegisterClass(MVT::i16, &C65::ZR16RegClass);
+  addRegisterClass(MVT::i32, &C65::ZR32RegClass);
+  addRegisterClass(MVT::i64, &C65::ZR64RegClass);
+
+
   // TODO: Remove these for bare-bones?
   // C65 has no *EXTLOAD
   // setLoadExtAction(ISD::EXTLOAD,  MVT::i1, Promote);
@@ -85,6 +92,8 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   computeRegisterProperties();
 }
 
+/// This method returns the name of a target specific DAG node.
+///
 const char *C65TargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
   default:
@@ -99,29 +108,30 @@ const char *C65TargetLowering::getTargetNodeName(unsigned Opcode) const {
   }
 }
 
-// TODO: Remove this for bare-bones?
+/// Return the ValueType of the result of SETCC operations.  Also used
+/// to obtain the target's preferred type for the condition operand of
+/// SELECT and BRCOND nodes.  In the case of BRCOND the argument
+/// passed is MVT::Other since there are no other operands to get a
+/// type hint from.
+///
 EVT C65TargetLowering::getSetCCResultType(LLVMContext &, EVT VT) const {
   if (!VT.isVector())
     return MVT::i8;
   return VT.changeVectorElementTypeToInteger();
 }
 
-// SDValue
-// BlackfinTargetLowering::LowerGlobalAddress(SDValue Op, SelectionDAG
-// &DAG)
-// {
-//    DebugLoc DL = Op.getDebugLoc();
-//    GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
-
-//    Op = DAG.getTargetGlobalAddress(GV, MVT::i32);
-//    return DAG.getNode(BfinISD::Wrapper, DL, MVT::i32, Op);
-// }
 SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
                                               SelectionDAG &DAG) const {
   SDLoc DL(Node);
   return DAG.getTargetGlobalAddress(Node->getGlobal(), DL, getPointerTy());
 }
 
+/// This callback is invoked for operations that are unsupported by
+/// the target, which are registered to use 'custom' lowering, and
+/// whose defined values are all legal. If the target has no
+/// operations that require custom lowering, it need not implement
+/// this.  The default implementation of this aborts.
+///
 SDValue C65TargetLowering::
 LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   SDLoc DL(Op);
@@ -136,24 +146,87 @@ LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   }
 }
 
+/// Emit a new machine instruction OpCode, with the operands
+/// re-ordered according to NumOps and OpOrder. Replaces occurrences
+/// of zero-page registers ZR with their corresponding zero-page
+/// addresses
+///
+MachineBasicBlock*
+C65TargetLowering::emitZROp(MachineInstr *MI,
+                            MachineBasicBlock *MBB,
+			    unsigned OpCode,
+			    unsigned NumOps,
+			    unsigned *OpOrder,
+                            bool ClearCarry = false) const {
+
+  const TargetInstrInfo &TII = *Subtarget->getInstrInfo();
+  const TargetRegisterInfo &TRI = *Subtarget->getRegisterInfo();
+  DebugLoc DL = MI->getDebugLoc();
+
+  if (ClearCarry) {
+    // Clear carry before the operation
+    BuildMI(*MBB, MI, DL, TII.get(C65::CLC));
+  }
+
+  MachineInstrBuilder &MIB = BuildMI(*MBB, MI, DL, TII.get(Opcode));
+
+  // Reorder the operands, and replace ZR references by ZP addresses
+  for(unsigned i = 0; i != NumOps, ++i) {
+    MachineOperand &Op = MI->getOperand(OpOrder[i]);
+    if(Op.isReg() && ZRRegClass.contains(Op.getReg())) {
+      MIB = MIB.addImm(TRI.getZRAddress(Op.getReg()));
+    } else {
+      MIB = MIB.addOperand(Op);
+    }
+  }
+
+  return MBB;
+}
+
+/// This method should be implemented by targets that mark
+/// instructions with the 'usesCustomInserter' flag.  These
+/// instructions are special in various ways, which require special
+/// support to insert.  The specified MachineInstr is created but not
+/// inserted into any basic blocks, and this method is called to
+/// expand it into a sequence of instructions, potentially also
+/// creating new basic blocks and control flow.
+///
 MachineBasicBlock *
 C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
-                                               MachineBasicBlock *BB) const {
+                                               MachineBasicBlock *MBB) const {
   switch (MI->getOpcode()) {
-  default:
-    // TODO
-    llvm_unreachable("Unknown SELECT_CC!");
+  default: llvm_unreachable("Unknown custom opcode to emit!");
+  case C65::MOVza: return emitZROp(MI, MBB, C65::STAzp, 2, {1, 0});
+  case C65::MOVzx: return emitZROp(MI, MBB, C65::STXzp, 2, {1, 0});
+  case C65::MOVzy: return emitZROp(MI, MBB, C65::STYzp, 2, {1, 0});
+  case C65::MOVaz: return emitZROp(MI, MBB, C65::LDAzp, 2, {0, 1});
+  case C65::MOVxz: return emitZROp(MI, MBB, C65::LDXzp, 2, {0, 1});
+  case C65::MOVyz: return emitZROp(MI, MBB, C65::LDYzp, 2, {0, 1});
+  case C65::ANDaz: return emitZROp(MI, MBB, C65::ANDzp, 2, {0, 2});
+  case C65::ORaz:  return emitZROp(MI, MBB, C65::ORAzp, 2, {0, 2});
+  case C65::XORaz: return emitZROp(MI, MBB, C65::EORzp, 2, {0, 2});
+  case C65::STZz:  return emitZROp(MI, MBB, C65::STZzp, 1, {0});
+  case C65::INCz:  return emitZROp(MI, MBB, C65::INCzp, 1, {0});
+  case C65::DECz:  return emitZROp(MI, MBB, C65::DECzp, 1, {0});
+  case C65::ADDaz: return emitZROp(MI, MBB, C65::ADCzp, 3, {0, 1, 2}, true);
+  case C65::SUBaz: return emitZROp(MI, MBB, C65::SBCzp, 3, {0, 1, 2}, true);
   }
 }
 
+/// Return true if folding a constant offset with the given
+/// GlobalAddress is legal. It is frequently not legal in PIC
+/// relocation models.
+///
 bool
 C65TargetLowering::isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const {
-  // TODO
+  // The C65 target isn't yet aware of offsets
   return false;
 }
 
-// Determine which of the bits specified in Mask are known to be either zero
-// or one and return them in the KnownZero/KnownOne bitsets.
+/// Determine which of the bits specified in Mask are known to be
+/// either zero or one and return them in the KnownZero/KnownOne
+/// bitsets.
+///
 void C65TargetLowering::
 computeKnownBitsForTargetNode(const SDValue Op,
                               APInt &KnownZero,
@@ -170,6 +243,10 @@ computeKnownBitsForTargetNode(const SDValue Op,
 
 #include "C65GenCallingConv.inc"
 
+/// This hook must be implemented to lower outgoing return values,
+/// described by the Outs array, into the specified DAG. The
+/// implementation should return the resulting token chain value.
+///
 SDValue
 C65TargetLowering::LowerReturn(SDValue Chain,
                                CallingConv::ID CallConv, bool IsVarArg,
@@ -177,7 +254,6 @@ C65TargetLowering::LowerReturn(SDValue Chain,
                                const SmallVectorImpl<SDValue> &OutVals,
                                SDLoc DL, SelectionDAG &DAG) const {
 
-  // TODO: Clean this up or remove for bare-bones functionality
   SmallVector<CCValAssign, 16> RVLocs;
   SmallVector<SDValue, 4> RetOps(1, Chain);
   SDValue Glue;
@@ -208,6 +284,11 @@ C65TargetLowering::LowerReturn(SDValue Chain,
   return DAG.getNode(C65ISD::RET, DL, MVT::Other, RetOps);
 }
 
+/// This hook must be implemented to lower the incoming (formal) arguments,
+/// described by the Ins array, into the specified DAG. The
+/// implementation should fill in the InVals array with legal-type
+/// argument values, and return the resulting token chain value.
+///
 SDValue C65TargetLowering::
 LowerFormalArguments(SDValue Chain,
                      CallingConv::ID CallConv,
@@ -255,6 +336,13 @@ LowerFormalArguments(SDValue Chain,
   return Chain;
 }
 
+/// This hook must be implemented to lower calls into the the
+/// specified DAG. The outgoing arguments to the call are described by
+/// the Outs array, and the values to be returned by the call are
+/// described by the Ins array. The implementation should fill in the
+/// InVals array with legal-type return values from the call, and
+/// return the resulting token chain value.
+///
 SDValue
 C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                              SmallVectorImpl<SDValue> &InVals) const {
@@ -421,6 +509,17 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   // return DAG.getNode(C65ISD::CALL, DL, NodeTys, Ops);
 }
 
+/// This callback is invoked when a node result type is illegal for
+/// the target, and the operation was registered to use 'custom'
+/// lowering for that result type.  The target places new result
+/// values for the node in Results (their number and types must
+/// exactly match those of the original return values of the node), or
+/// leaves Results empty, which indicates that the node is not to be
+/// custom lowered after all.
+///
+/// If the target has no operations that require custom lowering, it
+/// need not implement this.  The default implementation aborts.
+///
 void C65TargetLowering::ReplaceNodeResults(SDNode *N,
                                            SmallVectorImpl<SDValue>& Results,
                                            SelectionDAG &DAG) const {

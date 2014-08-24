@@ -67,6 +67,29 @@ C65RegisterInfo::getPointerRegClass(const MachineFunction &MF,
     return &C65::ID16RegClass;
 }
 
+unsigned
+C65RegisterInfo::getZRAddress(unsigned RegNo) const {
+  switch(RegNo) {
+  default: llvm_unreachable("Not a zero-page register!");
+  case C65::ZR0: return 0;
+  case C65::ZR1: return 2;
+  case C65::ZR2: return 4;
+  case C65::ZR3: return 6;
+  case C65::ZR4: return 8;
+  case C65::ZR5: return 10;
+  case C65::ZR6: return 12;
+  case C65::ZR7: return 14;
+  case C65::ZR8: return 16;
+  case C65::ZR9: return 18;
+  case C65::ZR10: return 20;
+  case C65::ZR11: return 22;
+  case C65::ZR12: return 24;
+  case C65::ZR13: return 26;
+  case C65::ZR14: return 28;
+  case C65::ZR15: return 30;
+  }
+}
+
 void
 C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
                                      int SPAdj, unsigned FIOperandNum,
