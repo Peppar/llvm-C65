@@ -1,6 +1,27 @@
 //===-- C65InstrInfo.td - Main C65 Instruction Definition --*- tablegen -*-===//
 
 //===----------------------------------------------------------------------===//
+// C65 predicates
+//===----------------------------------------------------------------------===//
+
+def Has65C02  : Predicate<"Subtarget->has65C02()">;
+def Has65C816 : Predicate<"Subtarget->has65C816()">;
+
+class AccSize<bits<2> val> {
+  bits<2> Value = val;
+}
+def AccSizeNA : AccSize<0>; // Not affected by accumulator flag
+def AccSize8  : AccSize<1>; // Requires 8-bit accumulator
+def AccSize16 : AccSize<2>; // Requires 16-bit accumulator (M flag clear)
+
+class IndexSize<bits<2> val> {
+  bits<2> Value = val;
+}
+def IndexSizeNA : IndexSize<0>; // Not affected by index flag
+def IndexSize8  : IndexSize<1>; // Requires 8-bit index
+def IndexSize16 : IndexSize<2>; // Requires 16-bit index (X flag clear)
+
+//===----------------------------------------------------------------------===//
 // C65 basic instruction formats
 //===----------------------------------------------------------------------===//
 
@@ -148,7 +169,7 @@ multiclass C65AddressingMode {
   }
 }
 
-defm i8mem : C65AddressingMode;
+defm mem : C65AddressingMode;
 defm i16mem : C65AddressingMode;
 defm i32mem : C65AddressingMode;
 defm i64mem : C65AddressingMode;
@@ -161,31 +182,76 @@ class F01<bits<3> op, bits<3> addrmode, dag outs, dag ins,
           string asmstr, list<dag> pattern>
     : Fcc<op, addrmode, 0b01, outs, ins, asmstr, pattern>;
 
+// Requires<[Has65C02]>;
+// Requires<[Has65C816]>;
+
+multiclass 
+
+multiclass F01_binary_p<bits<3> op, string asmstr,
+                        SDPatternOperator operator,
+                        RegisterClass RC, Operand immOp> {
+  def imm : F01<op, 0b010, (outs RC:$dst), (ins RC:$src, immOp:$imm),
+                  !strconcat(asmstr, " $imm"),
+                  [(set RC:$dst, (operator RC:$src, imm:$imm))]>;
+
+  def zp : F01<op, 0b001, (outs RC:$dst),
+                   (ins RC:$src, i16mem_zp:$addr),
+                   !strconcat(asmstr, " $addr"),
+                   [(set ACC16:$dst,
+                      (operator ACC16:$src, (load addr_zp:$addr)))]>;
+
+// SDNode - shl
+// ValueType - i64
+// RCClass - I64Regs
+// Operand - simm130p
+
 multiclass F01_binary<bits<3> op, string asmstr, SDPatternOperator operator> {
-  // Binary operation on 16-bit accumulator
-  def imm  : F01<op, 0b010, (outs ACC16:$dst),
-                 (ins ACC16:$src, i16imm:$imm),
-                 !strconcat(asmstr, " $imm"),
-                 [(set ACC16:$dst, (operator ACC16:$src, imm:$imm))]>;
+  // def 8imm  : F01<op, 0b010, (outs ACC16:$dst),
+  //                 (ins ACC16:$src, i16imm:$imm),
+  //                 !strconcat(asmstr, " $imm"),
+  //                 [(set ACC16:$dst, (operator ACC16:$src, imm:$imm))]>;
+
+  def imm : F01<op, 0b010, (outs ACC8:$dst),
+                  (ins ACC8:$src, i8imm:$imm),
+                  !strconcat(asmstr, " $imm"),
+                  [(set ACC8:$dst, (operator ACC8:$src, imm:$imm))]>;
 
   let mayLoad = 1 in {
+    // def 8zp  : F01<op, 0b001, (outs ACC8:$dst),
+    //                (ins ACC8:$src, i8mem_zp:$addr),
+    //                !strconcat(asmstr, " $addr"),
+    //                [(set ACC8:$dst,
+    //                   (operator ACC8:$src, (load addr_zp:$addr)))]>;
+
     def zp : F01<op, 0b001, (outs ACC16:$dst),
-                 (ins ACC16:$src, i16mem_zp:$addr),
-                 !strconcat(asmstr, " $addr"),
-                 [(set ACC16:$dst,
-                    (operator ACC16:$src, (load addr_zp:$addr)))]>;
+                   (ins ACC16:$src, i16mem_zp:$addr),
+                   !strconcat(asmstr, " $addr"),
+                   [(set ACC16:$dst,
+                      (operator ACC16:$src, (load addr_zp:$addr)))]>;
+
+    // def 8i   : F01<op, 0b011, (outs ACC8:$dst),
+    //                (ins ACC8:$src, i16mem_a8:$addr),
+    //                !strconcat(asmstr, " $addr"),
+    //                [(set ACC8:$dst,
+    //                   (operator ACC8:$src, (load tglobaladdr:$addr)))]>;
 
     def i  : F01<op, 0b011, (outs ACC16:$dst),
-                 (ins ACC16:$src, i16mem_a16:$addr),
-                 !strconcat(asmstr, " $addr"),
-                 [(set ACC16:$dst,
-                    (operator ACC16:$src, (load tglobaladdr:$addr)))]>;
+                   (ins ACC16:$src, i16mem_a16:$addr),
+                   !strconcat(asmstr, " $addr"),
+                   [(set ACC16:$dst,
+                      (operator ACC16:$src, (load tglobaladdr:$addr)))]>;
 
     def ix : F01<op, 0b110, (outs ACC16:$dst),
                  (ins ACC16:$src, i16mem_ix16:$addr),
                  !strconcat(asmstr, " $addr"),
                  [(set ACC16:$dst,
                     (operator ACC16:$src, (load addr_ix:$addr)))]>;
+
+    // def 8ix : F01<op, 0b110, (outs ACC16:$dst),
+    //              (ins ACC16:$src, i16mem_ix16:$addr),
+    //              !strconcat(asmstr, " $addr"),
+    //              [(set ACC16:$dst,
+    //                 (operator ACC16:$src, (load addr_ix:$addr)))]>;
 
     def izy : F01<op, 0b110, (outs ACC16:$dst),
                   (ins ACC16:$src, i16mem_izy16:$addr),
@@ -352,7 +418,6 @@ class F00<bits<3> op, bits<3> addrmode, dag outs, dag ins,
           string asmstr, list<dag> pattern>
     : Fcc<op, addrmode, 0b00, outs, ins, asmstr, pattern>;
 
-// TODO: Decide if Y register is required for bare-bones operation
 let mayStore = 1 in {
   def STYi : F00<0b100, 0b011, (outs), (ins IY16:$src, i16mem_a16:$addr),
                  "STY $addr",
@@ -507,7 +572,7 @@ class FF<bits<8> op, dag outs, dag ins,
 }
 
 let neverHasSideEffects = 1 in {
-  def NOOP : FF<0xea, (outs), (ins), "NOP", []>;
+  def NOP : FF<0xea, (outs), (ins), "NOP", []>;
 }
 
 let Defs = [P] in {
@@ -519,6 +584,7 @@ let Defs = [P] in {
                   []>;
 }
 
+// 65C02 instructions
 def STZzp : FF<0x64, (outs), (ins i16mem_zp:$addr), "STZ $addr",
                [(store (i16 0), addr_zp:$addr)]>;
 def STZi  : FF<0x9c, (outs), (ins i16mem_a16:$addr), "STZ $addr",
@@ -530,23 +596,26 @@ def STZix : FF<0x9e, (outs), (ins i16mem_ix16:$addr), "STZ $addr",
 let neverHasSideEffects = 1 in {
   let Defs = [P], mayLoad = 1 in {
     def PLA : FF<0x68, (outs ACC16:$dst), (ins), "PLA", []>;
+    def PLP : FF<0x08, (outs CCR:$dst), (ins), "PLP", []>;
+    // 65C02 instructions
     def PLX : FF<0xfa, (outs IX16:$dst), (ins), "PLX", []>;
     def PLY : FF<0x7a, (outs IY16:$dst), (ins), "PLY", []>;
-    // 65C816-only instructions
-    def PLP : FF<0x08, (outs CCR:$dst), (ins), "PLP", []>;
+    // 65C816 instructions
     def PLD : FF<0x2b, (outs ID16:$dst), (ins), "PLD", []>;
   }
   let mayStore = 1 in {
     def PHA : FF<0x48, (outs), (ins ACC16:$src), "PHA", []>;
+    def PHP : FF<0x28, (outs), (ins CCR:$src), "PLP", []>;
+    // 65C02 instructions
     def PHX : FF<0xda, (outs), (ins IX16:$src), "PHX", []>;
     def PHY : FF<0x5a, (outs), (ins IY16:$src), "PHY", []>;
-    def PHP : FF<0x28, (outs), (ins CCR:$src), "PLP", []>;
-    // 65C816-only instructions
+    // 65C816 instructions
     def PHD : FF<0x0b, (outs), (ins ID16:$src), "PLD", []>;
     def PEA : FF<0xf4, (outs), (ins i16mem_a16:$addr), "PEA $addr", []>;
     def PER : FF<0x62, (outs), (ins brtarget8:$addr), "PER $addr", []>;
   }
   let mayLoad = 1, mayStore = 1 in {
+    // 65C816 instruction
     def PEI : FF<0xd4, (outs), (ins i16mem_a16:$addr), "PEI $addr", []>;
   }
 }
@@ -619,6 +688,17 @@ let Defs = [P], neverHasSideEffects = 1, isCodeGenOnly = 1 in {
                [(set ID16:$dst, ACC16:$src)]>;
 }
 
+// 65C02-only instructions
+
+def TSBzp : FF<0x04, (outs), (ins ACC16:$src, imem16_zp:$addr),
+               "TSB $addr", []>;
+def TSBi  : FF<0x0c, (outs), (ins ACC16:$src, imem16_a16:$addr),
+               "TSB $addr", []>;
+def TRBzp : FF<0x14, (outs), (ins ACC16:$src, imem16_zp:$addr),
+               "TRB $addr", []>;
+def TRBi  : FF<0x1c, (outs), (ins ACC16:$src, imem16_a16:$addr),
+               "TRB $addr", []>;
+
 // 65C816-only instructions
 
 let Constraints = "$src = $dst" in {
@@ -650,23 +730,26 @@ let Defs = [P], Uses = [P] in {
 
 // Increment and decrement instructions
 let Defs = [P], Constraints = "$src = $dst" in {
-  def INCa : FF<0x1a, (outs ACC16:$dst), (ins ACC16:$src), "INC A",
-                [(set ACC16:$dst, (add ACC16:$src, 1))]>;
-
   def INX  : FF<0xe8, (outs IX16:$dst), (ins IX16:$src), "INX",
                 [(set IX16:$dst, (add IX16:$src, 1))]>;
 
   def INY  : FF<0xc8, (outs IY16:$dst), (ins IY16:$src), "INY",
                 [(set IY16:$dst, (add IY16:$src, 1))]>;
 
-  def DECa : FF<0x3a, (outs ACC16:$dst), (ins ACC16:$src), "DEC A",
-                [(set ACC16:$dst, (sub ACC16:$src, 1))]>;
-
   def DEX  : FF<0xca, (outs IX16:$dst), (ins IX16:$src), "DEX",
                 [(set IX16:$dst, (sub IX16:$src, 1))]>;
 
   def DEY  : FF<0x88, (outs IY16:$dst), (ins IY16:$src), "DEY",
                 [(set IY16:$dst, (sub IY16:$src, 1))]>;
+
+  // 65C02-only instructions
+
+  def INCa : FF<0x1a, (outs ACC16:$dst), (ins ACC16:$src), "INC A",
+                [(set ACC16:$dst, (add ACC16:$src, 1))]>;
+
+  def DECa : FF<0x3a, (outs ACC16:$dst), (ins ACC16:$src), "DEC A",
+                [(set ACC16:$dst, (sub ACC16:$src, 1))]>;
+
 }
 
 //===----------------------------------------------------------------------===//
