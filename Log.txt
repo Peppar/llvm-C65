@@ -61,3 +61,41 @@ TODO: Define what "bare-bones" means...
 * only boolean functions ORA, EOR, AND...
 * no push, pull
 * no awareness of stack pointer, PC
+
+IMPORTANT: tried to use timm: class instead of imm: class, and then
+the compiler didn't make use of my immediate instructions anymore..!!
+
+Modifs:
+  ~/llvm/lib/Target/LLVMBuild.txt
+    : added C65 to subdirectories in [common]
+  ~/llvm/tools/clang/lib/Basic/Targets.cpp
+  /home/peppar/llvm/configure
+  /home/peppar/llvm/CMakeLists.txt
+    : added C65 to all targets
+
+Not modifs:
+// ~/llvm/tools/clang/include/clang/Basic/TargetBuiltins.h
+// ~/llvm/tools/clang/Basic/BuiltinsC65.def
+// ~/llvm/tools/clang/lib/Driver/Driver.cpp
+// ~/llvm/tools/clang/lib/Driver/ToolChains.cpp
+// ~/llvm/tools/clang/lib/Driver/ToolChains.h
+// ~/llvm/tools/clang/lib/Driver/Tools.cpp
+// ~/llvm/tools/clang/lib/Driver/Tools.h
+
+// /home/peppar/llvm/tools/clang/lib/CodeGen/TargetInfo.cpp
+// Seems to have a default..
+// /home/peppar/llvm/bindings/python/llvm/disassembler.py
+// Do not have a disassembler
+// /home/peppar/llvm/docs/CompilerWriterInfo.rst
+
+
+Modifying instructions with Select(..) in C65ISelDAGToDAG: Force
+spilling of one of the operators to AND, SUB, OR, etc..  Inserted
+store followed by load, using target-independent types, led to the
+LOAD being consumed while the STORE left target-indepdendent. This is
+because, in Select(..) as well as in patterns, the resulting DAG must
+not include target-independent nodes.
+
+The target-independent load was consumed because it appears on the
+left hand side of many instruction patterns, and is selected by the
+TableGen generated SelectCode function.

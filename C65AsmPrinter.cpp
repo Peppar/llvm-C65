@@ -45,8 +45,11 @@ namespace {
     }
 
     void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
-    //void printMemOperand(const MachineInstr *MI, int opNum, raw_ostream &OS,
-    //                     const char *Modifier = nullptr);
+
+    void printMemOperandAbs(const MachineInstr *MI, int opNum,
+                            raw_ostream &OS, const char *Modifier = nullptr);
+    void printMemOperandIndex(const MachineInstr *MI, int opNum,
+                              raw_ostream &OS, const char *Modifier = nullptr);
 
     static const char *getRegisterName(unsigned RegNo) {
       return C65InstPrinter::getRegisterName(RegNo);
@@ -235,6 +238,7 @@ void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
     llvm_unreachable("<unknown operand type>");
   }
 }
+
 
 bool C65AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                                     unsigned AsmVariant,

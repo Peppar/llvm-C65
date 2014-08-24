@@ -30,13 +30,26 @@ def DBR : C65Reg<"DBR">, DwarfRegNum<[8]>;
 // Processor status register
 def P : C65Reg<"P">, DwarfRegNum<[6]>;
 
+class C65ZPReg<string n, bits<16> num> : C65Reg<n> {
+  let HWEncoding = num;
+}
 
 def ACC16 : RegisterClass<"C65", [i16], 16, (add A)>;
 def IX16 : RegisterClass<"C65", [i16], 16, (add X)>;
 def IY16 : RegisterClass<"C65", [i16], 16, (add Y)>;
+def IS16 : RegisterClass<"C65", [i16], 16, (add S)>;
+def ID16 : RegisterClass<"C65", [i16], 16, (add D)>;
 
 let CopyCost = -1, isAllocatable = 0 in {
   def PC_REG : RegisterClass<"C65", [i16], 16, (add PC)>;
   def BANK_REG : RegisterClass<"C65", [i8], 8, (add PBR, DBR)>;
   def CCR : RegisterClass<"C65", [i8], 8, (add P)>;
 }
+
+// Memory registers
+foreach I = 0-15 in {
+  def ZP#I : C65ZPReg<"ZP"#I, 0>;
+}
+
+// Memory register class
+def ZP16 : RegisterClass<"C65", [i16], 16, (sequence "ZP%u", 0, 15)>;
