@@ -54,7 +54,7 @@ namespace llvm {
     MachineBasicBlock*
       emitZROp(MachineInstr *MI, MachineBasicBlock *MBB,
                unsigned OpCode, unsigned NumOps,
-               unsigned *OpOrder, bool ClearCarry = false) const;
+               const unsigned *OpOrder, bool ClearCarry = false) const;
 
     MachineBasicBlock *
       EmitInstrWithCustomInserter(MachineInstr *MI,

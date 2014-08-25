@@ -50,10 +50,10 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   addRegisterClass(MVT::i8, &C65::CCRRegClass);
 
   // Zero-page registers
-  addRegisterClass(MVT::i8, &C65::ZR8RegClass);
-  addRegisterClass(MVT::i16, &C65::ZR16RegClass);
-  addRegisterClass(MVT::i32, &C65::ZR32RegClass);
-  addRegisterClass(MVT::i64, &C65::ZR64RegClass);
+  addRegisterClass(MVT::i8, &C65::ZRC8RegClass);
+  addRegisterClass(MVT::i16, &C65::ZRC16RegClass);
+  addRegisterClass(MVT::i32, &C65::ZRC32RegClass);
+  addRegisterClass(MVT::i64, &C65::ZRC64RegClass);
 
 
   // TODO: Remove these for bare-bones?
@@ -156,11 +156,12 @@ C65TargetLowering::emitZROp(MachineInstr *MI,
                             MachineBasicBlock *MBB,
 			    unsigned OpCode,
 			    unsigned NumOps,
-			    unsigned *OpOrder,
-                            bool ClearCarry = false) const {
+			    const unsigned *OpOrder,
+                            bool ClearCarry) const {
 
   const TargetInstrInfo &TII = *Subtarget->getInstrInfo();
-  const TargetRegisterInfo &TRI = *Subtarget->getRegisterInfo();
+  const C65RegisterInfo &TRI =
+      *static_cast<const C65RegisterInfo *>(Subtarget->getRegisterInfo());
   DebugLoc DL = MI->getDebugLoc();
 
   if (ClearCarry) {
@@ -168,15 +169,15 @@ C65TargetLowering::emitZROp(MachineInstr *MI,
     BuildMI(*MBB, MI, DL, TII.get(C65::CLC));
   }
 
-  MachineInstrBuilder &MIB = BuildMI(*MBB, MI, DL, TII.get(Opcode));
+  MachineInstrBuilder MIB = BuildMI(*MBB, MI, DL, TII.get(OpCode));
 
   // Reorder the operands, and replace ZR references by ZP addresses
-  for(unsigned i = 0; i != NumOps, ++i) {
+  for (unsigned i = 0; i != NumOps; ++i) {
     MachineOperand &Op = MI->getOperand(OpOrder[i]);
-    if(Op.isReg() && ZRRegClass.contains(Op.getReg())) {
-      MIB = MIB.addImm(TRI.getZRAddress(Op.getReg()));
+    if(Op.isReg() && C65::ZRC16RegClass.contains(Op.getReg())) {
+      MIB.addImm(TRI.getZRAddress(Op.getReg()));
     } else {
-      MIB = MIB.addOperand(Op);
+      MIB.addOperand(Op);
     }
   }
 
@@ -194,22 +195,28 @@ C65TargetLowering::emitZROp(MachineInstr *MI,
 MachineBasicBlock *
 C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                MachineBasicBlock *MBB) const {
+  static const unsigned ST_order[2] = {1, 0};
+  static const unsigned LD_order[2] = {0, 1};
+  static const unsigned AND_OR_XOR_order[2] = {0, 2};
+  static const unsigned STZ_INC_DEC_order[2] = {1, 0};
+  static const unsigned ADD_SUB_order[3] = {0, 1, 2};
+
   switch (MI->getOpcode()) {
   default: llvm_unreachable("Unknown custom opcode to emit!");
-  case C65::MOVza: return emitZROp(MI, MBB, C65::STAzp, 2, {1, 0});
-  case C65::MOVzx: return emitZROp(MI, MBB, C65::STXzp, 2, {1, 0});
-  case C65::MOVzy: return emitZROp(MI, MBB, C65::STYzp, 2, {1, 0});
-  case C65::MOVaz: return emitZROp(MI, MBB, C65::LDAzp, 2, {0, 1});
-  case C65::MOVxz: return emitZROp(MI, MBB, C65::LDXzp, 2, {0, 1});
-  case C65::MOVyz: return emitZROp(MI, MBB, C65::LDYzp, 2, {0, 1});
-  case C65::ANDaz: return emitZROp(MI, MBB, C65::ANDzp, 2, {0, 2});
-  case C65::ORaz:  return emitZROp(MI, MBB, C65::ORAzp, 2, {0, 2});
-  case C65::XORaz: return emitZROp(MI, MBB, C65::EORzp, 2, {0, 2});
-  case C65::STZz:  return emitZROp(MI, MBB, C65::STZzp, 1, {0});
-  case C65::INCz:  return emitZROp(MI, MBB, C65::INCzp, 1, {0});
-  case C65::DECz:  return emitZROp(MI, MBB, C65::DECzp, 1, {0});
-  case C65::ADDaz: return emitZROp(MI, MBB, C65::ADCzp, 3, {0, 1, 2}, true);
-  case C65::SUBaz: return emitZROp(MI, MBB, C65::SBCzp, 3, {0, 1, 2}, true);
+  case C65::MOVza: return emitZROp(MI, MBB, C65::STAzp, 2, ST_order);
+  case C65::MOVzx: return emitZROp(MI, MBB, C65::STXzp, 2, ST_order);
+  case C65::MOVzy: return emitZROp(MI, MBB, C65::STYzp, 2, ST_order);
+  case C65::MOVaz: return emitZROp(MI, MBB, C65::LDAzp, 2, LD_order);
+  case C65::MOVxz: return emitZROp(MI, MBB, C65::LDXzp, 2, LD_order);
+  case C65::MOVyz: return emitZROp(MI, MBB, C65::LDYzp, 2, LD_order);
+  case C65::ANDaz: return emitZROp(MI, MBB, C65::AND16zp, 2, AND_OR_XOR_order);
+  case C65::ORaz:  return emitZROp(MI, MBB, C65::ORA16zp, 2, AND_OR_XOR_order);
+  case C65::XORaz: return emitZROp(MI, MBB, C65::EOR16zp, 2, AND_OR_XOR_order);
+  case C65::STZz:  return emitZROp(MI, MBB, C65::STZzp, 1, STZ_INC_DEC_order);
+  case C65::INCz:  return emitZROp(MI, MBB, C65::INCzp, 1, STZ_INC_DEC_order);
+  case C65::DECz:  return emitZROp(MI, MBB, C65::DECzp, 1, STZ_INC_DEC_order);
+  case C65::ADDaz: return emitZROp(MI, MBB, C65::ADC16zp, 3, ADD_SUB_order, true);
+  case C65::SUBaz: return emitZROp(MI, MBB, C65::SBC16zp, 3, ADD_SUB_order, true);
   }
 }
 

@@ -33,7 +33,8 @@ C65FrameLowering::C65FrameLowering(const C65Subtarget &ST)
 
 void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
   const MachineFrameInfo *MFI = MF.getFrameInfo();
-  const TargetInstrInfo &TII = *MF.getTarget().getInstrInfo();
+  const C65InstrInfo &TII =
+      *static_cast<const C65InstrInfo *>(MF.getSubtarget().getInstrInfo());
   MachineBasicBlock &MBB = MF.front();
   MachineBasicBlock::iterator MBBI = MBB.begin();
   //  MachineModuleInfo &MMI = MF.getMMI();
@@ -54,7 +55,8 @@ void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
 void C65FrameLowering::emitEpilogue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
   const MachineFrameInfo *MFI = MF.getFrameInfo();
-  const TargetInstrInfo &TII = *MF.getTarget().getInstrInfo();
+  const C65InstrInfo &TII =
+      *static_cast<const C65InstrInfo *>(MF.getSubtarget().getInstrInfo());
   MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
   assert(MBBI != MBB.end() && "Returning block has no instructions");
   DebugLoc DL = MBBI->getDebugLoc();

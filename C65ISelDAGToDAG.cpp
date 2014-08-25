@@ -101,7 +101,8 @@ bool C65DAGToDAGISel::SelectAddrS(SDValue Addr, SDValue &Base,
 /// Select address for zero page, imm8
 ///
 bool C65DAGToDAGISel::SelectAddrZP(SDValue Addr, SDValue &Offset) {
-  if ((ConstantSDNode *CN = dyn_cast<ConstantSDNode>(Addr)) &&
+  ConstantSDNode *CN;
+  if ((CN = dyn_cast<ConstantSDNode>(Addr)) &&
       isInt<8>(CN->getSExtValue())) {
     Offset = Addr.getOperand(0);
   }
@@ -130,10 +131,12 @@ bool C65DAGToDAGISel::SelectAddrXY(SDValue Addr, SDValue &Base,
     return false;
   }
   if (Addr.getOpcode() == ISD::ADD) {
-    if ((ConstantSDNode *CN = dyn_cast<ConstantSDNode>(Addr.getOperand(1))) &&
-        isInt<16>(CN->getSExtValue())) {
-      if ((FrameIndexSDNode *FIN =
-            dyn_cast<FrameIndexSDNode>(Addr.getOperand(0)))) {
+    ConstantSDNode *CN;
+    if ((CN = dyn_cast<ConstantSDNode>(Addr.getOperand(1))) &&
+         isInt<16>(CN->getSExtValue())) {
+      FrameIndexSDNode *FIN;
+      if ((FIN =
+	   dyn_cast<FrameIndexSDNode>(Addr.getOperand(0)))) {
           // Constant offset from frame ref.
 	return false;
       } else {
@@ -154,46 +157,46 @@ bool C65DAGToDAGISel::IsSimpleNode(SDValue N) const {
 /// Insert a load and a store to the stack frame for the specified
 /// SDValue
 ///
-SDValue C65DAGToDAGISel::SpillValue(SDValue N, SDLoc DL) {
-  EVT PtrVT = TM.getTargetLowering()->getPointerTy();
-  MVT NVT = N->getSimpleValueType(0);
-  MachineFunction &MF = CurDAG->getMachineFunction();
-  MachineFrameInfo *MFI = MF.getFrameInfo();
+// SDValue C65DAGToDAGISel::SpillValue(SDValue N, SDLoc DL) {
+//   EVT PtrVT = TM.getTargetLowering()->getPointerTy();
+//   MVT NVT = N->getSimpleValueType(0);
+//   MachineFunction &MF = CurDAG->getMachineFunction();
+//   MachineFrameInfo *MFI = MF.getFrameInfo();
 
-  unsigned Size = NVT.getSizeInBits() / 8;
+//   unsigned Size = NVT.getSizeInBits() / 8;
 
-  int FI = MFI->CreateSpillStackObject(Size, 1);
+//   int FI = MFI->CreateSpillStackObject(Size, 1);
 
-  SDValue FIN = CurDAG->getFrameIndex(FI, PtrVT);
-  SDValue Offset = CurDAG->getConstant(0, PtrVT);
+//   SDValue FIN = CurDAG->getFrameIndex(FI, PtrVT);
+//   SDValue Offset = CurDAG->getConstant(0, PtrVT);
 
-  SmallVector<SDValue, 4> Args;
-  Args.push_back(N);
-  Args.push_back(FIN);
-  Args.push_back(Offset);
-  Args.push_back(CurDAG->getEntryNode());
+//   SmallVector<SDValue, 4> Args;
+//   Args.push_back(N);
+//   Args.push_back(FIN);
+//   Args.push_back(Offset);
+//   Args.push_back(CurDAG->getEntryNode());
 
-  SDNode *Store = CurDAG->getMachineNode(C65::STAis, DL, MVT::Other, Args);
+//   SDNode *Store = CurDAG->getMachineNode(C65::STAis, DL, MVT::Other, Args);
 
-  //SDValue Load = DAG.getMachineNode(C65::LDAis, DL, NVT, FIN,
-  //                                  CurDAG->getEntryNode());
+//   //SDValue Load = DAG.getMachineNode(C65::LDAis, DL, NVT, FIN,
+//   //                                  CurDAG->getEntryNode());
 
-  // SDValue Store = CurDAG->getStore(CurDAG->getEntryNode(), DL, N, FIN,
-  //                                  MachinePointerInfo::getFixedStack(FI),
-  //                                  false, false, false, 0);
+//   // SDValue Store = CurDAG->getStore(CurDAG->getEntryNode(), DL, N, FIN,
+//   //                                  MachinePointerInfo::getFixedStack(FI),
+//   //                                  false, false, false, 0);
 
-  //  CurDAG->viewGraph();
+//   //  CurDAG->viewGraph();
 
-  Store->dump();
+//   Store->dump();
 
-  SDValue(Store, 0).dump();
+//   SDValue(Store, 0).dump();
 
-  SDValue Load = CurDAG->getLoad(NVT, DL, SDValue(Store, 0), FIN,
-                                 MachinePointerInfo::getFixedStack(FI),
-                                 false, false, false, 0);
+//   SDValue Load = CurDAG->getLoad(NVT, DL, SDValue(Store, 0), FIN,
+//                                  MachinePointerInfo::getFixedStack(FI),
+//                                  false, false, false, 0);
 
-  return Load;
-}
+//   return Load;
+// }
 
 SDNode *C65DAGToDAGISel::Select(SDNode *N) {
   MVT NVT = N->getSimpleValueType(0);
@@ -207,77 +210,77 @@ SDNode *C65DAGToDAGISel::Select(SDNode *N) {
 
   // Insert register-spilling...
   switch (N->getOpcode()) {
-  case ISD::ADD:
-  case ISD::SUB:
-  case ISD::AND:
-  case ISD::OR:
-  case ISD::XOR: {
-    // If both operands are complex, then spill one of them to the stack frame
-    SDValue N0 = N->getOperand(0);
-    SDValue N1 = N->getOperand(1);
-    DEBUG({
-      dbgs() << "MATCH AND/OR/XOR: ";
-      N->dump();
-      N0.dump();
-      N1.dump();
-    });
-    if (!IsSimpleNode(N1)) {
-      //      SDValue Store = CurDAG->getStore(Chain, DL,
-      //      N->getOperand(1), FI, MMO); SDValue Load =
-      //      CurDAG->getLoad(ISD::UNINDEXED, ISD::NON_EXTLOAD, DL,
-      //      MVT, Chain, FI, Undef, NVT, DL, Chain, FI, MMO); SDValue
-      //      NewVal0 = CurDAG->getConstant(123, NVT); SDValue NewVal1
-      //      = CurDAG->getConstant(456, NVT);
-      //      CurDAG->viewGraph();
+  // case ISD::ADD:
+  // case ISD::SUB:
+  // case ISD::AND:
+  // case ISD::OR:
+  // case ISD::XOR: {
+  //   // If both operands are complex, then spill one of them to the stack frame
+  //   SDValue N0 = N->getOperand(0);
+  //   SDValue N1 = N->getOperand(1);
+  //   DEBUG({
+  //     dbgs() << "MATCH AND/OR/XOR: ";
+  //     N->dump();
+  //     N0.dump();
+  //     N1.dump();
+  //   });
+  //   if (!IsSimpleNode(N1)) {
+  //     //      SDValue Store = CurDAG->getStore(Chain, DL,
+  //     //      N->getOperand(1), FI, MMO); SDValue Load =
+  //     //      CurDAG->getLoad(ISD::UNINDEXED, ISD::NON_EXTLOAD, DL,
+  //     //      MVT, Chain, FI, Undef, NVT, DL, Chain, FI, MMO); SDValue
+  //     //      NewVal0 = CurDAG->getConstant(123, NVT); SDValue NewVal1
+  //     //      = CurDAG->getConstant(456, NVT);
+  //     //      CurDAG->viewGraph();
 
-  // EVT PtrVT = TM.getTargetLowering()->getPointerTy();
-  // MVT NVT = N->getSimpleValueType(0);
-  // MachineFunction &MF = CurDAG->getMachineFunction();
-  // MachineFrameInfo *MFI = MF.getFrameInfo();
+  // // EVT PtrVT = TM.getTargetLowering()->getPointerTy();
+  // // MVT NVT = N->getSimpleValueType(0);
+  // // MachineFunction &MF = CurDAG->getMachineFunction();
+  // // MachineFrameInfo *MFI = MF.getFrameInfo();
 
-  // unsigned Size = NVT.getSizeInBits() / 8;
+  // // unsigned Size = NVT.getSizeInBits() / 8;
 
-  // int FI = MFI->CreateSpillStackObject(Size, 1);
-  // SDValue FIN = CurDAG->getFrameIndex(FI, PtrVT);
+  // // int FI = MFI->CreateSpillStackObject(Size, 1);
+  // // SDValue FIN = CurDAG->getFrameIndex(FI, PtrVT);
 
-  // SDValue Store = CurDAG->getStore(CurDAG->getEntryNode(), DL, N1, FIN,
-  //                                  MachinePointerInfo::getFixedStack(FI),
-  //                                  false, false, false, 0);
+  // // SDValue Store = CurDAG->getStore(CurDAG->getEntryNode(), DL, N1, FIN,
+  // //                                  MachinePointerInfo::getFixedStack(FI),
+  // //                                  false, false, false, 0);
 
-  // Store = SelectCode(Store.getNode());
+  // // Store = SelectCode(Store.getNode());
 
-  // SDValue Load = CurDAG->getLoad(NVT, DL, Store, FIN,
-  //                                MachinePointerInfo::getFixedStack(FI),
-  //                                false, false, false, 0);
+  // // SDValue Load = CurDAG->getLoad(NVT, DL, Store, FIN,
+  // //                                MachinePointerInfo::getFixedStack(FI),
+  // //                                false, false, false, 0);
 
-  // Load = SelectCode(Load.getNode());
+  // // Load = SelectCode(Load.getNode());
 
-      SDValue Load = SpillValue(N1, DL);
+  //     SDValue Load = SpillValue(N1, DL);
 
-      // SDValue FI = CurDAG->CreateStackTemporary(NVT, 1);
-      // int Index = FI.getNode->
-      // unsigned ByteSize = NVT.getSizeInBits() / 8;
-      // MachineMemOperand *MMO;
+  //     // SDValue FI = CurDAG->CreateStackTemporary(NVT, 1);
+  //     // int Index = FI.getNode->
+  //     // unsigned ByteSize = NVT.getSizeInBits() / 8;
+  //     // MachineMemOperand *MMO;
 
-      // MMO = DAG.getMachineFunction()
-      //         .getMachineMemOperand(MachinePointerInfo::getFixedStack(FI),
-      //                               MachineMemOperand::MOStore, ByteSize);
+  //     // MMO = DAG.getMachineFunction()
+  //     //         .getMachineMemOperand(MachinePointerInfo::getFixedStack(FI),
+  //     //                               MachineMemOperand::MOStore, ByteSize);
 
-      // SDValue Store = CurDAG->getStore(N1, DL, N1, FI, MMO);
+  //     // SDValue Store = CurDAG->getStore(N1, DL, N1, FI, MMO);
 
-      // MMO = DAG.getMachineFunction()
-      //         .getMachineMemOperand(MachinePointerInfo::getFixedStack(FI),
-      //                               MachineMemOperand::MOLoad, ByteSize);
+  //     // MMO = DAG.getMachineFunction()
+  //     //         .getMachineMemOperand(MachinePointerInfo::getFixedStack(FI),
+  //     //                               MachineMemOperand::MOLoad, ByteSize);
 
-      // SDValue Load = CurDAG->getLoad(NVT, DL, Store, FI, MMO);
+  //     // SDValue Load = CurDAG->getLoad(NVT, DL, Store, FI, MMO);
 
-      //      CurDAG->viewGraph();
+  //     //      CurDAG->viewGraph();
 
-      CurDAG->UpdateNodeOperands(N, N0, Load);
+  //     CurDAG->UpdateNodeOperands(N, N0, Load);
 
-      //      CurDAG->viewGraph();
-    }
-  } break;
+  //     //      CurDAG->viewGraph();
+  //   }
+  // } break;
   default: break;
   }
 

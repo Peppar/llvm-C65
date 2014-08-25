@@ -98,7 +98,7 @@ C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   MachineInstr &MI = *II;
   MachineFunction &MF = *MI.getParent()->getParent();
-  const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
+  //  const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
   unsigned BasePtr = C65::S;
 
@@ -106,7 +106,8 @@ C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   MI.getOperand(FIOperandNum).ChangeToRegister(C65::S, false);
 
-  int FIOffset = TFI->getFrameIndexOffset(MF, FrameIndex);
+  //  int FIOffset = TFI->getFrameIndexOffset(MF, FrameIndex);
+  int64_t FIOffset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
 
   if (MI.getOperand(FIOperandNum + 1).isImm()) {
     // Offset is a 16-bit integer.
