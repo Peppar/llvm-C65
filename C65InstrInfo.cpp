@@ -40,39 +40,39 @@ C65InstrInfo::C65InstrInfo(C65Subtarget &ST)
 void C65InstrInfo::buildPushReg(MachineBasicBlock &MBB,
                                 MachineBasicBlock::iterator MI,
                                 DebugLoc DL, unsigned Reg) const {
-  if (Reg == C65::A) {
-    BuildMI(MBB, MI, DL, get(C65::PHA));
-  } else if (Reg == C65::X) {
-    BuildMI(MBB, MI, DL, get(C65::PHX));
-  } else if (Reg == C65::Y) {
-    BuildMI(MBB, MI, DL, get(C65::PHY));
-  } else if (Reg == C65::D) {
-    BuildMI(MBB, MI, DL, get(C65::PHD));
-  } else if (Reg == C65::P) {
-    BuildMI(MBB, MI, DL, get(C65::PHP));
-  } else {
-    DEBUG(dbgs() << "Cannot push " << RI.getName(Reg) << '\n');
-    llvm_unreachable("Impossible reg-to-reg copy push");
-  }
+  // if (Reg == C65::A) {
+  //   BuildMI(MBB, MI, DL, get(C65::PHA));
+  // } else if (Reg == C65::X) {
+  //   BuildMI(MBB, MI, DL, get(C65::PHX));
+  // } else if (Reg == C65::Y) {
+  //   BuildMI(MBB, MI, DL, get(C65::PHY));
+  // } else if (Reg == C65::D) {
+  //   BuildMI(MBB, MI, DL, get(C65::PHD));
+  // } else if (Reg == C65::P) {
+  //   BuildMI(MBB, MI, DL, get(C65::PHP));
+  // } else {
+  //   DEBUG(dbgs() << "Cannot push " << RI.getName(Reg) << '\n');
+  //   llvm_unreachable("Impossible reg-to-reg copy push");
+  // }
 }
 
 void C65InstrInfo::buildPullReg(MachineBasicBlock &MBB,
                                 MachineBasicBlock::iterator MI,
                                 DebugLoc DL, unsigned Reg) const {
-  if (Reg == C65::A) {
-    BuildMI(MBB, MI, DL, get(C65::PLA));
-  } else if (Reg == C65::X) {
-    BuildMI(MBB, MI, DL, get(C65::PLX));
-  } else if (Reg == C65::Y) {
-    BuildMI(MBB, MI, DL, get(C65::PLY));
-  } else if (Reg == C65::D) {
-    BuildMI(MBB, MI, DL, get(C65::PLD));
-  } else if (Reg == C65::P) {
-    BuildMI(MBB, MI, DL, get(C65::PLP));
-  } else {
-    DEBUG(dbgs() << "Cannot pull " << RI.getName(Reg) << '\n');
-    llvm_unreachable("Impossible reg-to-reg copy pull");
-  }
+  // if (Reg == C65::A) {
+  //   BuildMI(MBB, MI, DL, get(C65::PLA));
+  // } else if (Reg == C65::X) {
+  //   BuildMI(MBB, MI, DL, get(C65::PLX));
+  // } else if (Reg == C65::Y) {
+  //   BuildMI(MBB, MI, DL, get(C65::PLY));
+  // } else if (Reg == C65::D) {
+  //   BuildMI(MBB, MI, DL, get(C65::PLD));
+  // } else if (Reg == C65::P) {
+  //   BuildMI(MBB, MI, DL, get(C65::PLP));
+  // } else {
+  //   DEBUG(dbgs() << "Cannot pull " << RI.getName(Reg) << '\n');
+  //   llvm_unreachable("Impossible reg-to-reg copy pull");
+  // }
 }
 
 void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
@@ -83,41 +83,41 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                << RI.getName(DestReg)
                << " to " << RI.getName(SrcReg) << '\n');
   MBB.dump();
-  if (SrcReg == C65::A && DestReg == C65::X) {
-    BuildMI(MBB, MI, DL, get(C65::TAX));
-  } else if (SrcReg == C65::A && DestReg == C65::Y) {
-    BuildMI(MBB, MI, DL, get(C65::TAY));
-  } else if (SrcReg == C65::X && DestReg == C65::A) {
-    BuildMI(MBB, MI, DL, get(C65::TXA));
-  } else if (SrcReg == C65::Y && DestReg == C65::A) {
-    BuildMI(MBB, MI, DL, get(C65::TYA));
-  } else if (SrcReg == C65::X && DestReg == C65::Y) {
-    BuildMI(MBB, MI, DL, get(C65::TXY));
-  } else if (SrcReg == C65::Y && DestReg == C65::X) {
-    BuildMI(MBB, MI, DL, get(C65::TYX));
-  } else if (SrcReg == C65::X && DestReg == C65::S) {
-    BuildMI(MBB, MI, DL, get(C65::TXS));
-  } else if (SrcReg == C65::S && DestReg == C65::X) {
-    BuildMI(MBB, MI, DL, get(C65::TSX));
-  } else if (SrcReg == C65::P || DestReg == C65::P ||
-             SrcReg == C65::D || DestReg == C65::D) {
-    buildPushReg(MBB, MI, DL, DestReg);
-    buildPullReg(MBB, MI, DL, SrcReg);
-  } else {
-    DEBUG(dbgs() << "Cannot copy " << RI.getName(SrcReg)
-                 << " to " << RI.getName(DestReg) << '\n');
-    llvm_unreachable("Impossible reg-to-reg copy");
-  }
+  // if (SrcReg == C65::A && DestReg == C65::X) {
+  //   BuildMI(MBB, MI, DL, get(C65::TAX));
+  // } else if (SrcReg == C65::A && DestReg == C65::Y) {
+  //   BuildMI(MBB, MI, DL, get(C65::TAY));
+  // } else if (SrcReg == C65::X && DestReg == C65::A) {
+  //   BuildMI(MBB, MI, DL, get(C65::TXA));
+  // } else if (SrcReg == C65::Y && DestReg == C65::A) {
+  //   BuildMI(MBB, MI, DL, get(C65::TYA));
+  // } else if (SrcReg == C65::X && DestReg == C65::Y) {
+  //   BuildMI(MBB, MI, DL, get(C65::TXY));
+  // } else if (SrcReg == C65::Y && DestReg == C65::X) {
+  //   BuildMI(MBB, MI, DL, get(C65::TYX));
+  // } else if (SrcReg == C65::X && DestReg == C65::S) {
+  //   BuildMI(MBB, MI, DL, get(C65::TXS));
+  // } else if (SrcReg == C65::S && DestReg == C65::X) {
+  //   BuildMI(MBB, MI, DL, get(C65::TSX));
+  // } else if (SrcReg == C65::P || DestReg == C65::P ||
+  //            SrcReg == C65::D || DestReg == C65::D) {
+  //   buildPushReg(MBB, MI, DL, DestReg);
+  //   buildPullReg(MBB, MI, DL, SrcReg);
+  // } else {
+  //   DEBUG(dbgs() << "Cannot copy " << RI.getName(SrcReg)
+  //                << " to " << RI.getName(DestReg) << '\n');
+  //   llvm_unreachable("Impossible reg-to-reg copy");
+  // }
 }
 
 unsigned C65InstrInfo::isStoreToStackSlot(const MachineInstr *MI,
                                           int &FrameIndex) const {
-  if (MI->getOpcode() == C65::STAis) {
-    if (MI->getOperand(0).isFI()) {
-      FrameIndex = MI->getOperand(0).getIndex();
-      return C65::A;
-    }
-  }
+  // if (MI->getOpcode() == C65::STAis) {
+  //   if (MI->getOperand(0).isFI()) {
+  //     FrameIndex = MI->getOperand(0).getIndex();
+  //     return C65::A;
+  //   }
+  // }
   return 0;
 }
 
@@ -127,24 +127,24 @@ storeRegToStackSlot(MachineBasicBlock &MBB,
                     unsigned SrcReg, bool isKill, int FI,
                     const TargetRegisterClass *RC,
                     const TargetRegisterInfo *TRI) const {
-  DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
-  if (SrcReg == C65::A) {
-    BuildMI(MBB, MBBI, DL, get(C65::STAis)).addFrameIndex(FI);
-  } else {
-    DEBUG(dbgs() << "Cannot store " << RI.getName(SrcReg)
-                 << " to stack frame\n");
-    llvm_unreachable("Unable to store reg from stack slot.");
-  }
+  // DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
+  // if (SrcReg == C65::A) {
+  //   BuildMI(MBB, MBBI, DL, get(C65::STAis)).addFrameIndex(FI);
+  // } else {
+  //   DEBUG(dbgs() << "Cannot store " << RI.getName(SrcReg)
+  //                << " to stack frame\n");
+  //   llvm_unreachable("Unable to store reg from stack slot.");
+  // }
 }
 
 unsigned C65InstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
                                            int &FrameIndex) const {
-  if (MI->getOpcode() == C65::LDAis) {
-    if (MI->getOperand(0).isFI()) {
-      FrameIndex = MI->getOperand(0).getIndex();
-      return C65::A;
-    }
-  }
+  // if (MI->getOpcode() == C65::LDAis) {
+  //   if (MI->getOperand(0).isFI()) {
+  //     FrameIndex = MI->getOperand(0).getIndex();
+  //     return C65::A;
+  //   }
+  // }
   return 0;
 }
 
@@ -154,12 +154,12 @@ loadRegFromStackSlot(MachineBasicBlock &MBB,
                      unsigned DestReg, int FI,
                      const TargetRegisterClass *RC,
                      const TargetRegisterInfo *TRI) const {
-  DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
-  if (DestReg == C65::A) {
-    BuildMI(MBB, MBBI, DL, get(C65::LDAis)).addFrameIndex(FI);
-  } else {
-    DEBUG(dbgs() << "Cannot load " << RI.getName(DestReg)
-                 << " from stack frame\n");
-    llvm_unreachable("Unable to load reg from stack slot.");
-  }
+  // DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
+  // if (DestReg == C65::A) {
+  //   BuildMI(MBB, MBBI, DL, get(C65::LDAis)).addFrameIndex(FI);
+  // } else {
+  //   DEBUG(dbgs() << "Cannot load " << RI.getName(DestReg)
+  //                << " from stack frame\n");
+  //   llvm_unreachable("Unable to load reg from stack slot.");
+  // }
 }

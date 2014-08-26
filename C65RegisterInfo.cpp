@@ -41,8 +41,10 @@ C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   return CSR_SaveList;
 }
 
+
 BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   BitVector Reserved(getNumRegs());
+  Reserved.set(C65::A);
   Reserved.set(C65::X);
   Reserved.set(C65::Y);
   Reserved.set(C65::S);
@@ -57,14 +59,15 @@ BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
 const TargetRegisterClass*
 C65RegisterInfo::getPointerRegClass(const MachineFunction &MF,
                                     unsigned Kind) const {
-  if (Kind == 0)
-    return &C65::IX16RegClass;
-  else if (Kind == 1)
-    return &C65::IY16RegClass;
-  else if (Kind == 2)
-    return &C65::IS16RegClass;
-  else
-    return &C65::ID16RegClass;
+  // if (Kind == 0)
+  //   return &C65::IX16RegClass;
+  // else if (Kind == 1)
+  //   return &C65::IY16RegClass;
+  // else if (Kind == 2)
+  //   return &C65::IS16RegClass;
+  // else
+  // return &C65::ID16RegClass;
+  return &C65::ZRC16RegClass;
 }
 
 unsigned

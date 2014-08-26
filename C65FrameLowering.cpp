@@ -32,42 +32,42 @@ C65FrameLowering::C65FrameLowering(const C65Subtarget &ST)
     ST(ST) {}
 
 void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
-  const MachineFrameInfo *MFI = MF.getFrameInfo();
-  const C65InstrInfo &TII =
-      *static_cast<const C65InstrInfo *>(MF.getSubtarget().getInstrInfo());
-  MachineBasicBlock &MBB = MF.front();
-  MachineBasicBlock::iterator MBBI = MBB.begin();
-  //  MachineModuleInfo &MMI = MF.getMMI();
-  //  const MCRegisterInfo *MRI = MMI.getContext().getRegisterInfo();
-  //  const std::vector<CalleeSavedInfo> &CSI = MFFrame->getCalleeSavedInfo();
-  //  bool HasFP = hasFP(MF);
-  DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
+  // const MachineFrameInfo *MFI = MF.getFrameInfo();
+  // const C65InstrInfo &TII =
+  //     *static_cast<const C65InstrInfo *>(MF.getSubtarget().getInstrInfo());
+  // MachineBasicBlock &MBB = MF.front();
+  // MachineBasicBlock::iterator MBBI = MBB.begin();
+  // //  MachineModuleInfo &MMI = MF.getMMI();
+  // //  const MCRegisterInfo *MRI = MMI.getContext().getRegisterInfo();
+  // //  const std::vector<CalleeSavedInfo> &CSI = MFFrame->getCalleeSavedInfo();
+  // //  bool HasFP = hasFP(MF);
+  // DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
 
-  int NumBytes = (int)MFI->getStackSize();
+  // int NumBytes = (int)MFI->getStackSize();
 
-  while (NumBytes > 0) {
-    // Push 2 bytes
-    BuildMI(MBB, MBBI, DL, TII.get(C65::PHA));
-    NumBytes -= 2;
-  }
+  // while (NumBytes > 0) {
+  //   // Push 2 bytes
+  //   BuildMI(MBB, MBBI, DL, TII.get(C65::PHA));
+  //   NumBytes -= 2;
+  // }
 }
 
 void C65FrameLowering::emitEpilogue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
-  const MachineFrameInfo *MFI = MF.getFrameInfo();
-  const C65InstrInfo &TII =
-      *static_cast<const C65InstrInfo *>(MF.getSubtarget().getInstrInfo());
-  MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
-  assert(MBBI != MBB.end() && "Returning block has no instructions");
-  DebugLoc DL = MBBI->getDebugLoc();
+  // const MachineFrameInfo *MFI = MF.getFrameInfo();
+  // const C65InstrInfo &TII =
+  //     *static_cast<const C65InstrInfo *>(MF.getSubtarget().getInstrInfo());
+  // MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
+  // assert(MBBI != MBB.end() && "Returning block has no instructions");
+  // DebugLoc DL = MBBI->getDebugLoc();
 
-  int NumBytes = (int)MFI->getStackSize();
+  // int NumBytes = (int)MFI->getStackSize();
 
-  while (NumBytes > 0) {
-    // Pull 2 bytes
-    BuildMI(MBB, MBBI, DL, TII.get(C65::PLA));
-    NumBytes -= 2;
-  }
+  // while (NumBytes > 0) {
+  //   // Pull 2 bytes
+  //   BuildMI(MBB, MBBI, DL, TII.get(C65::PLA));
+  //   NumBytes -= 2;
+  // }
 }
 
 // hasFP - Return true if the specified function should have a dedicated frame

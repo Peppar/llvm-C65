@@ -40,20 +40,20 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
     : TargetLowering(TM, new TargetLoweringObjectFileELF()) {
   Subtarget = &TM.getSubtarget<C65Subtarget>();
 
-  // Set up the register classes.
-  addRegisterClass(MVT::i16, &C65::ACC16RegClass);
-  addRegisterClass(MVT::i16, &C65::IX16RegClass);
-  addRegisterClass(MVT::i16, &C65::IY16RegClass);
-  addRegisterClass(MVT::i16, &C65::IS16RegClass);
-  addRegisterClass(MVT::i16, &C65::PC_REGRegClass);
-  addRegisterClass(MVT::i8, &C65::BANK_REGRegClass);
-  addRegisterClass(MVT::i8, &C65::CCRRegClass);
-
   // Zero-page registers
   addRegisterClass(MVT::i8, &C65::ZRC8RegClass);
   addRegisterClass(MVT::i16, &C65::ZRC16RegClass);
   addRegisterClass(MVT::i32, &C65::ZRC32RegClass);
   addRegisterClass(MVT::i64, &C65::ZRC64RegClass);
+
+  // Set up the register classes.
+  // addRegisterClass(MVT::i16, &C65::ACC16RegClass);
+  // addRegisterClass(MVT::i16, &C65::IX16RegClass);
+  // addRegisterClass(MVT::i16, &C65::IY16RegClass);
+  // addRegisterClass(MVT::i16, &C65::IS16RegClass);
+  addRegisterClass(MVT::i16, &C65::PC_REGRegClass);
+  addRegisterClass(MVT::i8, &C65::BANK_REGRegClass);
+  addRegisterClass(MVT::i8, &C65::CCRRegClass);
 
 
   // TODO: Remove these for bare-bones?
@@ -164,10 +164,10 @@ C65TargetLowering::emitZROp(MachineInstr *MI,
       *static_cast<const C65RegisterInfo *>(Subtarget->getRegisterInfo());
   DebugLoc DL = MI->getDebugLoc();
 
-  if (ClearCarry) {
-    // Clear carry before the operation
-    BuildMI(*MBB, MI, DL, TII.get(C65::CLC));
-  }
+  // if (ClearCarry) {
+  //   // Clear carry before the operation
+  //   BuildMI(*MBB, MI, DL, TII.get(C65::CLC));
+  // }
 
   MachineInstrBuilder MIB = BuildMI(*MBB, MI, DL, TII.get(OpCode));
 
@@ -203,20 +203,20 @@ C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
 
   switch (MI->getOpcode()) {
   default: llvm_unreachable("Unknown custom opcode to emit!");
-  case C65::MOVza: return emitZROp(MI, MBB, C65::STAzp, 2, ST_order);
-  case C65::MOVzx: return emitZROp(MI, MBB, C65::STXzp, 2, ST_order);
-  case C65::MOVzy: return emitZROp(MI, MBB, C65::STYzp, 2, ST_order);
-  case C65::MOVaz: return emitZROp(MI, MBB, C65::LDAzp, 2, LD_order);
-  case C65::MOVxz: return emitZROp(MI, MBB, C65::LDXzp, 2, LD_order);
-  case C65::MOVyz: return emitZROp(MI, MBB, C65::LDYzp, 2, LD_order);
-  case C65::ANDaz: return emitZROp(MI, MBB, C65::AND16zp, 2, AND_OR_XOR_order);
-  case C65::ORaz:  return emitZROp(MI, MBB, C65::ORA16zp, 2, AND_OR_XOR_order);
-  case C65::XORaz: return emitZROp(MI, MBB, C65::EOR16zp, 2, AND_OR_XOR_order);
-  case C65::STZz:  return emitZROp(MI, MBB, C65::STZzp, 1, STZ_INC_DEC_order);
-  case C65::INCz:  return emitZROp(MI, MBB, C65::INCzp, 1, STZ_INC_DEC_order);
-  case C65::DECz:  return emitZROp(MI, MBB, C65::DECzp, 1, STZ_INC_DEC_order);
-  case C65::ADDaz: return emitZROp(MI, MBB, C65::ADC16zp, 3, ADD_SUB_order, true);
-  case C65::SUBaz: return emitZROp(MI, MBB, C65::SBC16zp, 3, ADD_SUB_order, true);
+  // case C65::MOVza: return emitZROp(MI, MBB, C65::STAzp, 2, ST_order);
+  // case C65::MOVzx: return emitZROp(MI, MBB, C65::STXzp, 2, ST_order);
+  // case C65::MOVzy: return emitZROp(MI, MBB, C65::STYzp, 2, ST_order);
+  // case C65::MOVaz: return emitZROp(MI, MBB, C65::LDAzp, 2, LD_order);
+  // case C65::MOVxz: return emitZROp(MI, MBB, C65::LDXzp, 2, LD_order);
+  // case C65::MOVyz: return emitZROp(MI, MBB, C65::LDYzp, 2, LD_order);
+  // case C65::ANDaz: return emitZROp(MI, MBB, C65::AND16zp, 2, AND_OR_XOR_order);
+  // case C65::ORaz:  return emitZROp(MI, MBB, C65::ORA16zp, 2, AND_OR_XOR_order);
+  // case C65::XORaz: return emitZROp(MI, MBB, C65::EOR16zp, 2, AND_OR_XOR_order);
+  // case C65::STZz:  return emitZROp(MI, MBB, C65::STZzp, 1, STZ_INC_DEC_order);
+  // case C65::INCz:  return emitZROp(MI, MBB, C65::INC16zp, 1, STZ_INC_DEC_order);
+  // case C65::DECz:  return emitZROp(MI, MBB, C65::DEC16zp, 1, STZ_INC_DEC_order);
+  // case C65::ADDaz: return emitZROp(MI, MBB, C65::ADC16zp, 3, ADD_SUB_order, true);
+  // case C65::SUBaz: return emitZROp(MI, MBB, C65::SBC16zp, 3, ADD_SUB_order, true);
   }
 }
 
@@ -321,7 +321,7 @@ LowerFormalArguments(SDValue Chain,
     EVT LocVT = VA.getLocVT();
     if (VA.isRegLoc()) {
       // Reserve a register for the incoming parameter
-      unsigned VReg = MRI.createVirtualRegister(&C65::ACC16RegClass);
+      unsigned VReg = MRI.createVirtualRegister(&C65::ZRC16RegClass);
       MRI.addLiveIn(VA.getLocReg(), VReg);
       ArgValue = DAG.getCopyFromReg(Chain, DL, VReg, MVT::i16);
     } else {
