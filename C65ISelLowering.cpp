@@ -146,42 +146,89 @@ LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   }
 }
 
-/// Emit a new machine instruction OpCode, with the operands
-/// re-ordered according to NumOps and OpOrder. Replaces occurrences
-/// of zero-page registers ZR with their corresponding zero-page
-/// addresses
-///
-MachineBasicBlock*
-C65TargetLowering::emitZROp(MachineInstr *MI,
-                            MachineBasicBlock *MBB,
-			    unsigned OpCode,
-			    unsigned NumOps,
-			    const unsigned *OpOrder,
-                            bool ClearCarry) const {
-
+MCInstrDesc C65TargetLowering::getOp(unsigned Op) const {
   const TargetInstrInfo &TII = *Subtarget->getInstrInfo();
+  return TII.get(Op);
+}
+
+
+
+//Module* mod = new Module("test", getGlobalContext());
+//Constant* c = mod->getOrInsertFunction("main",
+//  IntegerType::get(getGlobalContext(), 32), NULL);
+//Function* main = cast<Function>  (c);
+//main->setCallingConv(CallingConv::C);
+//Twine s("foo");
+//StringRef s1("foo");
+//Constant *cons = ConstantArray::get(getGlobalContext(),s1, true);
+//GlobalVariable val(*mod,
+//ArrayType::get(Type::getInt8Ty(getGlobalContext()), 4),
+//               true,GlobalValue::ExternalLinkage, cons, s);
+
+
+// Get Ptr from Val
+//Value* ptr = ConstantExpr::getIntToPtr((Constant*)loc[n],PointerType::getUnqual(builder->getInt32Ty()));
+
+
+
+uint8_t C65TargetLowering::getZRAddress(MachineOperand Val) const {
   const C65RegisterInfo &TRI =
       *static_cast<const C65RegisterInfo *>(Subtarget->getRegisterInfo());
-  DebugLoc DL = MI->getDebugLoc();
+  //  CurDAG->getConstant(, Op.getValueType());
+  return TRI.getZRAddress(Val.getReg());
+}
 
-  // if (ClearCarry) {
-  //   // Clear carry before the operation
-  //   BuildMI(*MBB, MI, DL, TII.get(C65::CLC));
-  // }
-
-  MachineInstrBuilder MIB = BuildMI(*MBB, MI, DL, TII.get(OpCode));
-
-  // Reorder the operands, and replace ZR references by ZP addresses
-  for (unsigned i = 0; i != NumOps; ++i) {
-    MachineOperand &Op = MI->getOperand(OpOrder[i]);
-    if(Op.isReg() && C65::ZRC16RegClass.contains(Op.getReg())) {
-      MIB.addImm(TRI.getZRAddress(Op.getReg()));
-    } else {
-      MIB.addOperand(Op);
-    }
+/// Get the operand size of the function. This should be replaced by a
+/// more declarative approach.
+///
+static unsigned getOpByteSize(unsigned Op) {
+  switch (Op) {
+  default: llvm_unreachable("Unknown opcode!");
+  case C65::STZ8z:
+  case C65::ST8zi:
+  case C65::LD8zi:
+  case C65::LD8zimm:
+  case C65::AND8zz:
+  case C65::OR8zz:
+  case C65::XOR8zz:
+  case C65::MOV8zz:
+  case C65::ADD8zz:
+  case C65::SUB8zz:
+    return 1;
+  case C65::STZ16z:
+  case C65::ST16zi:
+  case C65::LD16zi:
+  case C65::LD16zimm:
+  case C65::AND16zz:
+  case C65::OR16zz:
+  case C65::XOR16zz:
+  case C65::MOV16zz:
+  case C65::ADD16zz:
+  case C65::SUB16zz:
+    return 2;
+  case C65::STZ32z:
+  case C65::ST32zi:
+  case C65::LD32zi:
+  case C65::LD32zimm:
+  case C65::AND32zz:
+  case C65::OR32zz:
+  case C65::XOR32zz:
+  case C65::MOV32zz:
+  case C65::ADD32zz:
+  case C65::SUB32zz:
+    return 4;
+  case C65::STZ64z:
+  case C65::ST64zi:
+  case C65::LD64zi:
+  case C65::LD64zimm:
+  case C65::AND64zz:
+  case C65::OR64zz:
+  case C65::XOR64zz:
+  case C65::MOV64zz:
+  case C65::ADD64zz:
+  case C65::SUB64zz:
+    return 8;
   }
-
-  return MBB;
 }
 
 /// This method should be implemented by targets that mark
@@ -195,29 +242,99 @@ C65TargetLowering::emitZROp(MachineInstr *MI,
 MachineBasicBlock *
 C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                MachineBasicBlock *MBB) const {
-  static const unsigned ST_order[2] = {1, 0};
-  static const unsigned LD_order[2] = {0, 1};
-  static const unsigned AND_OR_XOR_order[2] = {0, 2};
-  static const unsigned STZ_INC_DEC_order[2] = {1, 0};
-  static const unsigned ADD_SUB_order[3] = {0, 1, 2};
+  unsigned NumBytes = getOpByteSize(MI->getOpcode());
+  DebugLoc DL = MI->getDebugLoc();
 
-  switch (MI->getOpcode()) {
-  default: llvm_unreachable("Unknown custom opcode to emit!");
-  // case C65::MOVza: return emitZROp(MI, MBB, C65::STAzp, 2, ST_order);
-  // case C65::MOVzx: return emitZROp(MI, MBB, C65::STXzp, 2, ST_order);
-  // case C65::MOVzy: return emitZROp(MI, MBB, C65::STYzp, 2, ST_order);
-  // case C65::MOVaz: return emitZROp(MI, MBB, C65::LDAzp, 2, LD_order);
-  // case C65::MOVxz: return emitZROp(MI, MBB, C65::LDXzp, 2, LD_order);
-  // case C65::MOVyz: return emitZROp(MI, MBB, C65::LDYzp, 2, LD_order);
-  // case C65::ANDaz: return emitZROp(MI, MBB, C65::AND16zp, 2, AND_OR_XOR_order);
-  // case C65::ORaz:  return emitZROp(MI, MBB, C65::ORA16zp, 2, AND_OR_XOR_order);
-  // case C65::XORaz: return emitZROp(MI, MBB, C65::EOR16zp, 2, AND_OR_XOR_order);
-  // case C65::STZz:  return emitZROp(MI, MBB, C65::STZzp, 1, STZ_INC_DEC_order);
-  // case C65::INCz:  return emitZROp(MI, MBB, C65::INC16zp, 1, STZ_INC_DEC_order);
-  // case C65::DECz:  return emitZROp(MI, MBB, C65::DEC16zp, 1, STZ_INC_DEC_order);
-  // case C65::ADDaz: return emitZROp(MI, MBB, C65::ADC16zp, 3, ADD_SUB_order, true);
-  // case C65::SUBaz: return emitZROp(MI, MBB, C65::SBC16zp, 3, ADD_SUB_order, true);
+  if (NumBytes == 1) {
+    BuildMI(*MBB, MI, DL, getOp(C65::SEP))
+      .addImm(0x20);
   }
+  for (unsigned I = 0; I < NumBytes; I += 2) {
+    switch (MI->getOpcode()) {
+    default: llvm_unreachable("Unknown custom opcode to emit!");
+    case C65::STZ8z:
+    case C65::STZ16z:
+    case C65::STZ32z:
+    case C65::STZ64z: {
+      BuildMI(*MBB, MI, DL, getOp(C65::STZzp))
+        .addImm(getZRAddress(MI->getOperand(0)), I);
+    } break;
+    case C65::ST8zi:
+    case C65::ST16zi:
+    case C65::ST32zi:
+    case C65::ST64zi: {
+      BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
+        .addImm(getZRAddress(MI->getOperand(0)), I);
+      BuildMI(*MBB, MI, DL, getOp(C65::STAi))
+        .addGlobalAddress(MI->getOperand(1).getGlobal(), I);
+    } break;
+    case C65::LD8zi:
+    case C65::LD16zi:
+    case C65::LD32zi:
+    case C65::LD64zi: {
+      BuildMI(*MBB, MI, DL, getOp(C65::LDAi))
+        .addGlobalAddress(MI->getOperand(1).getGlobal(), I);
+      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
+        .addImm(getZRAddress(MI->getOperand(0)), I);
+    } break;
+    case C65::LD8zimm:
+    case C65::LD16zimm:
+    case C65::LD32zimm:
+    case C65::LD64zimm: {
+      BuildMI(*MBB, MI, DL, getOp(C65::LDAimm))
+        .addImm(MI->getOperand(1).getImm() >> (16 * I) & 0xFFFF);
+      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
+        .addImm(getZRAddress(MI->getOperand(0)), I);
+    } break;
+    case C65::AND8zz:
+    case C65::AND16zz:
+    case C65::AND32zz:
+    case C65::AND64zz: {
+      BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
+        .addImm(getZRAddress(MI->getOperand(1)), I);
+      BuildMI(*MBB, MI, DL, getOp(C65::ANDzp))
+        .addImm(getZRAddress(MI->getOperand(2)), I);
+      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
+        .addImm(getZRAddress(MI->getOperand(0)), I);
+    } break;
+    case C65::OR8zz:
+    case C65::OR16zz:
+    case C65::OR32zz:
+    case C65::OR64zz: {
+      BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
+        .addImm(getZRAddress(MI->getOperand(1)), I);
+      BuildMI(*MBB, MI, DL, getOp(C65::ORAzp))
+        .addImm(getZRAddress(MI->getOperand(2)), I);
+      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
+        .addImm(getZRAddress(MI->getOperand(0)), I);
+    } break;
+    case C65::XOR8zz:
+    case C65::XOR16zz:
+    case C65::XOR32zz:
+    case C65::XOR64zz: {
+      BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
+        .addImm(getZRAddress(MI->getOperand(1)), I);
+      BuildMI(*MBB, MI, DL, getOp(C65::EORzp))
+        .addImm(getZRAddress(MI->getOperand(2)), I);
+      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
+        .addImm(getZRAddress(MI->getOperand(0)), I);
+    } break;
+    case C65::MOV8zz:
+    case C65::MOV16zz:
+    case C65::MOV32zz:
+    case C65::MOV64zz: {
+      BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
+        .addImm(getZRAddress(MI->getOperand(1)), I);
+      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
+        .addImm(getZRAddress(MI->getOperand(0)), I);
+    } break;
+    }
+  }
+  if (NumBytes == 1) {
+    BuildMI(*MBB, MI, DL, getOp(C65::REP))
+      .addImm(0x20);
+  }
+  return MBB;
 }
 
 /// Return true if folding a constant offset with the given

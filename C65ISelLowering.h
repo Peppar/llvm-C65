@@ -16,6 +16,8 @@
 #define LLVM_TARGET_C65_ISELLOWERING_H
 
 #include "C65.h"
+#include "llvm/CodeGen/MachineOperand.h"
+#include "llvm/MC/MCInstrDesc.h"
 #include "llvm/Target/TargetLowering.h"
 
 namespace llvm {
@@ -51,10 +53,9 @@ namespace llvm {
                                        const SelectionDAG &DAG,
                                        unsigned Depth = 0) const override;
 
-    MachineBasicBlock*
-      emitZROp(MachineInstr *MI, MachineBasicBlock *MBB,
-               unsigned OpCode, unsigned NumOps,
-               const unsigned *OpOrder, bool ClearCarry = false) const;
+    MCInstrDesc getOp(unsigned Op) const;
+
+    uint8_t getZRAddress(MachineOperand Val) const;
 
     MachineBasicBlock *
       EmitInstrWithCustomInserter(MachineInstr *MI,
