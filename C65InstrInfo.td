@@ -551,13 +551,11 @@ let Defs = [S, P], Uses = [S], isCodeGenOnly = 1 in {
 //===----------------------------------------------------------------------===//
 
 class ZPInstr<dag outs, dag ins, string asmstr, list<dag> pattern>
-    : InstC65<outs, ins, asmstr, pattern> {
-  let isPseudo = 1;
-}
+    : InstC65<outs, ins, asmstr, pattern>;
 
 class MOVzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src), ";MOV $dst,$src",
-            [(set Ty:$dst, Ty:$src)]>;
+            [(set RC:$dst, RC:$src)]>;
 
 def MOV8zz  : MOVzz<ZRC8,  i8>;
 def MOV16zz : MOVzz<ZRC16, i16>;
@@ -577,7 +575,7 @@ def STZ64z : STZz<ZRC64, i64>;
 
 class STzi<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs), (ins RC:$src, mem_a16:$mem), ";STORE $src,$mem",
-            [(store Ty:$src, tglobaladdr:$mem)]> {
+            [(store RC:$src, tglobaladdr:$mem)]> {
   let mayStore = 1;
 }
 
@@ -588,7 +586,7 @@ def ST64zi : STzi<ZRC64, i64>;
 
 class LDzi<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins mem_a16:$mem), ";LOAD $dst,$mem",
-            [(set Ty:$dst, (load tglobaladdr:$mem))]> {
+            [(set RC:$dst, (load tglobaladdr:$mem))]> {
   let mayLoad = 1;
 }
 
@@ -604,7 +602,7 @@ def LD64zi : LDzi<ZRC64, i64>;
 
 class LDzimm<RegisterClass RC, ValueType Ty, Operand immOp>
   : ZPInstr<(outs RC:$dst), (ins immOp:$imm), ";LOAD $dst,$imm",
-            [(set Ty:$dst, imm:$imm)]> {
+            [(set RC:$dst, imm:$imm)]> {
   let isMoveImm = 1;
 }
 
@@ -615,7 +613,7 @@ def LD64zimm : LDzimm<ZRC64, i64, i64imm>;
 
 class ANDzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src1, RC:$src2), ";AND $dst,$src1,$src2",
-            [(set Ty:$dst, (and Ty:$src1, Ty:$src2))]>;
+            [(set RC:$dst, (and RC:$src1, RC:$src2))]>;
 
 def AND8zz  : ANDzz<ZRC8,  i8>;
 def AND16zz : ANDzz<ZRC16, i16>;
@@ -624,7 +622,7 @@ def AND64zz : ANDzz<ZRC64, i64>;
 
 class ORzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src1, RC:$src2), ";OR $dst,$src1,$src2",
-            [(set Ty:$dst, (or Ty:$src1, Ty:$src2))]>;
+            [(set RC:$dst, (or RC:$src1, RC:$src2))]>;
 
 def OR8zz  : ORzz<ZRC8,  i8>;
 def OR16zz : ORzz<ZRC16, i16>;
@@ -633,7 +631,7 @@ def OR64zz : ORzz<ZRC64, i64>;
 
 class XORzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src1, RC:$src2), ";XOR $dst,$src1,$src2",
-            [(set Ty:$dst, (xor Ty:$src1, Ty:$src2))]>;
+            [(set RC:$dst, (xor RC:$src1, RC:$src2))]>;
 
 def XOR8zz  : XORzz<ZRC8,  i8>;
 def XOR16zz : XORzz<ZRC16, i16>;
@@ -642,7 +640,7 @@ def XOR64zz : XORzz<ZRC64, i64>;
 
 class ADDzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src1, RC:$src2), ";ADD $dst,$src1,$src2",
-            [(set Ty:$dst, (add Ty:$src1, Ty:$src2))]>;
+            [(set RC:$dst, (add RC:$src1, RC:$src2))]>;
 
 def ADD8zz  : ADDzz<ZRC8,  i8>;
 def ADD16zz : ADDzz<ZRC16, i16>;
@@ -651,7 +649,7 @@ def ADD64zz : ADDzz<ZRC64, i64>;
 
 class SUBzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src1, RC:$src2), ";SUB $dst,$src1,$src2",
-            [(set Ty:$dst, (sub Ty:$src1, Ty:$src2))]>;
+            [(set RC:$dst, (sub RC:$src1, RC:$src2))]>;
 
 def SUB8zz  : SUBzz<ZRC8,  i8>;
 def SUB16zz : SUBzz<ZRC16, i16>;
