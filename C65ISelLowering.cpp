@@ -51,10 +51,12 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   // addRegisterClass(MVT::i16, &C65::IX16RegClass);
   // addRegisterClass(MVT::i16, &C65::IY16RegClass);
   // addRegisterClass(MVT::i16, &C65::IS16RegClass);
-  addRegisterClass(MVT::i16, &C65::PC_REGRegClass);
-  addRegisterClass(MVT::i8, &C65::BANK_REGRegClass);
-  addRegisterClass(MVT::i8, &C65::CCRRegClass);
+  // addRegisterClass(MVT::i16, &C65::PC_REGRegClass);
+  // addRegisterClass(MVT::i8, &C65::BANK_REGRegClass);
+  // addRegisterClass(MVT::i8, &C65::CCRRegClass);
 
+  // Compute derived properties from the register classes
+  computeRegisterProperties();
 
   // TODO: Remove these for bare-bones?
   // C65 has no *EXTLOAD
@@ -88,8 +90,6 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
 
   // TODO: Remove this for bare-bones?
   setStackPointerRegisterToSaveRestore(C65::S);
-
-  computeRegisterProperties();
 }
 
 /// This method returns the name of a target specific DAG node.
@@ -223,99 +223,6 @@ static unsigned getOpByteSize(unsigned Op) {
 MachineBasicBlock *
 C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
                                                MachineBasicBlock *MBB) const {
-  unsigned NumBytes = getOpByteSize(MI->getOpcode());
-  DebugLoc DL = MI->getDebugLoc();
-
-  if (NumBytes == 1) {
-    BuildMI(*MBB, MI, DL, getOp(C65::SEP))
-      .addImm(0x20);
-  }
-  MI->dump();
-  for (unsigned I = 0; I < NumBytes; I += 2) {
-    switch (MI->getOpcode()) {
-    default: llvm_unreachable("Unknown custom opcode to emit!");
-    case C65::STZ8z:
-    case C65::STZ16z:
-    case C65::STZ32z:
-    case C65::STZ64z: {
-      BuildMI(*MBB, MI, DL, getOp(C65::STZzp))
-        .addImm(getZRAddress(MI->getOperand(0)) + I);
-    } break;
-    case C65::ST8zi:
-    case C65::ST16zi:
-    case C65::ST32zi:
-    case C65::ST64zi: {
-      BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
-        .addImm(getZRAddress(MI->getOperand(0)) + I);
-      BuildMI(*MBB, MI, DL, getOp(C65::STAi))
-        .addGlobalAddress(MI->getOperand(1).getGlobal(), I);
-    } break;
-    case C65::LD8zi:
-    case C65::LD16zi:
-    case C65::LD32zi:
-    case C65::LD64zi: {
-      BuildMI(*MBB, MI, DL, getOp(C65::LDAi))
-        .addGlobalAddress(MI->getOperand(1).getGlobal(), I);
-      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)) + I);
-    } break;
-    case C65::LD8zimm:
-    case C65::LD16zimm:
-    case C65::LD32zimm:
-    case C65::LD64zimm: {
-      BuildMI(*MBB, MI, DL, getOp(C65::LDAimm))
-        .addImm(MI->getOperand(1).getImm() >> (16 * I) & 0xFFFF);
-      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)) + I);
-    } break;
-    case C65::AND8zz:
-    case C65::AND16zz:
-    case C65::AND32zz:
-    case C65::AND64zz: {
-      BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
-        .addImm(getZRAddress(MI->getOperand(1)) + I);
-      BuildMI(*MBB, MI, DL, getOp(C65::ANDzp))
-        .addImm(getZRAddress(MI->getOperand(2)) + I);
-      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)) + I);
-    } break;
-    case C65::OR8zz:
-    case C65::OR16zz:
-    case C65::OR32zz:
-    case C65::OR64zz: {
-      BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
-        .addImm(getZRAddress(MI->getOperand(1)) + I);
-      BuildMI(*MBB, MI, DL, getOp(C65::ORAzp))
-        .addImm(getZRAddress(MI->getOperand(2)) + I);
-      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)) + I);
-    } break;
-    case C65::XOR8zz:
-    case C65::XOR16zz:
-    case C65::XOR32zz:
-    case C65::XOR64zz: {
-      BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
-        .addImm(getZRAddress(MI->getOperand(1)) + I);
-      BuildMI(*MBB, MI, DL, getOp(C65::EORzp))
-        .addImm(getZRAddress(MI->getOperand(2)) + I);
-      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)) + I);
-    } break;
-    case C65::MOV8zz:
-    case C65::MOV16zz:
-    case C65::MOV32zz:
-    case C65::MOV64zz: {
-      BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
-        .addImm(getZRAddress(MI->getOperand(1)) + I);
-      BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)) + I);
-    } break;
-    }
-  }
-  if (NumBytes == 1) {
-    BuildMI(*MBB, MI, DL, getOp(C65::REP))
-      .addImm(0x20);
-  }
   return MBB;
 }
 

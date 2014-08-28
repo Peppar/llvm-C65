@@ -46,9 +46,6 @@ public:
       TM(tm) {
   }
 
-  bool IsSimpleNode(SDValue N) const;
-  SDValue SpillValue(SDValue N, SDLoc DL);
-
   SDNode *Select(SDNode *N) override;
 
   // Complex pattern selectors
@@ -149,144 +146,31 @@ bool C65DAGToDAGISel::SelectAddrXY(SDValue Addr, SDValue &Base,
   return false;
 }
 
-bool C65DAGToDAGISel::IsSimpleNode(SDValue N) const {
-  return N.getOpcode() == ISD::LOAD ||
-         N.getOpcode() == ISD::Constant;
-}
-
-/// Insert a load and a store to the stack frame for the specified
-/// SDValue
-///
-// SDValue C65DAGToDAGISel::SpillValue(SDValue N, SDLoc DL) {
-//   EVT PtrVT = TM.getTargetLowering()->getPointerTy();
-//   MVT NVT = N->getSimpleValueType(0);
-//   MachineFunction &MF = CurDAG->getMachineFunction();
-//   MachineFrameInfo *MFI = MF.getFrameInfo();
-
-//   unsigned Size = NVT.getSizeInBits() / 8;
-
-//   int FI = MFI->CreateSpillStackObject(Size, 1);
-
-//   SDValue FIN = CurDAG->getFrameIndex(FI, PtrVT);
-//   SDValue Offset = CurDAG->getConstant(0, PtrVT);
-
-//   SmallVector<SDValue, 4> Args;
-//   Args.push_back(N);
-//   Args.push_back(FIN);
-//   Args.push_back(Offset);
-//   Args.push_back(CurDAG->getEntryNode());
-
-//   SDNode *Store = CurDAG->getMachineNode(C65::STAis, DL, MVT::Other, Args);
-
-//   //SDValue Load = DAG.getMachineNode(C65::LDAis, DL, NVT, FIN,
-//   //                                  CurDAG->getEntryNode());
-
-//   // SDValue Store = CurDAG->getStore(CurDAG->getEntryNode(), DL, N, FIN,
-//   //                                  MachinePointerInfo::getFixedStack(FI),
-//   //                                  false, false, false, 0);
-
-//   //  CurDAG->viewGraph();
-
-//   Store->dump();
-
-//   SDValue(Store, 0).dump();
-
-//   SDValue Load = CurDAG->getLoad(NVT, DL, SDValue(Store, 0), FIN,
-//                                  MachinePointerInfo::getFixedStack(FI),
-//                                  false, false, false, 0);
-
-//   return Load;
-// }
-
 SDNode *C65DAGToDAGISel::Select(SDNode *N) {
   MVT NVT = N->getSimpleValueType(0);
   SDLoc DL(N);
-  //  C65InstInfo *II = TM.getInstrInfo();
 
   if (N->isMachineOpcode()) {
+    DEBUG(dbgs() << "== ";  N->dump(CurDAG); dbgs() << '\n');
     N->setNodeId(-1);
     return nullptr;   // Already selected.
   }
 
-  // Insert register-spilling...
   switch (N->getOpcode()) {
-  // case ISD::ADD:
-  // case ISD::SUB:
-  // case ISD::AND:
-  // case ISD::OR:
-  // case ISD::XOR: {
-  //   // If both operands are complex, then spill one of them to the stack frame
-  //   SDValue N0 = N->getOperand(0);
-  //   SDValue N1 = N->getOperand(1);
-  //   DEBUG({
-  //     dbgs() << "MATCH AND/OR/XOR: ";
-  //     N->dump();
-  //     N0.dump();
-  //     N1.dump();
-  //   });
-  //   if (!IsSimpleNode(N1)) {
-  //     //      SDValue Store = CurDAG->getStore(Chain, DL,
-  //     //      N->getOperand(1), FI, MMO); SDValue Load =
-  //     //      CurDAG->getLoad(ISD::UNINDEXED, ISD::NON_EXTLOAD, DL,
-  //     //      MVT, Chain, FI, Undef, NVT, DL, Chain, FI, MMO); SDValue
-  //     //      NewVal0 = CurDAG->getConstant(123, NVT); SDValue NewVal1
-  //     //      = CurDAG->getConstant(456, NVT);
-  //     //      CurDAG->viewGraph();
-
-  // // EVT PtrVT = TM.getTargetLowering()->getPointerTy();
-  // // MVT NVT = N->getSimpleValueType(0);
-  // // MachineFunction &MF = CurDAG->getMachineFunction();
-  // // MachineFrameInfo *MFI = MF.getFrameInfo();
-
-  // // unsigned Size = NVT.getSizeInBits() / 8;
-
-  // // int FI = MFI->CreateSpillStackObject(Size, 1);
-  // // SDValue FIN = CurDAG->getFrameIndex(FI, PtrVT);
-
-  // // SDValue Store = CurDAG->getStore(CurDAG->getEntryNode(), DL, N1, FIN,
-  // //                                  MachinePointerInfo::getFixedStack(FI),
-  // //                                  false, false, false, 0);
-
-  // // Store = SelectCode(Store.getNode());
-
-  // // SDValue Load = CurDAG->getLoad(NVT, DL, Store, FIN,
-  // //                                MachinePointerInfo::getFixedStack(FI),
-  // //                                false, false, false, 0);
-
-  // // Load = SelectCode(Load.getNode());
-
-  //     SDValue Load = SpillValue(N1, DL);
-
-  //     // SDValue FI = CurDAG->CreateStackTemporary(NVT, 1);
-  //     // int Index = FI.getNode->
-  //     // unsigned ByteSize = NVT.getSizeInBits() / 8;
-  //     // MachineMemOperand *MMO;
-
-  //     // MMO = DAG.getMachineFunction()
-  //     //         .getMachineMemOperand(MachinePointerInfo::getFixedStack(FI),
-  //     //                               MachineMemOperand::MOStore, ByteSize);
-
-  //     // SDValue Store = CurDAG->getStore(N1, DL, N1, FI, MMO);
-
-  //     // MMO = DAG.getMachineFunction()
-  //     //         .getMachineMemOperand(MachinePointerInfo::getFixedStack(FI),
-  //     //                               MachineMemOperand::MOLoad, ByteSize);
-
-  //     // SDValue Load = CurDAG->getLoad(NVT, DL, Store, FI, MMO);
-
-  //     //      CurDAG->viewGraph();
-
-  //     CurDAG->UpdateNodeOperands(N, N0, Load);
-
-  //     //      CurDAG->viewGraph();
-  //   }
-  // } break;
   default: break;
   }
 
-  return SelectCode(N);
-}
+  SDNode *ResNode = SelectCode(N);
 
+  DEBUG(dbgs() << "=> ";
+        if (ResNode == nullptr || ResNode == N)
+          N->dump(CurDAG);
+        else
+          ResNode->dump(CurDAG);
+        dbgs() << '\n');
+
+  return ResNode;
+}
 
 /// SelectInlineAsmMemoryOperand - Implement addressing mode selection
 /// for inline asm expressions.
@@ -295,17 +179,7 @@ bool
 C65DAGToDAGISel::SelectInlineAsmMemoryOperand(const SDValue &Op,
                                               char ConstraintCode,
                                               std::vector<SDValue> &OutOps) {
-  // SDValue Op0, Op1;
-  // switch (ConstraintCode) {
-  // default: return true;
-  // case 'm':   // memory
-  //  if (!SelectADDRrr(Op, Op0, Op1))
-  //    SelectADDRri(Op, Op0, Op1);
-  //  break;
-  // }
-
-  //OutOps.push_back(Op0);
-  //OutOps.push_back(Op1);
+  // TODO
   return true;
 }
 
