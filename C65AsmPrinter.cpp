@@ -26,6 +26,7 @@
 #include "llvm/MC/MCAsmInfo.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCInstBuilder.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/TargetRegistry.h"
@@ -51,9 +52,26 @@ namespace {
     void printMemOperandIndex(const MachineInstr *MI, int opNum,
                               raw_ostream &OS, const char *Modifier = nullptr);
 
+    MCOperand LowerSymbolOperand(const MachineOperand &MO);
+
+    MCOperand LowerOperand(const MachineOperand &MO);
+
+    void LowerC65MachineInstrToMCInst(const MachineInstr *MI,
+                                      MCInst &OutMI);
+
     static const char *getRegisterName(unsigned RegNo) {
       return C65InstPrinter::getRegisterName(RegNo);
     }
+
+    uint8_t getZRAddress(MachineOperand Val) const;
+
+    void InstAddGA(MCInst &Inst, const MachineOperand &MO,
+                   unsigned Offset);
+
+    void InstAddZR(MCInst &Inst, const MachineOperand &MO,
+                   unsigned Offset);
+
+    void EmitInstructionFinal(MCInst &Inst);
 
     virtual void EmitInstruction(const MachineInstr *) override;
 
@@ -120,10 +138,7 @@ namespace {
 //   EmitOR(OutStreamer, RD, lo, RD, STI);
 // }
 
-static MCOperand LowerSymbolOperand(const MachineInstr *MI,
-                                    const MachineOperand &MO,
-                                    AsmPrinter &AP) {
-
+MCOperand C65AsmPrinter::LowerSymbolOperand(const MachineOperand &MO) {
   const MCSymbol *Symbol = nullptr;
 
   switch(MO.getType()) {
@@ -133,30 +148,27 @@ static MCOperand LowerSymbolOperand(const MachineInstr *MI,
     break;
 
   case MachineOperand::MO_GlobalAddress:
-    Symbol = AP.getSymbol(MO.getGlobal());
+    Symbol = getSymbol(MO.getGlobal());
     break;
 
   case MachineOperand::MO_BlockAddress:
-    Symbol = AP.GetBlockAddressSymbol(MO.getBlockAddress());
+    Symbol = GetBlockAddressSymbol(MO.getBlockAddress());
     break;
 
   case MachineOperand::MO_ExternalSymbol:
-    Symbol = AP.GetExternalSymbolSymbol(MO.getSymbolName());
+    Symbol = GetExternalSymbolSymbol(MO.getSymbolName());
     break;
 
   case MachineOperand::MO_ConstantPoolIndex:
-    Symbol = AP.GetCPISymbol(MO.getIndex());
+    Symbol = GetCPISymbol(MO.getIndex());
     break;
   }
 
-  const MCSymbolRefExpr *MCSym = MCSymbolRefExpr::Create(Symbol,
-                                                         AP.OutContext);
+  const MCSymbolRefExpr *MCSym = MCSymbolRefExpr::Create(Symbol, OutContext);
   return MCOperand::CreateExpr(MCSym);
 }
 
-static MCOperand LowerOperand(const MachineInstr *MI,
-                              const MachineOperand &MO,
-                              AsmPrinter &AP) {
+MCOperand C65AsmPrinter::LowerOperand(const MachineOperand &MO) {
   switch(MO.getType()) {
   default: llvm_unreachable("unknown operand type"); break;
   case MachineOperand::MO_Register:
@@ -172,37 +184,293 @@ static MCOperand LowerOperand(const MachineInstr *MI,
   case MachineOperand::MO_BlockAddress:
   case MachineOperand::MO_ExternalSymbol:
   case MachineOperand::MO_ConstantPoolIndex:
-    return LowerSymbolOperand(MI, MO, AP);
+    return LowerSymbolOperand(MO);
 
-  case MachineOperand::MO_RegisterMask:   break;
-
+  case MachineOperand::MO_RegisterMask:
+    break;
   }
   return MCOperand();
 }
 
-static void LowerC65MachineInstrToMCInst(const MachineInstr *MI,
-                                         MCInst &OutMI,
-                                         AsmPrinter &AP) {
+void C65AsmPrinter::LowerC65MachineInstrToMCInst(const MachineInstr *MI,
+                                                 MCInst &OutMI) {
 
   OutMI.setOpcode(MI->getOpcode());
 
   for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
     const MachineOperand &MO = MI->getOperand(i);
-    MCOperand MCOp = LowerOperand(MI, MO, AP);
+    MCOperand MCOp = LowerOperand(MO);
 
     if (MCOp.isValid())
       OutMI.addOperand(MCOp);
   }
 }
 
+///
+static bool getOpRequireCLC(unsigned Op) {
+  switch (Op) {
+  default: return false;
+  case C65::ADD8zz:
+  case C65::ADD16zz:
+  case C65::ADD32zz:
+  case C65::ADD64zz:
+  case C65::SUB8zz:
+  case C65::SUB16zz:
+  case C65::SUB32zz:
+  case C65::SUB64zz:
+    return true;
+  }
+}
+
+/// Get the operand size of the function. This should be replaced by a
+/// more declarative approach.
+///
+static unsigned getOpByteSize(unsigned Op) {
+  switch (Op) {
+  default: return 0;
+  case C65::STZ8z:
+  case C65::ST8zi:
+  case C65::LD8zi:
+  case C65::LD8zimm:
+  case C65::AND8zz:
+  case C65::OR8zz:
+  case C65::XOR8zz:
+  case C65::MOV8zz:
+  case C65::ADD8zz:
+  case C65::SUB8zz:
+    return 1;
+  case C65::STZ16z:
+  case C65::ST16zi:
+  case C65::LD16zi:
+  case C65::LD16zimm:
+  case C65::AND16zz:
+  case C65::OR16zz:
+  case C65::XOR16zz:
+  case C65::MOV16zz:
+  case C65::ADD16zz:
+  case C65::SUB16zz:
+    return 2;
+  case C65::STZ32z:
+  case C65::ST32zi:
+  case C65::LD32zi:
+  case C65::LD32zimm:
+  case C65::AND32zz:
+  case C65::OR32zz:
+  case C65::XOR32zz:
+  case C65::MOV32zz:
+  case C65::ADD32zz:
+  case C65::SUB32zz:
+    return 4;
+  case C65::STZ64z:
+  case C65::ST64zi:
+  case C65::LD64zi:
+  case C65::LD64zimm:
+  case C65::AND64zz:
+  case C65::OR64zz:
+  case C65::XOR64zz:
+  case C65::MOV64zz:
+  case C65::ADD64zz:
+  case C65::SUB64zz:
+    return 8;
+  }
+}
+
+void C65AsmPrinter::EmitInstructionFinal(MCInst &Inst) {
+  OutStreamer.EmitInstruction(Inst, getSubtargetInfo());
+}
+
+void C65AsmPrinter::InstAddGA(MCInst &Inst,
+                              const MachineOperand &MO,
+                              unsigned Offset) {
+  Inst.addOperand
+    (LowerOperand
+     (MachineOperand::CreateGA(MO.getGlobal(), MO.getOffset() + Offset)));
+}
+
+void C65AsmPrinter::InstAddZR(MCInst &Inst,
+                              const MachineOperand &MO,
+                              unsigned Offset) {
+  const C65RegisterInfo &TRI =
+    *static_cast<const C65RegisterInfo *>
+    (TM.getSubtargetImpl()->getRegisterInfo());
+  unsigned Addr = TRI.getZRAddress(MO.getReg());
+  Inst.addOperand(MCOperand::CreateImm(Addr + Offset));
+}
+
 void C65AsmPrinter::EmitInstruction(const MachineInstr *MI) {
+  unsigned NumBytes = getOpByteSize(MI->getOpcode());
   if (MI->getOpcode() == TargetOpcode::DBG_VALUE) {
     // FIXME: Debug Value.
     return;
-  } else {
+  } else if (NumBytes == 0) {
     MCInst TmpInst;
-    LowerC65MachineInstrToMCInst(MI, TmpInst, *this);
+    LowerC65MachineInstrToMCInst(MI, TmpInst);
     EmitToStreamer(OutStreamer, TmpInst);
+  } else {
+    if (NumBytes == 1) {
+      EmitInstructionFinal(MCInstBuilder(C65::SEP)
+        .addImm(0x20));
+    }
+    if (getOpRequireCLC(MI->getOpcode())) {
+      EmitInstructionFinal(MCInstBuilder(C65::CLC));
+    }
+    for (unsigned I = 0; I < NumBytes; I += 2) {
+      switch (MI->getOpcode()) {
+      default: llvm_unreachable("Unknown Z instr.");
+      case C65::STZ8z:
+      case C65::STZ16z:
+      case C65::STZ32z:
+      case C65::STZ64z: {
+        MCInst Inst;
+        Inst.setOpcode(C65::STZzp);
+        InstAddZR(Inst, MI->getOperand(0), I);
+        EmitInstructionFinal(Inst);
+      } break;
+      case C65::ST8zi:
+      case C65::ST16zi:
+      case C65::ST32zi:
+      case C65::ST64zi: {
+        MCInst LDAInst, STAInst;
+        LDAInst.setOpcode(C65::LDAzp);
+        InstAddZR(LDAInst, MI->getOperand(0), I);
+        EmitInstructionFinal(LDAInst);
+
+        STAInst.setOpcode(C65::STAi);
+        InstAddGA(STAInst, MI->getOperand(1), I);
+        EmitInstructionFinal(STAInst);
+      } break;
+      case C65::LD8zi:
+      case C65::LD16zi:
+      case C65::LD32zi:
+      case C65::LD64zi: {
+        MCInst LDAInst, STAInst;
+        LDAInst.setOpcode(C65::LDAi);
+        InstAddGA(LDAInst, MI->getOperand(1), I);
+        EmitInstructionFinal(LDAInst);
+
+        STAInst.setOpcode(C65::STAzp);
+        InstAddZR(STAInst, MI->getOperand(0), I);
+        EmitInstructionFinal(STAInst);
+      } break;
+      case C65::LD8zimm:
+      case C65::LD16zimm:
+      case C65::LD32zimm:
+      case C65::LD64zimm: {
+        MCInst LDAInst, STAInst;
+        LDAInst.setOpcode(C65::LDAi);
+        LDAInst.addOperand
+          (MCOperand::CreateImm
+           (MI->getOperand(1).getImm() >> (16 * I) & 0xFFFF));
+        EmitInstructionFinal(LDAInst);
+
+        STAInst.setOpcode(C65::STAzp);
+        InstAddZR(STAInst, MI->getOperand(0), I);
+        EmitInstructionFinal(STAInst);
+      } break;
+      case C65::AND8zz:
+      case C65::AND16zz:
+      case C65::AND32zz:
+      case C65::AND64zz: {
+        MCInst LDAInst, ArithInst, STAInst;
+        LDAInst.setOpcode(C65::LDAzp);
+        InstAddZR(LDAInst, MI->getOperand(1), I);
+        EmitInstructionFinal(LDAInst);
+
+        ArithInst.setOpcode(C65::ANDzp);
+        InstAddZR(ArithInst, MI->getOperand(2), I);
+        EmitInstructionFinal(ArithInst);
+
+        STAInst.setOpcode(C65::STAzp);
+        InstAddZR(STAInst, MI->getOperand(0), I);
+        EmitInstructionFinal(STAInst);
+      } break;
+      case C65::OR8zz:
+      case C65::OR16zz:
+      case C65::OR32zz:
+      case C65::OR64zz: {
+        MCInst LDAInst, ArithInst, STAInst;
+        LDAInst.setOpcode(C65::LDAzp);
+        InstAddZR(LDAInst, MI->getOperand(1), I);
+        EmitInstructionFinal(LDAInst);
+
+        ArithInst.setOpcode(C65::ORAzp);
+        InstAddZR(ArithInst, MI->getOperand(2), I);
+        EmitInstructionFinal(ArithInst);
+
+        STAInst.setOpcode(C65::STAzp);
+        InstAddZR(STAInst, MI->getOperand(0), I);
+        EmitInstructionFinal(STAInst);
+      } break;
+      case C65::XOR8zz:
+      case C65::XOR16zz:
+      case C65::XOR32zz:
+      case C65::XOR64zz: {
+        MCInst LDAInst, ArithInst, STAInst;
+        LDAInst.setOpcode(C65::LDAzp);
+        InstAddZR(LDAInst, MI->getOperand(1), I);
+        EmitInstructionFinal(LDAInst);
+
+        ArithInst.setOpcode(C65::EORzp);
+        InstAddZR(ArithInst, MI->getOperand(2), I);
+        EmitInstructionFinal(ArithInst);
+
+        STAInst.setOpcode(C65::STAzp);
+        InstAddZR(STAInst, MI->getOperand(0), I);
+        EmitInstructionFinal(STAInst);
+      } break;
+      case C65::ADD8zz:
+      case C65::ADD16zz:
+      case C65::ADD32zz:
+      case C65::ADD64zz: {
+        MCInst LDAInst, ArithInst, STAInst;
+        LDAInst.setOpcode(C65::LDAzp);
+        InstAddZR(LDAInst, MI->getOperand(1), I);
+        EmitInstructionFinal(LDAInst);
+
+        ArithInst.setOpcode(C65::ADCzp);
+        InstAddZR(ArithInst, MI->getOperand(2), I);
+        EmitInstructionFinal(ArithInst);
+
+        STAInst.setOpcode(C65::STAzp);
+        InstAddZR(STAInst, MI->getOperand(0), I);
+        EmitInstructionFinal(STAInst);
+      } break;
+      case C65::SUB8zz:
+      case C65::SUB16zz:
+      case C65::SUB32zz:
+      case C65::SUB64zz: {
+        MCInst LDAInst, ArithInst, STAInst;
+        LDAInst.setOpcode(C65::LDAzp);
+        InstAddZR(LDAInst, MI->getOperand(1), I);
+        EmitInstructionFinal(LDAInst);
+
+        ArithInst.setOpcode(C65::SBCzp);
+        InstAddZR(ArithInst, MI->getOperand(2), I);
+        EmitInstructionFinal(ArithInst);
+
+        STAInst.setOpcode(C65::STAzp);
+        InstAddZR(STAInst, MI->getOperand(0), I);
+        EmitInstructionFinal(STAInst);
+      } break;
+      case C65::MOV8zz:
+      case C65::MOV16zz:
+      case C65::MOV32zz:
+      case C65::MOV64zz: {
+        MCInst LDAInst, STAInst;
+        LDAInst.setOpcode(C65::LDAzp);
+        InstAddZR(LDAInst, MI->getOperand(1), I);
+        EmitInstructionFinal(LDAInst);
+
+        STAInst.setOpcode(C65::STAzp);
+        InstAddZR(STAInst, MI->getOperand(0), I);
+        EmitInstructionFinal(STAInst);
+      } break;
+      }
+    }
+    if (NumBytes == 1) {
+      EmitInstructionFinal(MCInstBuilder(C65::REP)
+        .addImm(0x20));
+    }
   }
 }
 

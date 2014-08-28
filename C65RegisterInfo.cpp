@@ -27,6 +27,8 @@
 #include "llvm/Target/TargetInstrInfo.h"
 #include "llvm/Target/TargetMachine.h"
 
+#define DEBUG_TYPE "c65-register-info"
+
 using namespace llvm;
 
 #define GET_REGINFO_TARGET_DESC
@@ -73,25 +75,47 @@ C65RegisterInfo::getPointerRegClass(const MachineFunction &MF,
 unsigned
 C65RegisterInfo::getZRAddress(unsigned RegNo) const {
   switch(RegNo) {
-  default: llvm_unreachable("Not a zero-page register!");
+  default: {
+    DEBUG(errs() << "Not a zero-page register: " << RegNo
+          << C65::ZR0 << " "
+          << C65::ZR0D << " "
+          << C65::ZR0W << " "
+          << C65::ZR0Q);
+    llvm_unreachable("Not a zero-page register!");
+  }
+  case C65::ZR0Q:
+  case C65::ZR0D:
+  case C65::ZR0W:
   case C65::ZR0: return 0;
-  case C65::ZR1: return 2;
-  case C65::ZR2: return 4;
-  case C65::ZR3: return 6;
-  case C65::ZR4: return 8;
-  case C65::ZR5: return 10;
-  case C65::ZR6: return 12;
-  case C65::ZR7: return 14;
-  case C65::ZR8: return 16;
-  case C65::ZR9: return 18;
-  case C65::ZR10: return 20;
-  case C65::ZR11: return 22;
-  case C65::ZR12: return 24;
-  case C65::ZR13: return 26;
-  case C65::ZR14: return 28;
-  case C65::ZR15: return 30;
+  case C65::ZR1: return 1;
+  case C65::ZR2W:
+  case C65::ZR2: return 2;
+  case C65::ZR3: return 3;
+  case C65::ZR4D:
+  case C65::ZR4W:
+  case C65::ZR4: return 4;
+  case C65::ZR5: return 5;
+  case C65::ZR6W:
+  case C65::ZR6: return 6;
+  case C65::ZR7: return 7;
+  case C65::ZR8Q:
+  case C65::ZR8D:
+  case C65::ZR8W:
+  case C65::ZR8: return 8;
+  case C65::ZR9: return 9;
+  case C65::ZR10W:
+  case C65::ZR10: return 10;
+  case C65::ZR11: return 11;
+  case C65::ZR12D:
+  case C65::ZR12W:
+  case C65::ZR12: return 12;
+  case C65::ZR13: return 13;
+  case C65::ZR14W:
+  case C65::ZR14: return 14;
+  case C65::ZR15: return 15;
   }
 }
+
 
 void
 C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,

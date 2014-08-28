@@ -30,7 +30,7 @@
 
 using namespace llvm;
 
-#define DEBUG_TYPE "isel-lowering"
+#define DEBUG_TYPE "c65-isel-lowering"
 
 //===----------------------------------------------------------------------===//
 // TargetLowering implementation
@@ -126,6 +126,7 @@ SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
   return DAG.getTargetGlobalAddress(Node->getGlobal(), DL, getPointerTy());
 }
 
+
 /// This callback is invoked for operations that are unsupported by
 /// the target, which are registered to use 'custom' lowering, and
 /// whose defined values are all legal. If the target has no
@@ -150,26 +151,6 @@ MCInstrDesc C65TargetLowering::getOp(unsigned Op) const {
   const TargetInstrInfo &TII = *Subtarget->getInstrInfo();
   return TII.get(Op);
 }
-
-
-
-//Module* mod = new Module("test", getGlobalContext());
-//Constant* c = mod->getOrInsertFunction("main",
-//  IntegerType::get(getGlobalContext(), 32), NULL);
-//Function* main = cast<Function>  (c);
-//main->setCallingConv(CallingConv::C);
-//Twine s("foo");
-//StringRef s1("foo");
-//Constant *cons = ConstantArray::get(getGlobalContext(),s1, true);
-//GlobalVariable val(*mod,
-//ArrayType::get(Type::getInt8Ty(getGlobalContext()), 4),
-//               true,GlobalValue::ExternalLinkage, cons, s);
-
-
-// Get Ptr from Val
-//Value* ptr = ConstantExpr::getIntToPtr((Constant*)loc[n],PointerType::getUnqual(builder->getInt32Ty()));
-
-
 
 uint8_t C65TargetLowering::getZRAddress(MachineOperand Val) const {
   const C65RegisterInfo &TRI =
@@ -249,6 +230,7 @@ C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     BuildMI(*MBB, MI, DL, getOp(C65::SEP))
       .addImm(0x20);
   }
+  MI->dump();
   for (unsigned I = 0; I < NumBytes; I += 2) {
     switch (MI->getOpcode()) {
     default: llvm_unreachable("Unknown custom opcode to emit!");
@@ -257,14 +239,14 @@ C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
     case C65::STZ32z:
     case C65::STZ64z: {
       BuildMI(*MBB, MI, DL, getOp(C65::STZzp))
-        .addImm(getZRAddress(MI->getOperand(0)), I);
+        .addImm(getZRAddress(MI->getOperand(0)) + I);
     } break;
     case C65::ST8zi:
     case C65::ST16zi:
     case C65::ST32zi:
     case C65::ST64zi: {
       BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
-        .addImm(getZRAddress(MI->getOperand(0)), I);
+        .addImm(getZRAddress(MI->getOperand(0)) + I);
       BuildMI(*MBB, MI, DL, getOp(C65::STAi))
         .addGlobalAddress(MI->getOperand(1).getGlobal(), I);
     } break;
@@ -275,7 +257,7 @@ C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
       BuildMI(*MBB, MI, DL, getOp(C65::LDAi))
         .addGlobalAddress(MI->getOperand(1).getGlobal(), I);
       BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)), I);
+        .addImm(getZRAddress(MI->getOperand(0)) + I);
     } break;
     case C65::LD8zimm:
     case C65::LD16zimm:
@@ -284,49 +266,49 @@ C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
       BuildMI(*MBB, MI, DL, getOp(C65::LDAimm))
         .addImm(MI->getOperand(1).getImm() >> (16 * I) & 0xFFFF);
       BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)), I);
+        .addImm(getZRAddress(MI->getOperand(0)) + I);
     } break;
     case C65::AND8zz:
     case C65::AND16zz:
     case C65::AND32zz:
     case C65::AND64zz: {
       BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
-        .addImm(getZRAddress(MI->getOperand(1)), I);
+        .addImm(getZRAddress(MI->getOperand(1)) + I);
       BuildMI(*MBB, MI, DL, getOp(C65::ANDzp))
-        .addImm(getZRAddress(MI->getOperand(2)), I);
+        .addImm(getZRAddress(MI->getOperand(2)) + I);
       BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)), I);
+        .addImm(getZRAddress(MI->getOperand(0)) + I);
     } break;
     case C65::OR8zz:
     case C65::OR16zz:
     case C65::OR32zz:
     case C65::OR64zz: {
       BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
-        .addImm(getZRAddress(MI->getOperand(1)), I);
+        .addImm(getZRAddress(MI->getOperand(1)) + I);
       BuildMI(*MBB, MI, DL, getOp(C65::ORAzp))
-        .addImm(getZRAddress(MI->getOperand(2)), I);
+        .addImm(getZRAddress(MI->getOperand(2)) + I);
       BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)), I);
+        .addImm(getZRAddress(MI->getOperand(0)) + I);
     } break;
     case C65::XOR8zz:
     case C65::XOR16zz:
     case C65::XOR32zz:
     case C65::XOR64zz: {
       BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
-        .addImm(getZRAddress(MI->getOperand(1)), I);
+        .addImm(getZRAddress(MI->getOperand(1)) + I);
       BuildMI(*MBB, MI, DL, getOp(C65::EORzp))
-        .addImm(getZRAddress(MI->getOperand(2)), I);
+        .addImm(getZRAddress(MI->getOperand(2)) + I);
       BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)), I);
+        .addImm(getZRAddress(MI->getOperand(0)) + I);
     } break;
     case C65::MOV8zz:
     case C65::MOV16zz:
     case C65::MOV32zz:
     case C65::MOV64zz: {
       BuildMI(*MBB, MI, DL, getOp(C65::LDAzp))
-        .addImm(getZRAddress(MI->getOperand(1)), I);
+        .addImm(getZRAddress(MI->getOperand(1)) + I);
       BuildMI(*MBB, MI, DL, getOp(C65::STAzp))
-        .addImm(getZRAddress(MI->getOperand(0)), I);
+        .addImm(getZRAddress(MI->getOperand(0)) + I);
     } break;
     }
   }

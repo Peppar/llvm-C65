@@ -552,7 +552,7 @@ let Defs = [S, P], Uses = [S], isCodeGenOnly = 1 in {
 
 class ZPInstr<dag outs, dag ins, string asmstr, list<dag> pattern>
     : InstC65<outs, ins, asmstr, pattern> {
-  let usesCustomInserter = 1;
+  let isPseudo = 1;
 }
 
 class MOVzz<RegisterClass RC, ValueType Ty>
@@ -576,8 +576,8 @@ def STZ32z : STZz<ZRC32, i32>;
 def STZ64z : STZz<ZRC64, i64>;
 
 class STzi<RegisterClass RC, ValueType Ty>
-  : ZPInstr<(outs), (ins RC:$dst, mem_a16:$mem), ";STORE $dst,$mem",
-            [(store Ty:$dst, tglobaladdr:$mem)]> {
+  : ZPInstr<(outs), (ins RC:$src, mem_a16:$mem), ";STORE $src,$mem",
+            [(store Ty:$src, tglobaladdr:$mem)]> {
   let mayStore = 1;
 }
 
