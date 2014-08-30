@@ -46,20 +46,20 @@ class C65ZReg64<string n, bits<16> num,
 }
 
 foreach I = 0-31 in {
-  def ZR#I : C65ZReg8<"ZP"#I, 0>;
+  def ZR#I : C65ZReg8<"ZR"#I, 0>;
 }
 foreach I = [0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30] in {
-  def ZR#I#W : C65ZReg16<"ZP"#I#"W", I,
+  def ZR#I#W : C65ZReg16<"ZR"#I#"W", I,
                          !cast<C65ZReg8>("ZR"#I),
                          !cast<C65ZReg8>("ZR"#!add(I, 1))>;
 }
 foreach I = [0,4,8,12,16,20,24,28] in {
-  def ZR#I#D : C65ZReg32<"ZP"#I#"D", I,
+  def ZR#I#D : C65ZReg32<"ZR"#I#"D", I,
                          !cast<C65ZReg16>("ZR"#I#"W"),
                          !cast<C65ZReg16>("ZR"#!add(I, 2)#"W")>;
 }
 foreach I = [0,8,16,24] in {
-  def ZR#I#Q : C65ZReg64<"ZP"#I#"Q", I,
+  def ZR#I#Q : C65ZReg64<"ZR"#I#"Q", I,
                          !cast<C65ZReg32>("ZR"#I#"D"),
                          !cast<C65ZReg32>("ZR"#!add(I, 4)#"D")>;
 }

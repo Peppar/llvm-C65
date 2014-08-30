@@ -24,6 +24,23 @@
 
 namespace llvm {
 
+namespace C65 {
+
+enum {
+  // This needs to be kept in sync with C65InstrInfo.td TSFlags
+
+  // Accumulator size requirement
+  AccSize = (1 << 0),
+  AccSizeShift = 0,
+  AccSizeNC = 0,
+  AccSize8 = 1,
+  AccSize16 = 2,
+};
+static inline unsigned getAccSize(unsigned int Flags) {
+  return (Flags & AccSize) >> AccSizeShift;
+}
+
+
 class C65TargetMachine;
 class C65Subtarget;
 class C65InstrInfo : public C65GenInstrInfo {

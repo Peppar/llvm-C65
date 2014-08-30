@@ -99,3 +99,51 @@ not include target-independent nodes.
 The target-independent load was consumed because it appears on the
 left hand side of many instruction patterns, and is selected by the
 TableGen generated SelectCode function.
+
+
+BREAKING REVELATION: Instruction selection process totally destroys my
+instructions, and this is due to mal-formed instruction
+definitions. For example, the register-to-register move instruction
+MOVzz is defined as follows:
+
+class MOVzz<RegisterClass RC, ValueType Ty>
+  : ZPInstr<(outs RC:$dst), (ins RC:$src), ";MOV $dst,$src",
+            [(set RC:$dst, RC:$src)]>;
+
+However, the instruction matches fails completely to compile this, so
+all of my arithmetic functions match it...
+
+How I found out: The compiled instruction selection process can be
+found in XXXGenDAGISel.inc under /build/lib/Target/XXX/
+
+Follow the indices to see what happens to your instruction:
+
+ISEL: Starting
+pattern match on root node: 0x2acae40: i16 = or 0x2aca918, 0x2acab28
+[ORD=5] [ID=7]
+
+  Skipped scope entry (due to false predicate) at index 2, continuing at 30
+  Skipped scope entry (due to false predicate) at index 31, continuing at 131
+  Skipped scope entry (due to false predicate) at index 132, continuing at 194
+  Skipped scope entry (due to false predicate) at index 195, continuing at 214
+  Skipped scope entry (due to false predicate) at index 215, continuing at 258
+  Skipped scope entry (due to false predicate) at index 259, continuing at 271
+  TypeSwitch[i16] from 273 to 286
+  Morphed node: 0x2acae40: i16 = MOV16zz 0x2acae40 [ORD=5]
+
+
+OH WHY:
+Do I remember failing to use A directly, when X86 can use CL directly?
+
+// SDNode - shl
+// ValueType - i64
+// RCClass - I64Regs
+// Operand - simm130p
+
+Input list item (ins i16imm:$imm) needs as pattern:
+  (i16 imm:$imm)
+  and not: i16imm:$imm
+
+Data*bitsDirective are MANDATORY, must not be nullptr, if you are ever
+to output the corresponding size. It will NOT default to several
+smaller. And the errors aren't helpful.

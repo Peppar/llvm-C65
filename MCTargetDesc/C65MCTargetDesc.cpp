@@ -45,8 +45,8 @@ namespace llvm {
 
       Data8bitsDirective = "\t.db\t";
       Data16bitsDirective = "\t.dw\t";
-      Data32bitsDirective = nullptr;
-      Data64bitsDirective = nullptr;
+      Data32bitsDirective = "\t.dd\t";
+      Data64bitsDirective = "\t.dq\t";
 
       AsciiDirective = "\t.db\t";
       AscizDirective = nullptr;

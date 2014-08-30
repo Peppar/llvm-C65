@@ -8,6 +8,17 @@ def Has65C02  : Predicate<"Subtarget->has65C02()">;
 def Has65C816 : Predicate<"Subtarget->has65C816()">;
 
 //===----------------------------------------------------------------------===//
+// C65 stuff
+//===----------------------------------------------------------------------===//
+
+// class AccSize<bits<2> val> {
+//   bits<2> Value = val;
+// }
+// def AccSizeNC : OperandSize<0>; // Don't care for accumulator size
+// def AccSize8  : OperandSize<1>; // Needs 8-bit accumulator
+// def AccSize16 : OperandSize<2>; // Needs 16-bit accumulator
+
+//===----------------------------------------------------------------------===//
 // C65 basic instruction formats
 //===----------------------------------------------------------------------===//
 
@@ -25,7 +36,20 @@ class InstC65<dag outs, dag ins, string asmstr, list<dag> pattern>
   let Pattern = pattern;
 
   let DecoderNamespace = "C65";
+
+  bit ZRShift = 0
+  bits<2> ZRSize = 0;
+
+  let TSFlags{0}   = ZRShift;
+  let TSFlags{2-1} = ZRSize;
 }
+
+class ZRShift { bit ZRShift = 1; }
+
+class ZROp8 { bits<2> ZRSize = 0; }
+class ZROp16 { bits<2> ZRSize = 1; }
+class ZROp32 { bits<2> ZRSize = 2; }
+class ZROp64 { bits<2> ZRSize = 3; }
 
 // Format cc instructions
 // 6502 instruction format generally follows: aaabbbcc
@@ -133,6 +157,13 @@ let PrintMethod = "printMemOperandIndex" in {
     let MIOperandInfo = (ops i16imm);
   }
 }
+
+
+// FIXME
+
+def uimm6 : Operand<i32>;
+def immZExt6 : ImmLeaf<i32, [{return Imm == (Imm & 0x3f);}]>;
+
 
 //===----------------------------------------------------------------------===//
 // Format 01 instructions : ora, and, eor, adc, sta, lda, cmp, sbc
@@ -357,13 +388,18 @@ def CondZero     : CondFlag<0b11>;
 
 // Branch if the value of the flag 'cf' equals 'value'
 class FC<CondFlag cf, bit value, string asmstr>
-    : InstC65<(outs), (ins brtarget8:$dst), asmstr, []> {
+    : InstC65<(outs), (ins brtarget8:$dst),
+              !strconcat(asmstr, " $dst")
+, []> {
   let Inst{7-6} = cf.flagIndex;
   let Inst{5} = value;
   let Inst{4-0} = 0b10000;
+  let isBranch = 1;
+  let isTerminator = 1;
+  let isBarrier = 1;
 }
 
-let Uses = [P], isBranch = 1, isTerminator = 1 in {
+let Uses = [P] in {
   def BPL : FC<CondNegative, 0, "BPL">;
   def BMI : FC<CondNegative, 1, "BMI">;
   def BVC : FC<CondOverflow, 0, "BVC">;
@@ -555,103 +591,140 @@ class ZPInstr<dag outs, dag ins, string asmstr, list<dag> pattern>
 
 class MOVzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src), ";MOV $dst,$src",
-            [(set RC:$dst, RC:$src)]>;
+            []>;
 
-def MOV8zz  : MOVzz<ZRC8,  i8>;
-def MOV16zz : MOVzz<ZRC16, i16>;
-def MOV32zz : MOVzz<ZRC32, i32>;
-def MOV64zz : MOVzz<ZRC64, i64>;
+def MOV8zz  : MOVzz<ZRC8,  i8>, ZROp8;
+def MOV16zz : MOVzz<ZRC16, i16>, ZROp16;
+def MOV32zz : MOVzz<ZRC32, i32>, ZROp32;
+def MOV64zz : MOVzz<ZRC64, i64>, ZROp64;
 
 class STZz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins), ";STZ $dst",
-            [(set RC:$dst, (Ty 0))]> {
+            [(set Ty:$dst, (Ty 0))]> {
   let isMoveImm = 1;
 }
 
-def STZ8z  : STZz<ZRC8,  i8>;
-def STZ16z : STZz<ZRC16, i16>;
-def STZ32z : STZz<ZRC32, i32>;
-def STZ64z : STZz<ZRC64, i64>;
+def STZ8z  : STZz<ZRC8,  i8>, ZROp8;
+def STZ16z : STZz<ZRC16, i16>, ZROp16;
+def STZ32z : STZz<ZRC32, i32>, ZROp32;
+def STZ64z : STZz<ZRC64, i64>, ZROp64;
 
 class STzi<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs), (ins RC:$src, mem_a16:$mem), ";STORE $src,$mem",
-            [(store RC:$src, tglobaladdr:$mem)]> {
+            [(store Ty:$src, tglobaladdr:$mem)]> {
   let mayStore = 1;
 }
 
-def ST8zi  : STzi<ZRC8,  i8>;
-def ST16zi : STzi<ZRC16, i16>;
-def ST32zi : STzi<ZRC32, i32>;
-def ST64zi : STzi<ZRC64, i64>;
+def ST8zi  : STzi<ZRC8,  i8>, ZROp8;
+def ST16zi : STzi<ZRC16, i16>, ZROp16;
+def ST32zi : STzi<ZRC32, i32>, ZROp32;
+def ST64zi : STzi<ZRC64, i64>, ZROp64;
 
 class LDzi<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins mem_a16:$mem), ";LOAD $dst,$mem",
-            [(set RC:$dst, (load tglobaladdr:$mem))]> {
+            [(set Ty:$dst, (load tglobaladdr:$mem))]> {
   let mayLoad = 1;
 }
 
-def LD8zi  : LDzi<ZRC8,  i8>;
-def LD16zi : LDzi<ZRC16, i16>;
-def LD32zi : LDzi<ZRC32, i32>;
-def LD64zi : LDzi<ZRC64, i64>;
+def LD8zi  : LDzi<ZRC8,  i8>, ZROp8;
+def LD16zi : LDzi<ZRC16, i16>, ZROp16;
+def LD32zi : LDzi<ZRC32, i32>, ZROp32;
+def LD64zi : LDzi<ZRC64, i64>, ZROp64;
 
-// SDNode - shl
-// ValueType - i64
-// RCClass - I64Regs
-// Operand - simm130p
+class LDZEXTzi<RegisterClass RC, ValueType Ty>
+  : ZPInstr<(outs RC:$dst), (ins mem_a16:$mem), ";LOAD $dst,$mem",
+            [(set Ty:$dst, (load tglobaladdr:$mem))]> {
+  let mayLoad = 1;
+}
 
 class LDzimm<RegisterClass RC, ValueType Ty, Operand immOp>
   : ZPInstr<(outs RC:$dst), (ins immOp:$imm), ";LOAD $dst,$imm",
-            [(set RC:$dst, imm:$imm)]> {
+            [(set Ty:$dst, imm:$imm)]> {
   let isMoveImm = 1;
 }
 
-def LD8zimm  : LDzimm<ZRC8,  i8,  i8imm>;
-def LD16zimm : LDzimm<ZRC16, i16, i16imm>;
-def LD32zimm : LDzimm<ZRC32, i32, i32imm>;
-def LD64zimm : LDzimm<ZRC64, i64, i64imm>;
+def LD8zimm  : LDzimm<ZRC8,  i8,  i8imm>, ZROp8;
+def LD16zimm : LDzimm<ZRC16, i16, i16imm>, ZROp16;
+def LD32zimm : LDzimm<ZRC32, i32, i32imm>, ZROp32;
+def LD64zimm : LDzimm<ZRC64, i64, i64imm>, ZROp64;
 
 class ANDzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src1, RC:$src2), ";AND $dst,$src1,$src2",
-            [(set RC:$dst, (and RC:$src1, RC:$src2))]>;
+            [(set Ty:$dst, (and Ty:$src1, Ty:$src2))]>;
 
-def AND8zz  : ANDzz<ZRC8,  i8>;
-def AND16zz : ANDzz<ZRC16, i16>;
-def AND32zz : ANDzz<ZRC32, i32>;
-def AND64zz : ANDzz<ZRC64, i64>;
+def AND8zz  : ANDzz<ZRC8,  i8>, ZROp8;
+def AND16zz : ANDzz<ZRC16, i16>, ZROp16;
+def AND32zz : ANDzz<ZRC32, i32>, ZROp32;
+def AND64zz : ANDzz<ZRC64, i64>, ZROp64;
 
 class ORzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src1, RC:$src2), ";OR $dst,$src1,$src2",
-            [(set RC:$dst, (or RC:$src1, RC:$src2))]>;
+            [(set Ty:$dst, (or Ty:$src1, Ty:$src2))]>;
 
-def OR8zz  : ORzz<ZRC8,  i8>;
-def OR16zz : ORzz<ZRC16, i16>;
-def OR32zz : ORzz<ZRC32, i32>;
-def OR64zz : ORzz<ZRC64, i64>;
+def OR8zz  : ORzz<ZRC8,  i8>, ZROp8;
+def OR16zz : ORzz<ZRC16, i16>, ZROp16;
+def OR32zz : ORzz<ZRC32, i32>, ZROp32;
+def OR64zz : ORzz<ZRC64, i64>, ZROp64;
 
 class XORzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src1, RC:$src2), ";XOR $dst,$src1,$src2",
-            [(set RC:$dst, (xor RC:$src1, RC:$src2))]>;
+            [(set Ty:$dst, (xor Ty:$src1, Ty:$src2))]>;
 
-def XOR8zz  : XORzz<ZRC8,  i8>;
-def XOR16zz : XORzz<ZRC16, i16>;
-def XOR32zz : XORzz<ZRC32, i32>;
-def XOR64zz : XORzz<ZRC64, i64>;
+def XOR8zz  : XORzz<ZRC8,  i8>, ZROp8;
+def XOR16zz : XORzz<ZRC16, i16>, ZROp16;
+def XOR32zz : XORzz<ZRC32, i32>, ZROp32;
+def XOR64zz : XORzz<ZRC64, i64>, ZROp64;
 
 class ADDzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src1, RC:$src2), ";ADD $dst,$src1,$src2",
-            [(set RC:$dst, (add RC:$src1, RC:$src2))]>;
+            [(set Ty:$dst, (add Ty:$src1, Ty:$src2))]>;
 
-def ADD8zz  : ADDzz<ZRC8,  i8>;
-def ADD16zz : ADDzz<ZRC16, i16>;
-def ADD32zz : ADDzz<ZRC32, i32>;
-def ADD64zz : ADDzz<ZRC64, i64>;
+def ADD8zz  : ADDzz<ZRC8,  i8>, ZROp8;
+def ADD16zz : ADDzz<ZRC16, i16>, ZROp16;
+def ADD32zz : ADDzz<ZRC32, i32>, ZROp32;
+def ADD64zz : ADDzz<ZRC64, i64>, ZROp64;
 
 class SUBzz<RegisterClass RC, ValueType Ty>
   : ZPInstr<(outs RC:$dst), (ins RC:$src1, RC:$src2), ";SUB $dst,$src1,$src2",
-            [(set RC:$dst, (sub RC:$src1, RC:$src2))]>;
+            [(set Ty:$dst, (sub Ty:$src1, Ty:$src2))]>;
 
-def SUB8zz  : SUBzz<ZRC8,  i8>;
-def SUB16zz : SUBzz<ZRC16, i16>;
-def SUB32zz : SUBzz<ZRC32, i32>;
-def SUB64zz : SUBzz<ZRC64, i64>;
+def SUB8zz  : SUBzz<ZRC8,  i8>, ZROp8;
+def SUB16zz : SUBzz<ZRC16, i16>, ZROp16;
+def SUB32zz : SUBzz<ZRC32, i32>, ZROp32;
+def SUB64zz : SUBzz<ZRC64, i64>, ZROp64;
+
+class SHLzimm<RegisterClass RC, ValueType Ty>
+  : ZPInstr<(outs RC:$dst), (ins RC:$src, uimm6:$imm), ";SHL $dst,$src,$imm",
+            [(set Ty:$dst, (shl Ty:$src, immZExt6:$imm))]>;
+
+def SHL8zimm  : SHLzimm<ZRC8,  i8>, ZROp8, ZRShift;
+def SHL16zimm : SHLzimm<ZRC16, i16>, ZROp16, ZRShift;
+def SHL32zimm : SHLzimm<ZRC32, i32>, ZROp32, ZRShift;
+def SHL64zimm : SHLzimm<ZRC64, i64>, ZROp64, ZRShift;
+
+class LSHRzimm<RegisterClass RC, ValueType Ty>
+  : ZPInstr<(outs RC:$dst), (ins RC:$src, uimm6:$imm), ";LSHR $dst,$src,$imm",
+            [(set Ty:$dst, (srl Ty:$src, immZExt6:$imm))]>;
+
+def LSHR8zimm  : LSHRzimm<ZRC8,  i8>, ZROp8, ZRShift;
+def LSHR16zimm : LSHRzimm<ZRC16, i16>, ZROp16, ZRShift;
+def LSHR32zimm : LSHRzimm<ZRC32, i32>, ZROp32, ZRShift;
+def LSHR64zimm : LSHRzimm<ZRC64, i64>, ZROp64, ZRShift;
+
+class SHLzz<RegisterClass RC, ValueType Ty>
+  : ZPInstr<(outs RC:$dst), (ins RC:$src, ZRC16:$amt), ";SHL $dst,$src,$amt",
+            [(set Ty:$dst, (shl Ty:$src, i16:$amt))]>;
+
+def SHL8zz  : SHLzz<ZRC8,  i8>, ZROp8, ZRShift;
+def SHL16zz : SHLzz<ZRC16, i16>, ZROp16, ZRShift;
+def SHL32zz : SHLzz<ZRC32, i32>, ZROp32, ZRShift;
+def SHL64zz : SHLzz<ZRC64, i64>, ZROp64, ZRShift;
+
+class LSHRzz<RegisterClass RC, ValueType Ty>
+  : ZPInstr<(outs RC:$dst), (ins RC:$src, ZRC16:$amt), ";LSHR $dst,$src,$amt",
+            [(set Ty:$dst, (srl Ty:$src, i16:$amt))]>;
+
+def LSHR8zz  : LSHRzz<ZRC8,  i8>, ZROp8, ZRShift;
+def LSHR16zz : LSHRzz<ZRC16, i16>, ZROp16, ZRShift;
+def LSHR32zz : LSHRzz<ZRC32, i32>, ZROp32, ZRShift;
+def LSHR64zz : LSHRzz<ZRC64, i64>, ZROp64, ZRShift;

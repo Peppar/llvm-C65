@@ -327,9 +327,20 @@ LowerFormalArguments(SDValue Chain,
     EVT LocVT = VA.getLocVT();
     if (VA.isRegLoc()) {
       // Reserve a register for the incoming parameter
-      unsigned VReg = MRI.createVirtualRegister(&C65::ZRC16RegClass);
-      MRI.addLiveIn(VA.getLocReg(), VReg);
-      ArgValue = DAG.getCopyFromReg(Chain, DL, VReg, MVT::i16);
+      const TargetRegisterClass *RC;
+      if (LocVT == MVT::i8) {
+        RC = &C65::ZRC8RegClass;
+      } else if (LocVT == MVT::i16) {
+        RC = &C65::ZRC16RegClass;
+      } else if (LocVT == MVT::i32) {
+        RC = &C65::ZRC32RegClass;
+      } else if (LocVT == MVT::i64) {
+        RC = &C65::ZRC64RegClass;
+      } else {
+        llvm_unreachable("Unknown argument type!");
+      }
+      unsigned VReg = MF.addLiveIn(VA.getLocReg(), RC);
+      ArgValue = DAG.getCopyFromReg(Chain, DL, VReg, LocVT);
     } else {
       assert(VA.isMemLoc());
       // Create the frame index object for this parameter (2 bytes)

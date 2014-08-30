@@ -24,14 +24,8 @@ using namespace llvm;
 void C65Subtarget::anchor() {}
 
 static std::string computeDataLayout(const C65Subtarget &ST) {
-  if (ST.has65C816()) {
-    // 65C816 has native 16-bit capabilities
-    return "e-p:16:8-n8:16:32:64-S8";
-  } else {
-    // 6502 and 65C02 have only native 8-bit capabilities, but still a
-    // 16-bit address space
-    return "e-p:16:8-n8-S8";
-  }
+  // Stub 2 simulates handling all 8, 16, 32, 64-bit integers natively
+  return "e-p:16:8-n8:16:32:64-S8";
 }
 
 C65Subtarget &
