@@ -29,17 +29,28 @@ namespace C65 {
 enum {
   // This needs to be kept in sync with C65InstrInfo.td TSFlags
 
-  // Accumulator size requirement
-  AccSize = (1 << 0),
-  AccSizeShift = 0,
-  AccSizeNC = 0,
-  AccSize8 = 1,
-  AccSize16 = 2,
+  // Is shift-type instruction
+  ZRShift = (1 << 0),
+
+  // Register size
+  ZROpSize = (3 << 1),
+  ZROpSizeShift = 1,
+  ZROpSize8 = 0,
+  ZROpSize16 = 1,
+  ZROpSize32 = 2,
+  ZROpSize64 = 2,
+
+  // Is a ZR instruction
+  ZRInstr = (1 << 3),
+
+  // Is a control flow instruction
+  ZRCtrl = (1 << 4)
 };
-static inline unsigned getAccSize(unsigned int Flags) {
-  return (Flags & AccSize) >> AccSizeShift;
+static inline unsigned getZROpSize(unsigned int Flags) {
+  return (Flags & ZROpSize) >> ZROpSizeShift;
 }
 
+}
 
 class C65TargetMachine;
 class C65Subtarget;
@@ -76,6 +87,8 @@ public:
                             const TargetRegisterClass *RC,
                             const TargetRegisterInfo *TRI) const override;
   const C65RegisterInfo &getRegisterInfo() const { return RI; }
+
+  bool expandPostRAPseudo(MachineBasicBlock::iterator MI) const override;
 };
 } // end namespace llvm
 

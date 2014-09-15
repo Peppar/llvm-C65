@@ -52,6 +52,11 @@ void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
   // }
 }
 
+void C65FrameLowering::
+eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
+                              MachineBasicBlock::iterator I) const {
+}
+
 void C65FrameLowering::emitEpilogue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
   // const MachineFrameInfo *MFI = MF.getFrameInfo();

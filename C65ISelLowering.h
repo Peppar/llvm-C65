@@ -26,14 +26,11 @@ namespace llvm {
   namespace C65ISD {
     enum NodeType {
       FIRST_NUMBER = ISD::BUILTIN_OP_END,
-      PUSH,
-      PULL,
-      CALL,
-      RET,
       CMP,
-      BR,
-      BRCOND,
-      SPILL
+      BR_CC,
+      SELECT_CC,
+      CALL,
+      RET
     };
   }
 
@@ -41,6 +38,8 @@ namespace llvm {
     const C65Subtarget *Subtarget;
   public:
     C65TargetLowering(TargetMachine &TM);
+
+    SDValue lowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
 
     SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
 
@@ -72,26 +71,32 @@ namespace llvm {
     EVT getSetCCResultType(LLVMContext &Context, EVT VT) const override;
 
     SDValue
-      LowerGlobalAddress(GlobalAddressSDNode *Node, SelectionDAG &DAG) const;
+    LowerGlobalAddress(GlobalAddressSDNode *Node, SelectionDAG &DAG) const;
 
     SDValue
-      LowerFormalArguments(SDValue Chain,
-                           CallingConv::ID CallConv,
-                           bool isVarArg,
-                           const SmallVectorImpl<ISD::InputArg> &Ins,
-                           SDLoc dl, SelectionDAG &DAG,
-                           SmallVectorImpl<SDValue> &InVals) const override;
+    LowerFormalArguments(SDValue Chain,
+                         CallingConv::ID CallConv,
+                         bool IsVarArg,
+                         const SmallVectorImpl<ISD::InputArg> &Ins,
+                         SDLoc dl, SelectionDAG &DAG,
+                         SmallVectorImpl<SDValue> &InVals) const override;
+    SDValue
+    LowerCallResult(SDValue Chain, SDValue Glue,
+                    CallingConv::ID CallConv, bool IsVarArg,
+                    const SmallVectorImpl<ISD::InputArg> &Ins,
+                    SDLoc DL, SelectionDAG &DAG,
+                    SmallVectorImpl<SDValue> &InVals) const;
 
     SDValue
-      LowerCall(TargetLowering::CallLoweringInfo &CLI,
-                SmallVectorImpl<SDValue> &InVals) const override;
+    LowerCall(TargetLowering::CallLoweringInfo &CLI,
+              SmallVectorImpl<SDValue> &InVals) const override;
 
     SDValue
-      LowerReturn(SDValue Chain,
-                  CallingConv::ID CallConv, bool isVarArg,
-                  const SmallVectorImpl<ISD::OutputArg> &Outs,
-                  const SmallVectorImpl<SDValue> &OutVals,
-                  SDLoc dl, SelectionDAG &DAG) const override;
+    LowerReturn(SDValue Chain,
+                CallingConv::ID CallConv, bool isVarArg,
+                const SmallVectorImpl<ISD::OutputArg> &Outs,
+                const SmallVectorImpl<SDValue> &OutVals,
+                SDLoc dl, SelectionDAG &DAG) const override;
 
     void ReplaceNodeResults(SDNode *N,
                             SmallVectorImpl<SDValue>& Results,

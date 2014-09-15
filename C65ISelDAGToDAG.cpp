@@ -150,13 +150,15 @@ SDNode *C65DAGToDAGISel::Select(SDNode *N) {
   MVT NVT = N->getSimpleValueType(0);
   SDLoc DL(N);
 
+  // If we have a custom node, we already have selected!
   if (N->isMachineOpcode()) {
     DEBUG(dbgs() << "== ";  N->dump(CurDAG); dbgs() << '\n');
     N->setNodeId(-1);
-    return nullptr;   // Already selected.
+    return nullptr;
   }
 
-  switch (N->getOpcode()) {
+  unsigned OpCode = N->getOpcode();
+  switch (OpCode) {
   default: break;
   }
 

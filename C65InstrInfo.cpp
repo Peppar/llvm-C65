@@ -14,6 +14,7 @@
 #include "C65InstrInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/CodeGen/ISDOpcodes.h"
 #include "llvm/CodeGen/LiveVariables.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
@@ -162,4 +163,156 @@ loadRegFromStackSlot(MachineBasicBlock &MBB,
   //                << " from stack frame\n");
   //   llvm_unreachable("Unable to load reg from stack slot.");
   // }
+}
+
+struct Comparison {
+  // The operands to the comparison.
+  const MachineOperand Op0, Op1;
+
+  // The opcode that should be used to compare Op0 and Op1.
+  bool Equality;
+
+  // Is signed comparison
+  bool Signed;
+
+  // The result on which we will trigger a branch:
+  //   Branch on bitresult == Z flag for equality
+  //   Branch on bitresult == N flag for signed
+  //   Branch on bitresult == C flag for unsigned
+  bool Bitvalue;
+};
+
+///
+///
+static struct Comparison getComparison(const MachineInstr *MI) {
+  ISD::CondCode CC = (ISD::CondCode)MI->getOperand(0).getImm();
+  const MachineOperand Op0 = MI->getOperand(1);
+  const MachineOperand Op1 = MI->getOperand(2);
+
+  switch (CC) { //           Op0  Op1  Equality Signed Bitvalue
+  case ISD::SETEQ:  return { Op0, Op1, true,    false, true };
+  case ISD::SETNE:  return { Op0, Op1, true,    false, false };
+  case ISD::SETLT:  return { Op1, Op0, false,   true,  false };
+  case ISD::SETLE:  return { Op0, Op1, false,   true,  true };
+  case ISD::SETGT:  return { Op0, Op1, false,   true,  false };
+  case ISD::SETGE:  return { Op1, Op0, false,   true,  true };
+  case ISD::SETULT: return { Op0, Op1, false,   false, true };
+  case ISD::SETULE: return { Op1, Op0, false,   false, false };
+  case ISD::SETUGT: return { Op1, Op0, false,   false, true };
+  case ISD::SETUGE: return { Op0, Op1, false,   false, false };
+  default:
+    llvm_unreachable("Cannot emit this type of comparison!");
+  }
+}
+
+//static GlobalValue
+
+// static C65AsmPrinter::getZRAddr(MCInstBuilder MIB,
+//                                 const MachineOperand &MO,
+//                                 unsigned Offset) {
+//   const C65RegisterInfo &TRI =
+//     *static_cast<const C65RegisterInfo *>
+//     (TM.getSubtargetImpl()->getRegisterInfo());
+//   unsigned Addr = TRI.getZRAddress(MO.getReg());
+//   MIB.addImm(Addr + Offset);
+//   return MIB;
+// }
+
+static bool ExpandBR_CC(MachineInstrBuilder &MIB,
+                        const C65InstrInfo &TII,
+                        const C65RegisterInfo &RI,
+                        unsigned NumBytes) {
+  MachineBasicBlock &MBB = *MIB->getParent();
+  DebugLoc DL = MIB->getDebugLoc();
+  MachineBasicBlock::iterator MBBI = MIB;
+
+  const unsigned ByteCapacity = 2;
+  struct Comparison C = getComparison(MIB);
+  const MachineOperand &Dest = MIB->getOperand(3);
+
+  if (NumBytes == 1) {
+    BuildMI(MBB, MBBI, DL, TII.get(C65::SEP)).addImm(0x20);
+  }
+  if (C.Equality) {
+    for (unsigned I = 0; I < NumBytes; I += ByteCapacity) {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::LDAzp))
+        .addImm(RI.getZRAddress(C.Op0.getReg()));
+      BuildMI(MBB, MBBI, DL, TII.get(C65::CMPzp))
+        .addImm(RI.getZRAddress(C.Op1.getReg()));
+      //      EmitInstructionFinal(MCInstBuilder(C65::BNE).addExpr(Dest));
+    }
+    // FIXME
+    if (NumBytes == 1) {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::REP)).addImm(0x20);
+    }
+    if (C.Bitvalue) {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::BNE)).addOperand(Dest);
+    } else {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::BEQ)).addOperand(Dest);
+    }
+  } else if (C.Signed) {
+    BuildMI(MBB, MBBI, DL, TII.get(C65::LDAzp))
+      .addImm(RI.getZRAddress(C.Op0.getReg()));
+    BuildMI(MBB, MBBI, DL, TII.get(C65::CMPzp))
+      .addImm(RI.getZRAddress(C.Op1.getReg()));
+
+    for (unsigned I = ByteCapacity; I < NumBytes; I += ByteCapacity) {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::LDAzp))
+        .addImm(RI.getZRAddress(C.Op0.getReg()) + I);
+      BuildMI(MBB, MBBI, DL, TII.get(C65::SBCzp))
+        .addImm(RI.getZRAddress(C.Op1.getReg()) + I);
+    }
+
+    // FIXME
+    //    EmitInstructionFinal(MCInstBuilder(C65::BVC).addImm(6));
+
+    if (NumBytes == 1 || ByteCapacity == 1) {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::EOR_8imm)).addImm(0x80);
+    } else {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::EOR_16imm)).addImm(0x8000);
+    }
+    if (NumBytes == 1) {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::REP)).addImm(0x20);
+    }
+    if (C.Bitvalue) {
+      //      EmitInstructionFinal(MCInstBuilder(C65::BMI).addExpr(Dest));
+    } else {
+      //      EmitInstructionFinal(MCInstBuilder(C65::BPL).addExpr(Dest));
+    }
+  } else {
+    BuildMI(MBB, MBBI, DL, TII.get(C65::LDAzp))
+      .addImm(RI.getZRAddress(C.Op0.getReg()));
+    BuildMI(MBB, MBBI, DL, TII.get(C65::CMPzp))
+      .addImm(RI.getZRAddress(C.Op1.getReg()));
+
+    for (unsigned I = ByteCapacity; I < NumBytes; I += ByteCapacity) {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::LDAzp))
+        .addImm(RI.getZRAddress(C.Op0.getReg()) + I);
+      BuildMI(MBB, MBBI, DL, TII.get(C65::SBCzp))
+        .addImm(RI.getZRAddress(C.Op1.getReg()) + I);
+    }
+    if (NumBytes == 1) {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::REP)).addImm(0x20);
+    }
+    if (C.Bitvalue) {
+      //      EmitInstructionFinal(MCInstBuilder(C65::BCS).addExpr(Dest));
+    } else {
+      //      EmitInstructionFinal(MCInstBuilder(C65::BCC).addExpr(Dest));
+    }
+  }
+}
+
+bool C65InstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MI) const {
+  MachineInstrBuilder MIB(*MI->getParent()->getParent(), MI);
+
+  switch (MI->getOpcode()) {
+  case C65::BRCC8zz:
+    return ExpandBR_CC(MIB, *this, RI, 1);
+  case C65::BRCC16zz:
+    return ExpandBR_CC(MIB, *this, RI, 2);
+  case C65::BRCC32zz:
+    return ExpandBR_CC(MIB, *this, RI, 4);
+  case C65::BRCC64zz:
+    return ExpandBR_CC(MIB, *this, RI, 8);
+  }
 }

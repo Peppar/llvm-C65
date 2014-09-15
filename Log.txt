@@ -147,3 +147,10 @@ Input list item (ins i16imm:$imm) needs as pattern:
 Data*bitsDirective are MANDATORY, must not be nullptr, if you are ever
 to output the corresponding size. It will NOT default to several
 smaller. And the errors aren't helpful.
+
+IR
+SelectionDAG
+MachineDAG
+MachineInstr
+MachineInstr
+MCInst

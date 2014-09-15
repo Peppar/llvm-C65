@@ -58,37 +58,31 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   // Compute derived properties from the register classes
   computeRegisterProperties();
 
-  // TODO: Remove these for bare-bones?
-  // C65 has no *EXTLOAD
-  // setLoadExtAction(ISD::EXTLOAD,  MVT::i1, Promote);
-  // setLoadExtAction(ISD::EXTLOAD,  MVT::i8, Promote);
-  // setLoadExtAction(ISD::ZEXTLOAD, MVT::i1, Promote);
-  // setLoadExtAction(ISD::ZEXTLOAD, MVT::i8, Promote);
-  // setLoadExtAction(ISD::SEXTLOAD, MVT::i1, Promote);
-  // setLoadExtAction(ISD::SEXTLOAD, MVT::i8, Promote);
+  // Handle operations that are handled in a similar way for all types.
+  for (unsigned I = MVT::FIRST_INTEGER_VALUETYPE;
+       I <= MVT::LAST_INTEGER_VALUETYPE;
+       ++I) {
+    MVT VT = MVT::SimpleValueType(I);
+    if (isTypeLegal(VT)) {
+      // Lower SET_CC into an IPM-based sequence.
+      setOperationAction(ISD::SETCC, VT, Expand);
 
-  // TODO: Remove these for bare-bones?
-  // setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Expand);
-  // setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Expand);
+      // Expand SELECT(C, A, B) into SELECT_CC(X, 0, A, B, NE).
+      setOperationAction(ISD::SELECT, VT, Expand);
 
-  // TODO: Remove these for bare-bones?
-  // C65 doesn't have BRCOND either, it has BR_CC.
-  // setOperationAction(ISD::BRCOND, MVT::Other, Expand);
-  // setOperationAction(ISD::BRIND, MVT::Other, Expand);
-  // setOperationAction(ISD::BR_JT, MVT::Other, Expand);
-  // setOperationAction(ISD::BR_CC, MVT::i32, Custom);
-  // setOperationAction(ISD::SELECT_CC, MVT::i32, Custom);
+      // Lower SELECT_CC and BR_CC into separate comparisons and branches.
+      setOperationAction(ISD::SELECT_CC, VT, Expand);
+      setOperationAction(ISD::BR_CC,     VT, Custom);
+    }
+  }
 
-  //setOperationAction(ISD::SHL, MVT::i16, Custom);
+  // Expand BRCOND into a BR_CC (see above).
+  setOperationAction(ISD::BRCOND, MVT::Other, Expand);
+
 
   // Custom legalize GlobalAddress nodes
   setOperationAction(ISD::GlobalAddress, getPointerTy(), Custom);
-  // TODO: Remove these three?
-  // setOperationAction(ISD::GlobalTLSAddress, getPointerTy(), Custom);
-  // setOperationAction(ISD::ConstantPool, getPointerTy(), Custom);
-  // setOperationAction(ISD::BlockAddress, getPointerTy(), Custom);
 
-  // TODO: Remove this for bare-bones?
   setStackPointerRegisterToSaveRestore(C65::S);
 }
 
@@ -98,13 +92,11 @@ const char *C65TargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
   default:
     return TargetLowering::getTargetNodeName(Opcode);
-  case C65ISD::PUSH:   return "C65ISD::PUSH";
-  case C65ISD::PULL:   return "C65ISD::PULL";
-  case C65ISD::CALL:   return "C65ISD::CALL";
-  case C65ISD::RET:    return "C65ISD::RET";
-  case C65ISD::CMP:    return "C65ISD::CMP";
-  case C65ISD::BR:     return "C65ISD::BR";
-  case C65ISD::BRCOND: return "C65ISD::BRCOND";
+  case C65ISD::CMP:       return "C65ISD::CMP";
+  case C65ISD::BR_CC:     return "C65ISD::BR_CC";
+  case C65ISD::SELECT_CC: return "C65ISD::SELECT_CC";
+  case C65ISD::CALL:      return "C65ISD::CALL";
+  case C65ISD::RET:       return "C65ISD::RET";
   }
 }
 
@@ -126,6 +118,57 @@ SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
   return DAG.getTargetGlobalAddress(Node->getGlobal(), DL, getPointerTy());
 }
 
+// struct Comparison {
+//   // The operands to the comparison.
+//   SDValue Op0, Op1;
+
+//   // The opcode that should be used to compare Op0 and Op1.
+//   bool Equality;
+
+//   // Is signed comparison
+//   bool Signed;
+
+//   // The result on which we will trigger a branch:
+//   //   Branch on bitresult == Z flag for equality
+//   //   Branch on bitresult == N flag for signed
+//   //   Branch on bitresult == C flag for unsigned
+//   bool Bitvalue;
+// };
+
+// static SDValue emitCmp(ISD::CondCode CC, SDValue Op0, SDValue Op1) {
+//   Comparison C;
+
+//   switch (CC) { //        Op0  Op1  Equality Signed Bitvalue
+//   case ISD::SETEQ:  C = { Op0, Op1, true,    false, true };  break;
+//   case ISD::SETNE:  C = { Op0, Op1, true,    false, false }; break;
+//   case ISD::SETLT:  C = { Op1, Op0, false,   true,  false }; break;
+//   case ISD::SETLE:  C = { Op0, Op1, false,   true,  true };  break;
+//   case ISD::SETGT:  C = { Op0, Op1, false,   true,  false }; break;
+//   case ISD::SETGE:  C = { Op1, Op0, false,   true,  true };  break;
+//   case ISD::SETULT: C = { Op0, Op1, false,   false, true };  break;
+//   case ISD::SETULE: C = { Op1, Op0, false,   false, false }; break;
+//   case ISD::SETUGT: C = { Op1, Op0, false,   false, true };  break;
+//   case ISD::SETUGE: C = { Op0, Op1, false,   false, false }; break;
+//   default:
+//     llvm_unreachable("Cannot emit this type of comparison!");
+//   }
+//   return DAG.getNode(C65ISD::CMP, DL, MVT::Glue, C.Op0, C.Op1,
+//                      DAG.getConstant(CC, MVT::i32));
+// }
+
+SDValue C65TargetLowering::
+lowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  SDValue Chain    = Op.getOperand(0);
+  ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(1))->get();
+  SDValue CmpOp0   = Op.getOperand(2);
+  SDValue CmpOp1   = Op.getOperand(3);
+  SDValue Dest     = Op.getOperand(4);
+
+  return DAG.getNode(C65ISD::BR_CC, DL, Op.getValueType(),
+                     Chain, DAG.getConstant(CC, MVT::i32),
+                     CmpOp0, CmpOp1, Dest);
+}
 
 /// This callback is invoked for operations that are unsupported by
 /// the target, which are registered to use 'custom' lowering, and
@@ -135,13 +178,12 @@ SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
 ///
 SDValue C65TargetLowering::
 LowerOperation(SDValue Op, SelectionDAG &DAG) const {
-  SDLoc DL(Op);
   switch(Op.getOpcode()) {
   default:
     llvm_unreachable("Unexpected node to lower");
-  case C65ISD::SPILL:
-    Op.dump();
-    llvm_unreachable("Trying to spill!");
+  case ISD::BR_CC:
+    return lowerBR_CC(Op, DAG);
+    //  case ISD::SELECT_CC:
   case ISD::GlobalAddress:
     return LowerGlobalAddress(cast<GlobalAddressSDNode>(Op), DAG);
   }
@@ -385,14 +427,14 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   MachineRegisterInfo &MRI = MF.getRegInfo();
   EVT PtrVT = getPointerTy();
 
-  assert(!CLI.IsVarArg && "Var args not supported.");
+  assert(!IsVarArg && "Var args not supported.");
 
   // Analyze the operands of the call, assigning locations to each operand.
   SmallVector<CCValAssign, 16> ArgLocs;
 
-  CCState CCInfo(CLI.CallConv, CLI.IsVarArg, DAG.getMachineFunction(),
+  CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
                  ArgLocs, *DAG.getContext());
-  CCInfo.AnalyzeCallOperands(CLI.Outs, CC_65c816);
+  CCInfo.AnalyzeCallOperands(Outs, CC_65c816);
 
   // No support for tail calls
   CLI.IsTailCall = false;
@@ -482,7 +524,7 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                                   RegsToPass[i].second.getValueType()));
   }
 
-  // TODO:T HIS
+  // TODO: THIS
   // Add a register mask operand representing the call-preserved registers.
   //  const TargetRegisterInfo *TRI =
   //    getTargetMachine().getSubtargetImpl()->getRegisterInfo();
@@ -507,30 +549,41 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
                              Glue, DL);
   Glue = Chain.getValue(1);
 
+  return LowerCallResult(Chain, Glue, CallConv, IsVarArg,
+                         Ins, DL, DAG, InVals);
+}
+
+/// LowerCallResult - Lower the result values of a call into the
+/// appropriate copies out of appropriate physical registers.
+///
+SDValue
+C65TargetLowering::LowerCallResult(SDValue Chain, SDValue Glue,
+                                   CallingConv::ID CallConv, bool IsVarArg,
+                                   const SmallVectorImpl<ISD::InputArg> &Ins,
+                                   SDLoc DL, SelectionDAG &DAG,
+                                   SmallVectorImpl<SDValue> &InVals) const {
+
+  // Assign locations to each value returned by this call.
+  SmallVector<CCValAssign, 16> RVLocs;
+
+  CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
+                 RVLocs, *DAG.getContext());
+  CCInfo.AnalyzeCallResult(Ins, RetCC_65c816);
+
+  // Copy all of the result registers out of their specified physreg.
+  for (unsigned I = 0, E = RVLocs.size(); I != E; ++I) {
+    CCValAssign &VA = RVLocs[I];
+    EVT CopyVT = VA.getValVT();
+    SDValue Val;
+
+    Chain = DAG.getCopyFromReg(Chain, DL, VA.getLocReg(),
+                               CopyVT, Glue).getValue(1);
+    Val = Chain.getValue(0);
+    Glue = Chain.getValue(2);
+    InVals.push_back(Val);
+  }
+
   return Chain;
-
-  // TODO: Return values!
-
-  // // Assign locations to each value returned by this call.
-  // SmallVector<CCValAssign, 16> RetLocs;
-  // CCState RetCCInfo(CallConv, IsVarArg, MF, RetLocs, *DAG.getContext());
-  // RetCCInfo.AnalyzeCallResult(Ins, RetCC_65C816);
-
-  // // Copy all of the result registers out of their specified physreg.
-  // for (unsigned i = 0, e = RetLocs.size(); i != e; ++i) {
-  //   CCValAssign &VA = RetLocs[I];
-
-  //   // Copy the value out, gluing the copy to the end of the call sequence.
-  //   SDValue RetValue = DAG.getCopyFromReg(Chain, DL, VA.getLocReg(),
-  //                                         VA.getLocVT(), Glue);
-  //   Chain = RetValue.getValue(1);
-  //   Glue = RetValue.getValue(2);
-
-  //   // Convert the value of the return register into the value that's
-  //   // being returned.
-  //   InVals.push_back(convertLocVTToValVT(DAG, DL, VA, Chain, RetValue));
-  // }
-  // return DAG.getNode(C65ISD::CALL, DL, NodeTys, Ops);
 }
 
 /// This callback is invoked when a node result type is illegal for
