@@ -88,7 +88,13 @@ public:
                             const TargetRegisterInfo *TRI) const override;
   const C65RegisterInfo &getRegisterInfo() const { return RI; }
 
-  bool expandPostRAPseudo(MachineBasicBlock::iterator MI) const override;
+  bool ExpandBR_CC(MachineInstr *MI,
+                   unsigned NumBytes) const;
+
+  bool expandZRInstr(MachineBasicBlock::iterator MBBI,
+                     unsigned Instruction) const;
+
+  bool expandPostRAPseudo(MachineBasicBlock::iterator MBBI) const override;
 };
 } // end namespace llvm
 

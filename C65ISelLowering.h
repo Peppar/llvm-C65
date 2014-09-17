@@ -34,6 +34,16 @@ namespace llvm {
     };
   }
 
+  namespace C65IC {
+    enum InstrClass {
+      ORA = 0, AND, EOR, ADC, SBC, STA, CMP, LDA, ASL,
+      ROL, LSR, ROR, DEC, INC, STX, LDX, STY, LDY,
+      CPY, CPX, STZ,
+
+      INSTR_CLASS_END
+    };
+  }
+
   class C65TargetLowering : public TargetLowering {
     const C65Subtarget *Subtarget;
   public:
@@ -56,6 +66,28 @@ namespace llvm {
 
     uint8_t getZRAddress(MachineOperand Val) const;
 
+    MachineBasicBlock *EmitBR_CC(MachineInstr *MI, MachineBasicBlock *MBB,
+                                 unsigned NumBytes) const;
+    MachineBasicBlock *EmitSTZz(MachineInstr *MI, MachineBasicBlock *MBB,
+                                unsigned NumBytes) const;
+    MachineBasicBlock *EmitSTzi(MachineInstr *MI, MachineBasicBlock *MBB,
+                                unsigned NumBytes) const;
+    MachineBasicBlock *EmitLDzi(MachineInstr *MI, MachineBasicBlock *MBB,
+                                unsigned NumBytes) const;
+    MachineBasicBlock *EmitLDzimm(MachineInstr *MI, MachineBasicBlock *MBB,
+                                  unsigned NumBytes) const;
+    MachineBasicBlock *EmitANDzz(MachineInstr *MI, MachineBasicBlock *MBB,
+                                 unsigned NumBytes) const;
+    MachineBasicBlock *EmitORzz(MachineInstr *MI, MachineBasicBlock *MBB,
+                                unsigned NumBytes) const;
+    MachineBasicBlock *EmitXORzz(MachineInstr *MI, MachineBasicBlock *MBB,
+                                 unsigned NumBytes) const;
+    MachineBasicBlock *EmitMOVzz(MachineInstr *MI, MachineBasicBlock *MBB,
+                                 unsigned NumBytes) const;
+    MachineBasicBlock *EmitADDzz(MachineInstr *MI, MachineBasicBlock *MBB,
+                                 unsigned NumBytes) const;
+    MachineBasicBlock *EmitSUBzz(MachineInstr *MI, MachineBasicBlock *MBB,
+                                 unsigned NumBytes) const;
     MachineBasicBlock *
       EmitInstrWithCustomInserter(MachineInstr *MI,
                                   MachineBasicBlock *MBB) const override;

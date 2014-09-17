@@ -77,6 +77,9 @@ public:
 
   // Return true if the target has 65C816 capabilities
   bool has65C816() const { return Has65C816; }
+
+  // Return true if the target has a 16-bit accumulator
+  bool is16bit() const { return Has65C816; }
 };
 } // end namespace llvm
 

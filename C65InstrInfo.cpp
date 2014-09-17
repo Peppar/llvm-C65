@@ -77,9 +77,48 @@ void C65InstrInfo::buildPullReg(MachineBasicBlock &MBB,
 }
 
 void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
-                               MachineBasicBlock::iterator MI, DebugLoc DL,
+                               MachineBasicBlock::iterator MBBI,
+                               DebugLoc DL,
                                unsigned DestReg, unsigned SrcReg,
                                bool KillSrc) const {
+  const unsigned ByteCapacity = 2;
+  unsigned NumBytes;
+  unsigned LDAInstr;
+  unsigned STAInstr;
+
+  if (C65::ZRC8RegClass.contains(DestReg, SrcReg)) {
+    NumBytes = 1;
+  } else if (C65::ZRC16RegClass.contains(DestReg, SrcReg)) {
+    NumBytes = 2;
+  } else if (C65::ZRC32RegClass.contains(DestReg, SrcReg)) {
+    NumBytes = 4;
+  } else if (C65::ZRC64RegClass.contains(DestReg, SrcReg)) {
+    NumBytes = 8;
+  } else {
+    llvm_unreachable("Impossible reg-to-reg copy");
+  }
+
+  if (NumBytes == 1 || ByteCapacity == 1) {
+    LDAInstr = C65::LDA_8zp;
+    STAInstr = C65::STA_8zp;
+  } else {
+    LDAInstr = C65::LDA_16zp;
+    STAInstr = C65::STA_16zp;
+  }
+
+  if (NumBytes == 1) {
+    BuildMI(MBB, MBBI, DL, get(C65::SEP)).addImm(0x20);
+  }
+  for (unsigned I = 0; I < NumBytes; I += ByteCapacity) {
+    BuildMI(MBB, MBBI, DL, get(LDAInstr))
+      .addImm(RI.getZRAddress(SrcReg) + I);
+    BuildMI(MBB, MBBI, DL, get(STAInstr))
+      .addImm(RI.getZRAddress(DestReg) + I);
+  }
+  if (NumBytes == 1) {
+    BuildMI(MBB, MBBI, DL, get(C65::REP)).addImm(0x20);
+  }
+
   DEBUG(dbgs() << "CopyPhysReg from "
                << RI.getName(DestReg)
                << " to " << RI.getName(SrcReg) << '\n');
@@ -165,45 +204,6 @@ loadRegFromStackSlot(MachineBasicBlock &MBB,
   // }
 }
 
-struct Comparison {
-  // The operands to the comparison.
-  const MachineOperand Op0, Op1;
-
-  // The opcode that should be used to compare Op0 and Op1.
-  bool Equality;
-
-  // Is signed comparison
-  bool Signed;
-
-  // The result on which we will trigger a branch:
-  //   Branch on bitresult == Z flag for equality
-  //   Branch on bitresult == N flag for signed
-  //   Branch on bitresult == C flag for unsigned
-  bool Bitvalue;
-};
-
-///
-///
-static struct Comparison getComparison(const MachineInstr *MI) {
-  ISD::CondCode CC = (ISD::CondCode)MI->getOperand(0).getImm();
-  const MachineOperand Op0 = MI->getOperand(1);
-  const MachineOperand Op1 = MI->getOperand(2);
-
-  switch (CC) { //           Op0  Op1  Equality Signed Bitvalue
-  case ISD::SETEQ:  return { Op0, Op1, true,    false, true };
-  case ISD::SETNE:  return { Op0, Op1, true,    false, false };
-  case ISD::SETLT:  return { Op1, Op0, false,   true,  false };
-  case ISD::SETLE:  return { Op0, Op1, false,   true,  true };
-  case ISD::SETGT:  return { Op0, Op1, false,   true,  false };
-  case ISD::SETGE:  return { Op1, Op0, false,   true,  true };
-  case ISD::SETULT: return { Op0, Op1, false,   false, true };
-  case ISD::SETULE: return { Op1, Op0, false,   false, false };
-  case ISD::SETUGT: return { Op1, Op0, false,   false, true };
-  case ISD::SETUGE: return { Op0, Op1, false,   false, false };
-  default:
-    llvm_unreachable("Cannot emit this type of comparison!");
-  }
-}
 
 //static GlobalValue
 
@@ -218,101 +218,176 @@ static struct Comparison getComparison(const MachineInstr *MI) {
 //   return MIB;
 // }
 
-static bool ExpandBR_CC(MachineInstrBuilder &MIB,
-                        const C65InstrInfo &TII,
-                        const C65RegisterInfo &RI,
-                        unsigned NumBytes) {
+// static MachineBasicBlock *getSuccessor(MachineBasicBlock *MBB) {
+//   MachineFunction::iterator I(MBB);
+//   return std::next(I);
+// }
+
+bool C65InstrInfo::expandZRInstr(MachineBasicBlock::iterator MBBI,
+                                 unsigned Instruction) const {
+  MachineInstrBuilder MIB(*MBBI->getParent()->getParent(), MBBI);
   MachineBasicBlock &MBB = *MIB->getParent();
   DebugLoc DL = MIB->getDebugLoc();
-  MachineBasicBlock::iterator MBBI = MIB;
+  unsigned ZReg = MIB->getOperand(0).getReg();
+  unsigned Offset = MIB->getOperand(1).getImm();
+  MachineBasicBlock::iterator I = MIB;
 
-  const unsigned ByteCapacity = 2;
-  struct Comparison C = getComparison(MIB);
-  const MachineOperand &Dest = MIB->getOperand(3);
+  BuildMI(MBB, I, DL, get(Instruction))
+    .addImm(getRegisterInfo().getZRAddress(ZReg) + Offset);
 
-  if (NumBytes == 1) {
-    BuildMI(MBB, MBBI, DL, TII.get(C65::SEP)).addImm(0x20);
-  }
-  if (C.Equality) {
-    for (unsigned I = 0; I < NumBytes; I += ByteCapacity) {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::LDAzp))
-        .addImm(RI.getZRAddress(C.Op0.getReg()));
-      BuildMI(MBB, MBBI, DL, TII.get(C65::CMPzp))
-        .addImm(RI.getZRAddress(C.Op1.getReg()));
-      //      EmitInstructionFinal(MCInstBuilder(C65::BNE).addExpr(Dest));
-    }
-    // FIXME
-    if (NumBytes == 1) {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::REP)).addImm(0x20);
-    }
-    if (C.Bitvalue) {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::BNE)).addOperand(Dest);
-    } else {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::BEQ)).addOperand(Dest);
-    }
-  } else if (C.Signed) {
-    BuildMI(MBB, MBBI, DL, TII.get(C65::LDAzp))
-      .addImm(RI.getZRAddress(C.Op0.getReg()));
-    BuildMI(MBB, MBBI, DL, TII.get(C65::CMPzp))
-      .addImm(RI.getZRAddress(C.Op1.getReg()));
-
-    for (unsigned I = ByteCapacity; I < NumBytes; I += ByteCapacity) {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::LDAzp))
-        .addImm(RI.getZRAddress(C.Op0.getReg()) + I);
-      BuildMI(MBB, MBBI, DL, TII.get(C65::SBCzp))
-        .addImm(RI.getZRAddress(C.Op1.getReg()) + I);
-    }
-
-    // FIXME
-    //    EmitInstructionFinal(MCInstBuilder(C65::BVC).addImm(6));
-
-    if (NumBytes == 1 || ByteCapacity == 1) {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::EOR_8imm)).addImm(0x80);
-    } else {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::EOR_16imm)).addImm(0x8000);
-    }
-    if (NumBytes == 1) {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::REP)).addImm(0x20);
-    }
-    if (C.Bitvalue) {
-      //      EmitInstructionFinal(MCInstBuilder(C65::BMI).addExpr(Dest));
-    } else {
-      //      EmitInstructionFinal(MCInstBuilder(C65::BPL).addExpr(Dest));
-    }
-  } else {
-    BuildMI(MBB, MBBI, DL, TII.get(C65::LDAzp))
-      .addImm(RI.getZRAddress(C.Op0.getReg()));
-    BuildMI(MBB, MBBI, DL, TII.get(C65::CMPzp))
-      .addImm(RI.getZRAddress(C.Op1.getReg()));
-
-    for (unsigned I = ByteCapacity; I < NumBytes; I += ByteCapacity) {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::LDAzp))
-        .addImm(RI.getZRAddress(C.Op0.getReg()) + I);
-      BuildMI(MBB, MBBI, DL, TII.get(C65::SBCzp))
-        .addImm(RI.getZRAddress(C.Op1.getReg()) + I);
-    }
-    if (NumBytes == 1) {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::REP)).addImm(0x20);
-    }
-    if (C.Bitvalue) {
-      //      EmitInstructionFinal(MCInstBuilder(C65::BCS).addExpr(Dest));
-    } else {
-      //      EmitInstructionFinal(MCInstBuilder(C65::BCC).addExpr(Dest));
-    }
-  }
+  return true;
 }
 
-bool C65InstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MI) const {
-  MachineInstrBuilder MIB(*MI->getParent()->getParent(), MI);
+bool C65InstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MBBI) const {
 
-  switch (MI->getOpcode()) {
-  case C65::BRCC8zz:
-    return ExpandBR_CC(MIB, *this, RI, 1);
-  case C65::BRCC16zz:
-    return ExpandBR_CC(MIB, *this, RI, 2);
-  case C65::BRCC32zz:
-    return ExpandBR_CC(MIB, *this, RI, 4);
-  case C65::BRCC64zz:
-    return ExpandBR_CC(MIB, *this, RI, 8);
+  switch (MBBI->getOpcode()) {
+  case C65::ORA_8zr8:
+  case C65::ORA_8zr16:
+  case C65::ORA_8zr32:
+  case C65::ORA_8zr64: return expandZRInstr(MBBI, C65::ORA_8zp);
+  case C65::ORA_16zr16:
+  case C65::ORA_16zr32:
+  case C65::ORA_16zr64: return expandZRInstr(MBBI, C65::ORA_16zp);
+  case C65::AND_8zr8:
+  case C65::AND_8zr16:
+  case C65::AND_8zr32:
+  case C65::AND_8zr64: return expandZRInstr(MBBI, C65::AND_8zp);
+  case C65::AND_16zr16:
+  case C65::AND_16zr32:
+  case C65::AND_16zr64: return expandZRInstr(MBBI, C65::AND_16zp);
+  case C65::EOR_8zr8:
+  case C65::EOR_8zr16:
+  case C65::EOR_8zr32:
+  case C65::EOR_8zr64: return expandZRInstr(MBBI, C65::EOR_8zp);
+  case C65::EOR_16zr16:
+  case C65::EOR_16zr32:
+  case C65::EOR_16zr64: return expandZRInstr(MBBI, C65::EOR_16zp);
+  case C65::ADC_8zr8:
+  case C65::ADC_8zr16:
+  case C65::ADC_8zr32:
+  case C65::ADC_8zr64: return expandZRInstr(MBBI, C65::ADC_8zp);
+  case C65::ADC_16zr16:
+  case C65::ADC_16zr32:
+  case C65::ADC_16zr64: return expandZRInstr(MBBI, C65::ADC_16zp);
+  case C65::SBC_8zr8:
+  case C65::SBC_8zr16:
+  case C65::SBC_8zr32:
+  case C65::SBC_8zr64: return expandZRInstr(MBBI, C65::SBC_8zp);
+  case C65::SBC_16zr16:
+  case C65::SBC_16zr32:
+  case C65::SBC_16zr64: return expandZRInstr(MBBI, C65::SBC_16zp);
+  case C65::STA_8zr8:
+  case C65::STA_8zr16:
+  case C65::STA_8zr32:
+  case C65::STA_8zr64: return expandZRInstr(MBBI, C65::STA_8zp);
+  case C65::STA_16zr16:
+  case C65::STA_16zr32:
+  case C65::STA_16zr64: return expandZRInstr(MBBI, C65::STA_16zp);
+  case C65::CMP_8zr8:
+  case C65::CMP_8zr16:
+  case C65::CMP_8zr32:
+  case C65::CMP_8zr64: return expandZRInstr(MBBI, C65::CMP_8zp);
+  case C65::CMP_16zr16:
+  case C65::CMP_16zr32:
+  case C65::CMP_16zr64: return expandZRInstr(MBBI, C65::CMP_16zp);
+  case C65::LDA_8zr8:
+  case C65::LDA_8zr16:
+  case C65::LDA_8zr32:
+  case C65::LDA_8zr64: return expandZRInstr(MBBI, C65::LDA_8zp);
+  case C65::LDA_16zr16:
+  case C65::LDA_16zr32:
+  case C65::LDA_16zr64: return expandZRInstr(MBBI, C65::LDA_16zp);
+  case C65::ASL_8zr8:
+  case C65::ASL_8zr16:
+  case C65::ASL_8zr32:
+  case C65::ASL_8zr64: return expandZRInstr(MBBI, C65::ASL_8zp);
+  case C65::ASL_16zr16:
+  case C65::ASL_16zr32:
+  case C65::ASL_16zr64: return expandZRInstr(MBBI, C65::ASL_16zp);
+  case C65::ROL_8zr8:
+  case C65::ROL_8zr16:
+  case C65::ROL_8zr32:
+  case C65::ROL_8zr64: return expandZRInstr(MBBI, C65::ROL_8zp);
+  case C65::ROL_16zr16:
+  case C65::ROL_16zr32:
+  case C65::ROL_16zr64: return expandZRInstr(MBBI, C65::ROL_16zp);
+  case C65::LSR_8zr8:
+  case C65::LSR_8zr16:
+  case C65::LSR_8zr32:
+  case C65::LSR_8zr64: return expandZRInstr(MBBI, C65::LSR_8zp);
+  case C65::LSR_16zr16:
+  case C65::LSR_16zr32:
+  case C65::LSR_16zr64: return expandZRInstr(MBBI, C65::LSR_16zp);
+  case C65::ROR_8zr8:
+  case C65::ROR_8zr16:
+  case C65::ROR_8zr32:
+  case C65::ROR_8zr64: return expandZRInstr(MBBI, C65::ROR_8zp);
+  case C65::ROR_16zr16:
+  case C65::ROR_16zr32:
+  case C65::ROR_16zr64: return expandZRInstr(MBBI, C65::ROR_16zp);
+  case C65::DEC_8zr8:
+  case C65::DEC_8zr16:
+  case C65::DEC_8zr32:
+  case C65::DEC_8zr64: return expandZRInstr(MBBI, C65::DEC_8zp);
+  case C65::DEC_16zr16:
+  case C65::DEC_16zr32:
+  case C65::DEC_16zr64: return expandZRInstr(MBBI, C65::DEC_16zp);
+  case C65::INC_8zr8:
+  case C65::INC_8zr16:
+  case C65::INC_8zr32:
+  case C65::INC_8zr64: return expandZRInstr(MBBI, C65::INC_8zp);
+  case C65::INC_16zr16:
+  case C65::INC_16zr32:
+  case C65::INC_16zr64: return expandZRInstr(MBBI, C65::INC_16zp);
+  case C65::STX_8zr8:
+  case C65::STX_8zr16:
+  case C65::STX_8zr32:
+  case C65::STX_8zr64: return expandZRInstr(MBBI, C65::STX_8zp);
+  case C65::STX_16zr16:
+  case C65::STX_16zr32:
+  case C65::STX_16zr64: return expandZRInstr(MBBI, C65::STX_16zp);
+  case C65::LDX_8zr8:
+  case C65::LDX_8zr16:
+  case C65::LDX_8zr32:
+  case C65::LDX_8zr64: return expandZRInstr(MBBI, C65::LDX_8zp);
+  case C65::LDX_16zr16:
+  case C65::LDX_16zr32:
+  case C65::LDX_16zr64: return expandZRInstr(MBBI, C65::LDX_16zp);
+  case C65::STY_8zr8:
+  case C65::STY_8zr16:
+  case C65::STY_8zr32:
+  case C65::STY_8zr64: return expandZRInstr(MBBI, C65::STY_8zp);
+  case C65::STY_16zr16:
+  case C65::STY_16zr32:
+  case C65::STY_16zr64: return expandZRInstr(MBBI, C65::STY_16zp);
+  case C65::LDY_8zr8:
+  case C65::LDY_8zr16:
+  case C65::LDY_8zr32:
+  case C65::LDY_8zr64: return expandZRInstr(MBBI, C65::LDY_8zp);
+  case C65::LDY_16zr16:
+  case C65::LDY_16zr32:
+  case C65::LDY_16zr64: return expandZRInstr(MBBI, C65::LDY_16zp);
+  case C65::CPY_8zr8:
+  case C65::CPY_8zr16:
+  case C65::CPY_8zr32:
+  case C65::CPY_8zr64: return expandZRInstr(MBBI, C65::CPY_8zp);
+  case C65::CPY_16zr16:
+  case C65::CPY_16zr32:
+  case C65::CPY_16zr64: return expandZRInstr(MBBI, C65::CPY_16zp);
+  case C65::CPX_8zr8:
+  case C65::CPX_8zr16:
+  case C65::CPX_8zr32:
+  case C65::CPX_8zr64: return expandZRInstr(MBBI, C65::CPX_8zp);
+  case C65::CPX_16zr16:
+  case C65::CPX_16zr32:
+  case C65::CPX_16zr64: return expandZRInstr(MBBI, C65::CPX_16zp);
+  case C65::STZ_8zr8:
+  case C65::STZ_8zr16:
+  case C65::STZ_8zr32:
+  case C65::STZ_8zr64: return expandZRInstr(MBBI, C65::STZ_8zp);
+  case C65::STZ_16zr16:
+  case C65::STZ_16zr32:
+  case C65::STZ_16zr64: return expandZRInstr(MBBI, C65::STZ_16zp);
   }
+  return false;
 }

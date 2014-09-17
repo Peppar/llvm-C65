@@ -154,3 +154,23 @@ MachineDAG
 MachineInstr
 MachineInstr
 MCInst
+
+count >> 3 byte-shift
+count & 7  bit-shift
+
+if count & 7 > 4 then
+
+000 0 left
+001 1 left
+010 2 left
+011 3 left
+100 4 left or right
+101 5 right
+110 6 right
+111 7 right
+
+
+Shift
+
+
+PPCISelLowering has some nice MBB-manipulating routines
