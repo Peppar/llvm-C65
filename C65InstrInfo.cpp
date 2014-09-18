@@ -235,6 +235,8 @@ bool C65InstrInfo::expandZRInstr(MachineBasicBlock::iterator MBBI,
   BuildMI(MBB, I, DL, get(Instruction))
     .addImm(getRegisterInfo().getZRAddress(ZReg) + Offset);
 
+  MBBI->eraseFromParent();
+
   return true;
 }
 

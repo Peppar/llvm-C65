@@ -62,10 +62,12 @@ namespace llvm {
                                        const SelectionDAG &DAG,
                                        unsigned Depth = 0) const override;
 
-    MCInstrDesc getOp(unsigned Op) const;
-
-    uint8_t getZRAddress(MachineOperand Val) const;
-
+    MachineBasicBlock *EmitSimpleZI(MachineInstr *MI,
+                                    MachineBasicBlock *MBB,
+                                    unsigned NumBytes) const;
+    MachineBasicBlock *EmitBinaryZI(MachineInstr *MI, MachineBasicBlock *MBB,
+                                    unsigned NumBytes, unsigned OP,
+                                    bool clc = false, bool stc = false) const;
     MachineBasicBlock *EmitBR_CC(MachineInstr *MI, MachineBasicBlock *MBB,
                                  unsigned NumBytes) const;
     MachineBasicBlock *EmitSTZz(MachineInstr *MI, MachineBasicBlock *MBB,
@@ -76,24 +78,13 @@ namespace llvm {
                                 unsigned NumBytes) const;
     MachineBasicBlock *EmitLDzimm(MachineInstr *MI, MachineBasicBlock *MBB,
                                   unsigned NumBytes) const;
-    MachineBasicBlock *EmitANDzz(MachineInstr *MI, MachineBasicBlock *MBB,
-                                 unsigned NumBytes) const;
-    MachineBasicBlock *EmitORzz(MachineInstr *MI, MachineBasicBlock *MBB,
-                                unsigned NumBytes) const;
-    MachineBasicBlock *EmitXORzz(MachineInstr *MI, MachineBasicBlock *MBB,
-                                 unsigned NumBytes) const;
     MachineBasicBlock *EmitMOVzz(MachineInstr *MI, MachineBasicBlock *MBB,
-                                 unsigned NumBytes) const;
-    MachineBasicBlock *EmitADDzz(MachineInstr *MI, MachineBasicBlock *MBB,
-                                 unsigned NumBytes) const;
-    MachineBasicBlock *EmitSUBzz(MachineInstr *MI, MachineBasicBlock *MBB,
                                  unsigned NumBytes) const;
     MachineBasicBlock *
       EmitInstrWithCustomInserter(MachineInstr *MI,
                                   MachineBasicBlock *MBB) const override;
 
     const char *getTargetNodeName(unsigned Opcode) const override;
-
 
     bool isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const override;
 

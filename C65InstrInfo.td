@@ -663,7 +663,7 @@ class FC<CondFlag cf, bit value, string asmstr>
   let Inst{4-0} = 0b10000;
   let isBranch = 1;
   let isTerminator = 1;
-  let isBarrier = 1;
+//  let isBarrier = 1;
 }
 
 let Uses = [P] in {
@@ -690,11 +690,32 @@ class FF<bits<8> op, dag outs, dag ins,
 
 def NOP      : FF<0xea, (outs), (ins), "NOP", []>;
 
-def BIT_imm  : FF<0x89, (outs), (ins i16imm:$imm), "BIT $imm", []>;
-
-def BIT_i    : FF<0x24, (outs), (ins mem_a16:$addr), "BIT $addr", []>;
-
-def BIT_ix   : FF<0x3c, (outs), (ins mem_ix16:$addr), "BIT $addr", []>;
+def BIT_8imm   : FF<0x89, (outs), (ins i8imm:$imm), "BIT $imm", []>,
+                 Acc8Bit;
+def BIT_16imm  : FF<0x89, (outs), (ins i16imm:$imm), "BIT $imm", []>,
+                 Acc16Bit;
+def BIT_8zp    : FF<0x24, (outs), (ins mem_a16:$addr), "BIT $addr", []>,
+                 Acc8Bit;
+def BIT_16zp   : FF<0x24, (outs), (ins mem_a16:$addr), "BIT $addr", []>,
+                 Acc16Bit;
+def BIT_8ix16  : FF<0x3c, (outs), (ins mem_ix16:$addr), "BIT $addr", []>,
+                 Acc8Bit, Ix16Bit;
+def BIT_16ix16 : FF<0x3c, (outs), (ins mem_ix16:$addr), "BIT $addr", []>,
+                 Acc16Bit, Ix16Bit;
+def BIT_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
+                        "BIT $reg+$offset", []>, Acc8Bit;
+def BIT_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
+                        "BIT $reg+$offset", []>, Acc8Bit;
+def BIT_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
+                        "BIT $reg+$offset", []>, Acc8Bit;
+def BIT_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
+                        "BIT $reg+$offset", []>, Acc8Bit;
+def BIT_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
+                        "BIT $reg+$offset", []>, Acc16Bit;
+def BIT_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
+                        "BIT $reg+$offset", []>, Acc16Bit;
+def BIT_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
+                        "BIT $reg+$offset", []>, Acc16Bit;
 
 def STZ_8zp    : FF<0x64, (outs), (ins mem_zp:$addr), "STZ $addr", []>,
                  Acc8Bit;
@@ -781,37 +802,51 @@ def RTS    : FF<0x60, (outs), (ins), "RTS", [(C65ret)]> {
   let isBarrier = 1;
 }
 
-def TAX    : FF<0xaa, (outs), (ins), "TAX", []>;
+def TAX_8  : FF<0xaa, (outs), (ins), "TAX", []>, Acc8Bit, Ix8Bit;
+def TAX_16 : FF<0xaa, (outs), (ins), "TAX", []>, Acc16Bit, Ix16Bit;
 
-def TAY    : FF<0xa8, (outs), (ins), "TAY", []>;
+def TAY_8  : FF<0xa8, (outs), (ins), "TAY", []>, Acc8Bit, Ix8Bit;
+def TAY_16 : FF<0xa8, (outs), (ins), "TAY", []>, Acc16Bit, Ix16Bit;
 
-def TXA    : FF<0x8a, (outs), (ins), "TXA", []>;
+def TXA_8  : FF<0x8a, (outs), (ins), "TXA", []>, Acc8Bit, Ix8Bit;
+def TXA_16 : FF<0x8a, (outs), (ins), "TXA", []>, Acc16Bit, Ix16Bit;
 
-def TYA    : FF<0xa8, (outs), (ins), "TYA", []>;
+def TYA_8  : FF<0xa8, (outs), (ins), "TYA", []>, Acc8Bit, Ix8Bit;
+def TYA_16 : FF<0xa8, (outs), (ins), "TYA", []>, Acc16Bit, Ix16Bit;
 
 def TXS    : FF<0x9b, (outs), (ins), "TXS", []>;
 
 def TSX    : FF<0xbb, (outs), (ins), "TSX", []>;
 
-def TXY    : FF<0x9b, (outs), (ins), "TXY", []>;
+def TXY_8  : FF<0x9b, (outs), (ins), "TXY", []>, Ix8Bit;
+def TXY_16 : FF<0x9b, (outs), (ins), "TXY", []>, Ix16Bit;
 
-def TYX    : FF<0xbb, (outs), (ins), "TYX", []>;
+def TYX_8  : FF<0xbb, (outs), (ins), "TYX", []>, Ix8Bit;
+def TYX_16 : FF<0xbb, (outs), (ins), "TYX", []>, Ix16Bit;
 
 def TCS    : FF<0x1b, (outs), (ins), "TCS", []>;
-
 def TSC    : FF<0x3b, (outs), (ins), "TSC", []>;
 
 def TCD    : FF<0x5b, (outs), (ins), "TCD", []>;
-
 def TDC    : FF<0x7b, (outs), (ins), "TDC", []>;
 
-def TSBzp  : FF<0x04, (outs), (ins mem_zp:$addr), "TSB $addr", []>;
+def TSB_8zp  : FF<0x04, (outs), (ins mem_zp:$addr), "TSB $addr", []>,
+               Acc8Bit;
+def TSB_16zp : FF<0x04, (outs), (ins mem_zp:$addr), "TSB $addr", []>,
+               Acc8Bit;
+def TSB_8i   : FF<0x0c, (outs), (ins mem_a16:$addr), "TSB $addr", []>,
+               Acc8Bit;
+def TSB_16i  : FF<0x0c, (outs), (ins mem_a16:$addr), "TSB $addr", []>,
+               Acc16Bit;
 
-def TSBi   : FF<0x0c, (outs), (ins mem_a16:$addr), "TSB $addr", []>;
-
-def TRBzp  : FF<0x14, (outs), (ins mem_zp:$addr), "TRB $addr", []>;
-
-def TRBi   : FF<0x1c, (outs), (ins mem_a16:$addr), "TRB $addr", []>;
+def TRB_8zp  : FF<0x04, (outs), (ins mem_zp:$addr), "TRB $addr", []>,
+               Acc8Bit;
+def TRB_16zp : FF<0x04, (outs), (ins mem_zp:$addr), "TRB $addr", []>,
+               Acc8Bit;
+def TRB_8i   : FF<0x0c, (outs), (ins mem_a16:$addr), "TRB $addr", []>,
+               Acc8Bit;
+def TRB_16i  : FF<0x0c, (outs), (ins mem_a16:$addr), "TRB $addr", []>,
+               Acc16Bit;
 
 def XBA    : FF<0xeb, (outs), (ins), "XBA", []>;
 
