@@ -24,51 +24,6 @@
 
 namespace llvm {
 
-namespace C65 {
-
-enum {
-  AccNA = 0,
-  Acc8Bit = 2,
-  Acc16Bit = 3,
-
-  IxNA = 0,
-  Ix8Bit = 2,
-  Ix16Bit = 3
-};
-
-enum {
-  // This needs to be kept in sync with C65InstrInfo.td TSFlags
-
-  // AccSize
-  AccSize = (3 << 0),
-  AccSizeShift = 0,
-
-  // IxSize
-  IxSize = (3 << 2),
-  IxSizeShift = 2,
-
-  // Is a ZR instruction
-  ZRInstr = (1 << 4),
-
-  // ZR operand size
-  ZROpSize = (3 << 5),
-  ZROpSizeShift = 5
-};
-
-static inline unsigned getAccSize(unsigned int Flags) {
-  return (Flags & AccSize) >> AccSizeShift;
-}
-
-static inline unsigned getIxSize(unsigned int Flags) {
-  return (Flags & IxSize) >> IxSizeShift;
-}
-
-static inline unsigned getZROpSize(unsigned int Flags) {
-  return (Flags & ZROpSize) >> ZROpSizeShift;
-}
-
-}
-
 class C65TargetMachine;
 class C65Subtarget;
 class C65InstrInfo : public C65GenInstrInfo {
@@ -125,11 +80,6 @@ public:
                         MachineBasicBlock *FBB,
                         const SmallVectorImpl<MachineOperand> &Cond,
                         DebugLoc DL) const override;
-
-  // bool expandZRInstr(MachineBasicBlock::iterator MBBI,
-  //                    unsigned Instruction) const;
-
-  // bool expandZInstr(MachineInstr *MI) const override;
 };
 } // end namespace llvm
 

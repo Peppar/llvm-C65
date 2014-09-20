@@ -14,6 +14,7 @@
 #include "C65.h"
 #include "C65InstrInfo.h"
 #include "C65Subtarget.h"
+#include "MCTargetDesc/C65BaseInfo.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -65,7 +66,7 @@ bool ZInstrExpander::runOnMachineFunction(MachineFunction &MF) {
       MachineInstr *MI = MBBI++;
 
       // If MI is a Z instruction, expand it.
-      if (MI->getDesc().TSFlags & C65::ZRInstr) {
+      if (MI->getDesc().TSFlags & C65II::ZRInstr) {
         Changed = true;
         MachineBasicBlock *NewMBB =
           TL->EmitZInstr(MI, MBB);

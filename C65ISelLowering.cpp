@@ -16,6 +16,7 @@
 #include "C65ISelLowering.h"
 #include "C65RegisterInfo.h"
 #include "C65TargetMachine.h"
+#include "MCTargetDesc/C65BaseInfo.h"
 #include "llvm/CodeGen/CallingConvLower.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
@@ -624,7 +625,7 @@ C65TargetLowering::EmitMOVzz(MachineInstr *MI,
 
 MachineBasicBlock *
 C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
-  unsigned OpSize = 1 << C65::getZROpSize(MI->getDesc().TSFlags);
+  unsigned OpSize = 1 << C65II::getZROpSize(MI->getDesc().TSFlags);
   switch (MI->getOpcode()) {
   case C65::BRCC8zz:
   case C65::BRCC16zz:

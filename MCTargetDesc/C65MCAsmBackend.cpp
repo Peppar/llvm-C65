@@ -62,7 +62,7 @@ public:
   }
   bool writeNopData(uint64_t Count, MCObjectWriter *OW) const override;
   MCObjectWriter *createObjectWriter(raw_ostream &OS) const override {
-    return createC65ObjectWriter(OS, OSABI);
+    return createC65WLAKObjectWriter(OS, OSABI);
   }
 };
 } // end anonymous namespace

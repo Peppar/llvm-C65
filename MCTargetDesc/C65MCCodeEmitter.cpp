@@ -11,6 +11,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "MCTargetDesc/C65BaseInfo.h"
 #include "MCTargetDesc/C65MCFixups.h"
 #include "MCTargetDesc/C65MCTargetDesc.h"
 #include "llvm/MC/MCCodeEmitter.h"
@@ -34,7 +35,6 @@ public:
 
   ~C65MCCodeEmitter() {}
 
-  // OVerride MCCodeEmitter.
   void EncodeInstruction(const MCInst &MI, raw_ostream &OS,
                          SmallVectorImpl<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
@@ -71,13 +71,22 @@ void C65MCCodeEmitter::
 EncodeInstruction(const MCInst &MI, raw_ostream &OS,
                   SmallVectorImpl<MCFixup> &Fixups,
                   const MCSubtargetInfo &STI) const {
-  uint64_t Bits = getBinaryCodeForInstr(MI, Fixups, STI);
-  unsigned Size = MCII.get(MI.getOpcode()).getSize();
-  // Big-endian insertion of Size bytes.
-  unsigned ShiftValue = (Size * 8) - 8;
-  for (unsigned I = 0; I != Size; ++I) {
-    OS << uint8_t(Bits >> ShiftValue);
-    ShiftValue -= 8;
+  unsigned Opcode = MI.getOpcode();
+  const MCInstrDesc &Desc = MCII.get(Opcode);
+  unsigned TSFlags = Desc.TSFlags;
+  unsigned OpSize = C65II::getOpSize(TSFlags);
+
+  unsigned Bits = getBinaryCodeForInstr(MI, Fixups, STI);
+  assert (MCII.get(MI.getOpcode()).getSize() == 1);
+  OS << uint8_t(Bits);
+
+  unsigned NumOps = Desc.getNumOperands();
+  for (unsigned I = 0; I < NumOps; ++I) {
+    const MCOperand &MO = MI.getOperand(I);
+    unsigned Value = getMachineOpValue(MI, MO, Fixups, STI);
+    for (unsigned X = 0; X < OpSize; ++X) {
+      OS << uint8_t((Value >> (8 * X)) & 0xFF);
+    }
   }
 }
 
@@ -85,11 +94,26 @@ uint64_t C65MCCodeEmitter::
 getMachineOpValue(const MCInst &MI, const MCOperand &MO,
                   SmallVectorImpl<MCFixup> &Fixups,
                   const MCSubtargetInfo &STI) const {
-  if (MO.isReg())
-    return Ctx.getRegisterInfo()->getEncodingValue(MO.getReg());
+  assert(!MO.isReg());
   if (MO.isImm())
-    return static_cast<uint64_t>(MO.getImm());
-  llvm_unreachable("Unexpected operand type!");
+    return MO.getImm();
+
+  unsigned Opcode = MI.getOpcode();
+  const MCInstrDesc &Desc = MCII.get(Opcode);
+  unsigned TSFlags = Desc.TSFlags;
+  unsigned OpSize = C65II::getOpSize(TSFlags);
+  MCFixupKind FixupKind;
+  if (OpSize == 1)
+    FixupKind = FK_Data_1;
+  else if (OpSize == 2)
+    FixupKind = FK_Data_2;
+  else if (OpSize == 3)
+    FixupKind = FK_Data_4;
+  else
+    llvm_unreachable("Instruction expected to be without operands.");
+
+  Fixups.push_back(MCFixup::Create(0, MO.getExpr(), FixupKind));
+  return 0;
 }
 
 uint64_t

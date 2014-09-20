@@ -18,6 +18,7 @@
 #include "C65.h"
 #include "C65InstrInfo.h"
 #include "C65Subtarget.h"
+#include "MCTargetDesc/C65BaseInfo.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -65,19 +66,20 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
          MBBI != MBBE; ) {
       MachineInstr *MI = MBBI++;
 
-      unsigned AccSize = C65::getAccSize(MI->getDesc().TSFlags);
-      unsigned IxSize = C65::getIxSize(MI->getDesc().TSFlags);
+      unsigned AccSize = C65II::getAccSize(MI->getDesc().TSFlags);
+      unsigned IxSize = C65II::getIxSize(MI->getDesc().TSFlags);
 
-      if (AccSize == C65::Acc8Bit || IxSize == C65::Ix8Bit) {
+      if (AccSize == C65II::Acc8Bit || IxSize == C65II::Ix8Bit) {
         unsigned StatusCode =
-          (AccSize == C65::Acc8Bit ? 0x20 : 0) +
-          (IxSize  == C65::Ix8Bit  ? 0x10 : 0);
+          (AccSize == C65II::Acc8Bit ? 0x20 : 0) +
+          (IxSize  == C65II::Ix8Bit  ? 0x10 : 0);
 
         DebugLoc DL = MI->getDebugLoc();
         BuildMI(*MBB, MBBI, DL, TII->get(C65::SEP))
           .addImm(StatusCode);
-        BuildMI(*MBB, std::next(MBBI), DL, TII->get(C65::REP))
+        MBBI = BuildMI(*MBB, std::next(MBBI), DL, TII->get(C65::REP))
           .addImm(StatusCode);
+        ++MBBI;
       }
     }
   }

@@ -30,11 +30,13 @@ class InstC65<dag outs, dag ins, string asmstr, list<dag> pattern>
   bits<2> IxSize = 0;
   bit is_ZRInstr = 0;
   bits<2> ZRSize = 0;
+  bits<2> OpSize = 0;
 
   let TSFlags{1-0} = AccSize;
   let TSFlags{3-2} = IxSize;
   let TSFlags{4}   = is_ZRInstr;
   let TSFlags{6-5} = ZRSize;
+  let TSFlags{8-7} = OpSize;
 }
 
 class ZROpSize8 { bits<2> ZRSize = 0; }
@@ -46,6 +48,10 @@ class Acc8Bit { bits<2> AccSize = 0b10; }
 class Acc16Bit { bits<2> AccSize = 0b11; }
 class Ix8Bit { bits<2> IxSize = 0b10; }
 class Ix16Bit { bits<2> IxSize = 0b11; }
+
+class OpSize8 { bits<2> OpSize = 1; }
+class OpSize16 { bits<2> OpSize = 2; }
+class OpSize24 { bits<2> OpSize = 3; }
 
 // Format cc instructions
 // 6502 instruction format generally follows: aaabbbcc
@@ -152,9 +158,11 @@ def brtarget16 : Operand<OtherVT> {
 
 let PrintMethod = "printMemOperandAbs" in {
   def mem_zp : Operand<iPTR> {
+    let EncoderMethod = "getZeroPageEncoding";
     let MIOperandInfo = (ops i8imm);
   }
   def mem_a16 : Operand<iPTR> {
+    let EncoderMethod = "getAbsolute16Encoding";
     let MIOperandInfo = (ops i16imm);
   }
   // def mem_a24 : Operand<iPTR> {
@@ -182,7 +190,6 @@ let PrintMethod = "printMemOperandIndex" in {
 def uimm6 : Operand<i32>;
 def immZExt6 : ImmLeaf<i32, [{return Imm == (Imm & 0x3f);}]>;
 
-
 //===----------------------------------------------------------------------===//
 // Format 01 instructions : ora, and, eor, adc, sta, lda, cmp, sbc
 //===----------------------------------------------------------------------===//
@@ -195,30 +202,30 @@ class F01<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 
 multiclass F01_binary<bits<3> op, string asmstr> {
   def _8imm  : F01<op, 0b010, (outs), (ins i8imm:$imm),
-                   !strconcat(asmstr, " $imm"), []>, Acc8Bit;
+                   !strconcat(asmstr, " $imm"), []>, Acc8Bit, OpSize8;
 
   def _16imm : F01<op, 0b010, (outs), (ins i16imm:$imm),
-                   !strconcat(asmstr, " $imm"), []>, Acc16Bit;
+                   !strconcat(asmstr, " $imm"), []>, Acc16Bit, OpSize16;
 
   def _8zp   : F01<op, 0b001, (outs), (ins mem_zp:$addr),
-                   !strconcat(asmstr, " $addr"), []>, Acc8Bit;
+                   !strconcat(asmstr, " $addr"), []>, Acc8Bit, OpSize8;
 
   def _16zp  : F01<op, 0b001, (outs), (ins mem_zp:$addr),
-                   !strconcat(asmstr, " $addr"), []>, Acc16Bit;
+                   !strconcat(asmstr, " $addr"), []>, Acc16Bit, OpSize8;
 
   def _8i    : F01<op, 0b011, (outs), (ins mem_a16:$addr),
-                   !strconcat(asmstr, " $addr"), []>, Acc8Bit;
+                   !strconcat(asmstr, " $addr"), []>, Acc8Bit, OpSize16;
 
   def _16i   : F01<op, 0b011, (outs), (ins mem_a16:$addr),
-                   !strconcat(asmstr, " $addr"), []>, Acc16Bit;
+                   !strconcat(asmstr, " $addr"), []>, Acc16Bit, OpSize16;
 
   def _8ix16  : F01<op, 0b110, (outs), (ins mem_ix16:$addr),
                    !strconcat(asmstr, " $addr"), []>,
-                Acc8Bit, Ix16Bit;
+                Acc8Bit, Ix16Bit, OpSize16;
 
   def _16ix16 : F01<op, 0b110, (outs), (ins mem_ix16:$addr),
                    !strconcat(asmstr, " $addr"), []>,
-                Acc16Bit, Ix16Bit;
+                Acc16Bit, Ix16Bit, OpSize16;
 }
 
 defm ORA   : F01_binary<0b000, "ORA">;
@@ -232,51 +239,51 @@ defm ADC   : F01_binary<0b011, "ADC">;
 defm SBC   : F01_binary<0b111, "SBC">;
 
 def STA_8zp    : F01<0b100, 0b001, (outs), (ins mem_zp:$addr),
-                     "STA $addr", []>, Acc8Bit;
+                     "STA $addr", []>, Acc8Bit, OpSize8;
 def STA_16zp   : F01<0b100, 0b001, (outs), (ins mem_zp:$addr),
-                     "STA $addr", []>, Acc16Bit;
+                     "STA $addr", []>, Acc16Bit, OpSize8;
 def STA_8i     : F01<0b100, 0b011, (outs), (ins mem_a16:$addr),
-                     "STA $addr", []>, Acc8Bit;
+                     "STA $addr", []>, Acc8Bit, OpSize16;
 def STA_16i    : F01<0b100, 0b011, (outs), (ins mem_a16:$addr),
-                     "STA $addr", []>, Acc16Bit;
+                     "STA $addr", []>, Acc16Bit, OpSize16;
 def STA_8ix16  : F01<0b100, 0b110, (outs), (ins mem_ix16:$addr),
-                     "STA $addr", []>, Acc8Bit, Ix16Bit;
+                     "STA $addr", []>, Acc8Bit, Ix16Bit, OpSize16;
 def STA_16ix16 : F01<0b100, 0b110, (outs), (ins mem_ix16:$addr),
-                     "STA $addr", []>, Acc16Bit, Ix16Bit;
+                     "STA $addr", []>, Acc16Bit, Ix16Bit, OpSize16;
 
 def CMP_8imm   : F01<0b110, 0b010, (outs), (ins i8imm:$imm),
-                     "CMP $imm", []>, Acc8Bit;
+                     "CMP $imm", []>, Acc8Bit, OpSize8;
 def CMP_16imm  : F01<0b110, 0b010, (outs), (ins i16imm:$imm),
-                     "CMP $imm", []>, Acc16Bit;
+                     "CMP $imm", []>, Acc16Bit, OpSize16;
 def CMP_8zp    : F01<0b110, 0b001, (outs), (ins mem_zp:$addr),
-                     "CMP $addr", []>, Acc8Bit;
+                     "CMP $addr", []>, Acc8Bit, OpSize8;
 def CMP_16zp   : F01<0b110, 0b001, (outs), (ins mem_zp:$addr),
-                     "CMP $addr", []>, Acc16Bit;
+                     "CMP $addr", []>, Acc16Bit, OpSize8;
 def CMP_8i     : F01<0b110, 0b011, (outs), (ins mem_a16:$addr),
-                     "CMP $addr", []>, Acc8Bit;
+                     "CMP $addr", []>, Acc8Bit, OpSize16;
 def CMP_16i    : F01<0b110, 0b011, (outs), (ins mem_a16:$addr),
-                     "CMP $addr", []>, Acc16Bit;
+                     "CMP $addr", []>, Acc16Bit, OpSize16;
 def CMP_8ix16  : F01<0b110, 0b011, (outs), (ins mem_ix16:$addr),
-                     "CMP $addr", []>, Acc8Bit, Ix16Bit;
+                     "CMP $addr", []>, Acc8Bit, Ix16Bit, OpSize16;
 def CMP_16ix16 : F01<0b110, 0b011, (outs), (ins mem_ix16:$addr),
-                     "CMP $addr", []>, Acc16Bit, Ix16Bit;
+                     "CMP $addr", []>, Acc16Bit, Ix16Bit, OpSize16;
 
 def LDA_8imm   : F01<0b101, 0b010, (outs), (ins i8imm:$imm),
-                     "LDA $imm", []>, Acc8Bit;
+                     "LDA $imm", []>, Acc8Bit, OpSize8;
 def LDA_16imm  : F01<0b101, 0b010, (outs), (ins i16imm:$imm),
-                     "LDA $imm", []>, Acc16Bit;
+                     "LDA $imm", []>, Acc16Bit, OpSize16;
 def LDA_8zp    : F01<0b101, 0b011, (outs), (ins mem_zp:$addr),
-                     "LDA $addr", []>, Acc8Bit;
+                     "LDA $addr", []>, Acc8Bit, OpSize8;
 def LDA_16zp   : F01<0b101, 0b011, (outs), (ins mem_zp:$addr),
-                     "LDA $addr", []>, Acc16Bit;
+                     "LDA $addr", []>, Acc16Bit, OpSize8;
 def LDA_8i     : F01<0b101, 0b011, (outs), (ins mem_a16:$addr),
-                     "LDA $addr", []>, Acc8Bit;
+                     "LDA $addr", []>, Acc8Bit, OpSize16;
 def LDA_16i    : F01<0b101, 0b011, (outs), (ins mem_a16:$addr),
-                     "LDA $addr", []>, Acc16Bit;
+                     "LDA $addr", []>, Acc16Bit, OpSize16;
 def LDA_8ix16  : F01<0b101, 0b110, (outs), (ins mem_ix16:$addr),
-                     "LDA $addr", []>, Acc8Bit, Ix16Bit;
+                     "LDA $addr", []>, Acc8Bit, Ix16Bit, OpSize16;
 def LDA_16ix16 : F01<0b101, 0b110, (outs), (ins mem_ix16:$addr),
-                     "LDA $addr", []>, Acc16Bit, Ix16Bit;
+                     "LDA $addr", []>, Acc16Bit, Ix16Bit, OpSize16;
 
 //===----------------------------------------------------------------------===//
 // Format 10 instructions : asl, rol, lsr, ror, stx, ldx, dec, inc
@@ -290,19 +297,21 @@ class F10<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 
 multiclass F10_unary<bits<3> op, string asmstr> {
   def _8zp    : F10<op, 0b001, (outs), (ins mem_zp:$addr),
-                    !strconcat(asmstr, " $addr"), []>, Acc8Bit;
+                    !strconcat(asmstr, " $addr"), []>, Acc8Bit, OpSize8;
   def _16zp   : F10<op, 0b001, (outs), (ins mem_zp:$addr),
-                    !strconcat(asmstr, " $addr"), []>, Acc16Bit;
+                    !strconcat(asmstr, " $addr"), []>, Acc16Bit, OpSize8;
 
   def _8i     : F10<op, 0b011, (outs), (ins mem_a16:$addr),
-                    !strconcat(asmstr, " $addr"), []>, Acc8Bit;
+                    !strconcat(asmstr, " $addr"), []>, Acc8Bit, OpSize16;
   def _16i    : F10<op, 0b011, (outs), (ins mem_a16:$addr),
-                    !strconcat(asmstr, " $addr"), []>, Acc16Bit;
+                    !strconcat(asmstr, " $addr"), []>, Acc16Bit, OpSize16;
 
   def _8ix16  : F10<op, 0b111, (outs), (ins mem_ix16:$addr),
-                    !strconcat(asmstr, " $addr"), []>, Acc8Bit, Ix16Bit;
+                    !strconcat(asmstr, " $addr"), []>,
+                    Acc8Bit, Ix16Bit, OpSize16;
   def _16ix16 : F10<op, 0b111, (outs), (ins mem_ix16:$addr),
-                    !strconcat(asmstr, " $addr"), []>, Acc16Bit, Ix16Bit;
+                    !strconcat(asmstr, " $addr"), []>,
+                    Acc16Bit, Ix16Bit, OpSize16;
 }
 
 defm ASL   : F10_unary<0b000, "ASL">;
@@ -338,30 +347,30 @@ defm DEC   : F10_unary<0b110, "DEC">;
 defm INC   : F10_unary<0b111, "INC">;
 
 def STX_8zp    : F10<0b100, 0b001, (outs), (ins mem_zp:$addr),
-                     "STX $addr", []>, Ix8Bit;
+                     "STX $addr", []>, Ix8Bit, OpSize8;
 def STX_16zp   : F10<0b100, 0b001, (outs), (ins mem_zp:$addr),
-                     "STX $addr", []>, Ix16Bit;
+                     "STX $addr", []>, Ix16Bit, OpSize8;
 def STX_8i     : F10<0b100, 0b011, (outs), (ins mem_a16:$addr),
-                     "STX $addr", []>, Ix8Bit;
+                     "STX $addr", []>, Ix8Bit, OpSize16;
 def STX_16i    : F10<0b100, 0b011, (outs), (ins mem_a16:$addr),
-                     "STX $addr", []>, Ix16Bit;
+                     "STX $addr", []>, Ix16Bit, OpSize16;
 
 def LDX_8imm   : F10<0b101, 0b000, (outs), (ins i8imm:$imm),
-                     "LDX $imm", []>, Ix8Bit;
+                     "LDX $imm", []>, Ix8Bit, OpSize8;
 def LDX_16imm  : F10<0b101, 0b000, (outs), (ins i16imm:$imm),
-                     "LDX $imm", []>, Ix16Bit;
+                     "LDX $imm", []>, Ix16Bit, OpSize16;
 def LDX_8zp    : F10<0b101, 0b001, (outs), (ins mem_zp:$addr),
-                     "LDX $addr", []>, Ix8Bit;
+                     "LDX $addr", []>, Ix8Bit, OpSize8;
 def LDX_16zp   : F10<0b101, 0b001, (outs), (ins mem_zp:$addr),
-                     "LDX $addr", []>, Ix16Bit;
+                     "LDX $addr", []>, Ix16Bit, OpSize8;
 def LDX_8i     : F10<0b101, 0b011, (outs), (ins mem_a16:$addr),
-                     "LDX $addr", []>, Ix8Bit;
+                     "LDX $addr", []>, Ix8Bit, OpSize16;
 def LDX_16i    : F10<0b101, 0b011, (outs), (ins mem_a16:$addr),
-                     "LDX $addr", []>, Ix16Bit;
+                     "LDX $addr", []>, Ix16Bit, OpSize16;
 def LDX_8iy16  : F10<0b101, 0b111, (outs), (ins mem_iy16:$addr),
-                     "LDX $addr", []>, Acc8Bit, Ix16Bit;
+                     "LDX $addr", []>, Acc8Bit, Ix16Bit, OpSize16;
 def LDX_16iy16 : F10<0b101, 0b111, (outs), (ins mem_iy16:$addr),
-                     "LDX $addr", []>, Acc16Bit, Ix16Bit;
+                     "LDX $addr", []>, Acc16Bit, Ix16Bit, OpSize16;
 
 //===----------------------------------------------------------------------===//
 // Format 00 instructions : bit, (jmp), sty, ldy, cpy, cpx
@@ -374,56 +383,56 @@ class F00<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 }
 
 def STY_8zp    : F00<0b100, 0b001, (outs), (ins mem_zp:$addr),
-                     "STY $addr", []>, Ix8Bit;
+                     "STY $addr", []>, Ix8Bit, OpSize8;
 def STY_16zp   : F00<0b100, 0b001, (outs), (ins mem_zp:$addr),
-                     "STY $addr", []>, Ix16Bit;
+                     "STY $addr", []>, Ix16Bit, OpSize8;
 def STY_8i     : F00<0b100, 0b011, (outs), (ins mem_a16:$addr),
-                     "STY $addr", []>, Ix8Bit;
+                     "STY $addr", []>, Ix8Bit, OpSize16;
 def STY_16i    : F00<0b100, 0b011, (outs), (ins mem_a16:$addr),
-                     "STY $addr", []>, Ix16Bit;
+                     "STY $addr", []>, Ix16Bit, OpSize16;
 
 def LDY_8imm   : F00<0b101, 0b000, (outs), (ins i16imm:$imm),
-                     "LDY $imm", []>, Ix8Bit;
+                     "LDY $imm", []>, Ix8Bit, OpSize16;
 def LDY_16imm  : F00<0b101, 0b000, (outs), (ins i16imm:$imm),
-                     "LDY $imm", []>, Ix16Bit;
+                     "LDY $imm", []>, Ix16Bit, OpSize16;
 def LDY_8zp    : F00<0b101, 0b001, (outs), (ins mem_zp:$addr),
-                     "LDY $addr", []>, Ix8Bit;
+                     "LDY $addr", []>, Ix8Bit, OpSize8;
 def LDY_16zp   : F00<0b101, 0b001, (outs), (ins mem_zp:$addr),
-                     "LDY $addr", []>, Ix16Bit;
+                     "LDY $addr", []>, Ix16Bit, OpSize8;
 def LDY_8i     : F00<0b101, 0b011, (outs), (ins mem_a16:$addr),
-                     "LDY $addr", []>, Ix8Bit;
+                     "LDY $addr", []>, Ix8Bit, OpSize16;
 def LDY_16i    : F00<0b101, 0b011, (outs), (ins mem_a16:$addr),
-                     "LDY $addr", []>, Ix16Bit;
+                     "LDY $addr", []>, Ix16Bit, OpSize16;
 def LDY_8ix16  : F00<0b101, 0b111, (outs), (ins mem_ix16:$addr),
-                     "LDY $addr", []>, Ix8Bit;
+                     "LDY $addr", []>, Ix8Bit, OpSize16;
 def LDY_16ix16 : F00<0b101, 0b111, (outs), (ins mem_ix16:$addr),
-                     "LDY $addr", []>, Ix16Bit;
+                     "LDY $addr", []>, Ix16Bit, OpSize16;
 
 def CPY_8imm   : F00<0b110, 0b000, (outs), (ins i8imm:$imm),
-                     "CPY $imm", []>, Ix8Bit;
+                     "CPY $imm", []>, Ix8Bit, OpSize8;
 def CPY_16imm  : F00<0b110, 0b000, (outs), (ins i16imm:$imm),
-                     "CPY $imm", []>, Ix16Bit;
+                     "CPY $imm", []>, Ix16Bit, OpSize16;
 def CPY_8zp    : F00<0b110, 0b001, (outs), (ins mem_zp:$addr),
-                     "CPY $addr", []>, Ix8Bit;
+                     "CPY $addr", []>, Ix8Bit, OpSize8;
 def CPY_16zp   : F00<0b110, 0b001, (outs), (ins mem_zp:$addr),
-                     "CPY $addr", []>, Ix16Bit;
+                     "CPY $addr", []>, Ix16Bit, OpSize8;
 def CPY_8i     : F00<0b110, 0b011, (outs), (ins mem_a16:$addr),
-                     "CPY $addr", []>, Ix8Bit;
+                     "CPY $addr", []>, Ix8Bit, OpSize16;
 def CPY_16i    : F00<0b110, 0b011, (outs), (ins mem_a16:$addr),
-                     "CPY $addr", []>, Ix16Bit;
+                     "CPY $addr", []>, Ix16Bit, OpSize16;
 
 def CPX_8imm   : F00<0b111, 0b000, (outs), (ins i8imm:$imm),
-                     "CPX $imm", []>, Ix8Bit;
+                     "CPX $imm", []>, Ix8Bit, OpSize8;
 def CPX_16imm  : F00<0b111, 0b000, (outs), (ins i16imm:$imm),
-                     "CPX $imm", []>, Ix16Bit;
+                     "CPX $imm", []>, Ix16Bit, OpSize16;
 def CPX_8zp    : F00<0b111, 0b001, (outs), (ins mem_a16:$addr),
-                     "CPX $addr", []>, Ix8Bit;
+                     "CPX $addr", []>, Ix8Bit, OpSize16;
 def CPX_16zp   : F00<0b111, 0b001, (outs), (ins mem_a16:$addr),
-                     "CPX $addr", []>, Ix16Bit;
+                     "CPX $addr", []>, Ix16Bit, OpSize16;
 def CPX_8i     : F00<0b111, 0b011, (outs), (ins mem_a16:$addr),
-                     "CPX $addr", []>, Ix8Bit;
+                     "CPX $addr", []>, Ix8Bit, OpSize16;
 def CPX_16i    : F00<0b111, 0b011, (outs), (ins mem_a16:$addr),
-                     "CPX $addr", []>, Ix16Bit;
+                     "CPX $addr", []>, Ix16Bit, OpSize16;
 
 //===----------------------------------------------------------------------===//
 // Format 11 instructions : Extended ora, and, eor, adc, sta, lda, cmp, sbc
@@ -437,9 +446,9 @@ class F11<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 
 multiclass F11_binary<bits<3> op, string asmstr> {
   def _8is16  : F11<op, 0b000, (outs), (ins mem_is16:$addr),
-                    !strconcat(asmstr, " $addr"), []>, Acc8Bit;
+                    !strconcat(asmstr, " $addr"), []>, Acc8Bit, OpSize16;
   def _16is16 : F11<op, 0b000, (outs), (ins mem_is16:$addr),
-                    !strconcat(asmstr, " $addr"), []>, Acc16Bit;
+                    !strconcat(asmstr, " $addr"), []>, Acc16Bit, OpSize16;
 }
 
 defm ORA : F11_binary<0b000, "ORA">;
@@ -453,22 +462,22 @@ defm ADC : F11_binary<0b011, "ADC">;
 defm SBC : F11_binary<0b111, "SBC">;
 
 def STA_8is16  : F11<0b100, 0b000, (outs), (ins mem_is16:$addr),
-                     "STA $addr", []>, Acc8Bit;
+                     "STA $addr", []>, Acc8Bit, OpSize16;
 
 def STA_16is16 : F11<0b100, 0b000, (outs), (ins mem_is16:$addr),
-                     "STA $addr", []>, Acc16Bit;
+                     "STA $addr", []>, Acc16Bit, OpSize16;
 
 def LDA_8is16  : F11<0b101, 0b000, (outs), (ins mem_is16:$addr),
-                     "LDA $addr", []>, Acc8Bit;
+                     "LDA $addr", []>, Acc8Bit, OpSize16;
 
 def LDA_16is16 : F11<0b101, 0b000, (outs), (ins mem_is16:$addr),
-                     "LDA $addr", []>, Acc16Bit;
+                     "LDA $addr", []>, Acc16Bit, OpSize16;
 
 def CMP_8is16  : F11<0b110, 0b000, (outs), (ins mem_is16:$addr),
-                     "CMP $addr", []>, Acc8Bit;
+                     "CMP $addr", []>, Acc8Bit, OpSize16;
 
 def CMP_16is16 : F11<0b110, 0b000, (outs), (ins mem_is16:$addr),
-                     "CMP $addr", []>, Acc16Bit;
+                     "CMP $addr", []>, Acc16Bit, OpSize16;
 
 //===----------------------------------------------------------------------===//
 // Conditional branch instructions : bpl, bmi, bvc, bvs, bcc, bcs, bne, beq
@@ -483,7 +492,7 @@ def CondZero     : CondFlag<0b11>;
 // Branch if the value of the flag 'cf' equals 'value'
 class FC<CondFlag cf, bit value, string asmstr>
     : InstC65<(outs), (ins brtarget8:$dst),
-              !strconcat(asmstr, " $dst"), []> {
+              !strconcat(asmstr, " $dst"), []>, OpSize8 {
   let Inst{7-6} = cf.flagIndex;
   let Inst{5} = value;
   let Inst{4-0} = 0b10000;
@@ -516,30 +525,30 @@ class FF<bits<8> op, dag outs, dag ins,
 def NOP      : FF<0xea, (outs), (ins), "NOP", []>;
 
 def BIT_8imm   : FF<0x89, (outs), (ins i8imm:$imm), "BIT $imm", []>,
-                 Acc8Bit;
+                 Acc8Bit, OpSize8;
 def BIT_16imm  : FF<0x89, (outs), (ins i16imm:$imm), "BIT $imm", []>,
-                 Acc16Bit;
+                 Acc16Bit, OpSize16;
 def BIT_8zp    : FF<0x24, (outs), (ins mem_a16:$addr), "BIT $addr", []>,
-                 Acc8Bit;
+                 Acc8Bit, OpSize8;
 def BIT_16zp   : FF<0x24, (outs), (ins mem_a16:$addr), "BIT $addr", []>,
-                 Acc16Bit;
+                 Acc16Bit, OpSize8;
 def BIT_8ix16  : FF<0x3c, (outs), (ins mem_ix16:$addr), "BIT $addr", []>,
-                 Acc8Bit, Ix16Bit;
+                 Acc8Bit, Ix16Bit, OpSize16;
 def BIT_16ix16 : FF<0x3c, (outs), (ins mem_ix16:$addr), "BIT $addr", []>,
-                 Acc16Bit, Ix16Bit;
+                 Acc16Bit, Ix16Bit, OpSize16;
 
 def STZ_8zp    : FF<0x64, (outs), (ins mem_zp:$addr), "STZ $addr", []>,
-                 Acc8Bit;
+                 Acc8Bit, OpSize8;
 def STZ_16zp   : FF<0x64, (outs), (ins mem_zp:$addr), "STZ $addr", []>,
-                 Acc16Bit;
+                 Acc16Bit, OpSize8;
 def STZ_8i     : FF<0x9c, (outs), (ins mem_a16:$addr), "STZ $addr", []>,
-                 Acc8Bit;
+                 Acc8Bit, OpSize16;
 def STZ_16i    : FF<0x9c, (outs), (ins mem_a16:$addr), "STZ $addr", []>,
-                 Acc16Bit;
+                 Acc16Bit, OpSize16;
 def STZ_8ix16  : FF<0x9e, (outs), (ins mem_ix16:$addr), "STZ $addr", []>,
-                 Acc8Bit, Ix16Bit;
+                 Acc8Bit, Ix16Bit, OpSize16;
 def STZ_16ix16 : FF<0x9e, (outs), (ins mem_ix16:$addr), "STZ $addr", []>,
-                 Acc16Bit, Ix16Bit;
+                 Acc16Bit, Ix16Bit, OpSize16;
 
 def PLA_8  : FF<0x68, (outs), (ins), "PLA", []>, Acc8Bit;
 def PLA_16 : FF<0x68, (outs), (ins), "PLA", []>, Acc16Bit;
@@ -567,27 +576,31 @@ def PHY_16 : FF<0x5a, (outs), (ins), "PHY", []>, Ix16Bit;
 
 def PHD    : FF<0x0b, (outs), (ins), "PLD", []>;
 
-def PEA    : FF<0xf4, (outs), (ins mem_a16:$addr), "PEA $addr", []>;
+def PEA    : FF<0xf4, (outs), (ins mem_a16:$addr), "PEA $addr", []>,
+             OpSize16;
 
-def PER    : FF<0x62, (outs), (ins brtarget8:$addr), "PER $addr", []>;
+def PER    : FF<0x62, (outs), (ins brtarget8:$addr), "PER $addr", []>,
+             OpSize8;
 
-def PEI    : FF<0xd4, (outs), (ins mem_zp:$addr), "PEI $addr", []>;
+def PEI    : FF<0xd4, (outs), (ins mem_zp:$addr), "PEI $addr", []>,
+             OpSize8;
 
-def BRA    : FF<0x80, (outs), (ins brtarget8:$addr), "BRA $addr", []> {
+def BRA    : FF<0x80, (outs), (ins brtarget8:$addr), "BRA $addr", []>,
+             OpSize8 {
   let isBranch = 1;
   let isTerminator = 1;
   let isBarrier = 1;
 }
 
 def JMP    : FF<0x6c, (outs), (ins brtarget16:$addr), "JMP $addr",
-                [(br bb:$addr)]> {
+                [(br bb:$addr)]>, OpSize16 {
   let isBranch = 1;
   let isTerminator = 1;
   let isBarrier = 1;
 }
 
 def JSR    : FF<0x20, (outs), (ins mem_a16:$addr), "JSR $addr",
-                [(C65call tglobaladdr:$addr)]> {
+                [(C65call tglobaladdr:$addr)]>, OpSize16 {
   let isCall = 1;
   let isTerminator = 1;
   let isBarrier = 1;
@@ -627,22 +640,22 @@ def TCD    : FF<0x5b, (outs), (ins), "TCD", []>;
 def TDC    : FF<0x7b, (outs), (ins), "TDC", []>;
 
 def TSB_8zp  : FF<0x04, (outs), (ins mem_zp:$addr), "TSB $addr", []>,
-               Acc8Bit;
+               Acc8Bit, OpSize8;
 def TSB_16zp : FF<0x04, (outs), (ins mem_zp:$addr), "TSB $addr", []>,
-               Acc8Bit;
+               Acc16Bit, OpSize8;
 def TSB_8i   : FF<0x0c, (outs), (ins mem_a16:$addr), "TSB $addr", []>,
-               Acc8Bit;
+               Acc8Bit, OpSize16;
 def TSB_16i  : FF<0x0c, (outs), (ins mem_a16:$addr), "TSB $addr", []>,
-               Acc16Bit;
+               Acc16Bit, OpSize16;
 
 def TRB_8zp  : FF<0x04, (outs), (ins mem_zp:$addr), "TRB $addr", []>,
-               Acc8Bit;
+               Acc8Bit, OpSize8;
 def TRB_16zp : FF<0x04, (outs), (ins mem_zp:$addr), "TRB $addr", []>,
-               Acc8Bit;
+               Acc16Bit, OpSize8;
 def TRB_8i   : FF<0x0c, (outs), (ins mem_a16:$addr), "TRB $addr", []>,
-               Acc8Bit;
+               Acc8Bit, OpSize16;
 def TRB_16i  : FF<0x0c, (outs), (ins mem_a16:$addr), "TRB $addr", []>,
-               Acc16Bit;
+               Acc16Bit, OpSize16;
 
 def XBA    : FF<0xeb, (outs), (ins), "XBA", []>;
 
@@ -656,9 +669,11 @@ def COP    : FF<0x02, (outs), (ins i8imm:$sig), "COP $sig", []>;
 
 def WDM    : FF<0x42, (outs), (ins), "WDM", []>;
 
-def MVP    : FF<0x44, (outs), (ins i8imm:$srcbank, i8imm:$dstbank), "MVP", []>;
+def MVP    : FF<0x44, (outs), (ins i8imm:$srcbank, i8imm:$dstbank), "MVP", []>,
+             OpSize8;
 
-def MVN    : FF<0x54, (outs), (ins i8imm:$srcbank, i8imm:$dstbank), "WDM", []>;
+def MVN    : FF<0x54, (outs), (ins i8imm:$srcbank, i8imm:$dstbank), "WDM", []>,
+             OpSize8;
 
 def CLC    : FF<0x18, (outs), (ins), "CLC", []>;
 
@@ -674,9 +689,11 @@ def SEI    : FF<0x78, (outs), (ins), "STI", []>;
 
 def CLV    : FF<0xb8, (outs), (ins), "CLV", []>;
 
-def REP    : FF<0xc2, (outs), (ins i8imm:$imm), "REP $imm", []>;
+def REP    : FF<0xc2, (outs), (ins i8imm:$imm), "REP $imm", []>,
+             OpSize8;
 
-def SEP    : FF<0xe2, (outs), (ins i8imm:$imm), "SEP $imm", []>;
+def SEP    : FF<0xe2, (outs), (ins i8imm:$imm), "SEP $imm", []>,
+             OpSize8;
 
 def INX_8  : FF<0xe8, (outs), (ins), "INX", []>, Ix8Bit;
 def INX_16 : FF<0xe8, (outs), (ins), "INX", []>, Ix16Bit;
