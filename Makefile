@@ -17,14 +17,12 @@ BUILT_SOURCES = C65GenAsmWriter.inc \
 		C65GenDAGISel.inc \
 		C65GenInstrInfo.inc \
 		C65GenRegisterInfo.inc \
-		C65GenSubtargetInfo.inc
+		C65GenSubtargetInfo.inc \
+		C65GenMCCodeEmitter.inc \
+		C65GenCodeEmitter.inc
 
-#C65GenMCCodeEmitter.inc
-#C65GenDAGISel.inc
-#C65GenSubtargetInfo.inc
-#C65GenAsmWriter.inc
+
 #C65GenAsmMatcher.inc
-#C65GenCodeEmitter.inc
 #C65GenDisassemblerTables.inc
 
 DIRS = InstPrinter TargetInfo MCTargetDesc

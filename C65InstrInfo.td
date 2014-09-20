@@ -8,17 +8,6 @@ def Has65C02  : Predicate<"Subtarget->has65C02()">;
 def Has65C816 : Predicate<"Subtarget->has65C816()">;
 
 //===----------------------------------------------------------------------===//
-// C65 stuff
-//===----------------------------------------------------------------------===//
-
-// class AccSize<bits<2> val> {
-//   bits<2> Value = val;
-// }
-// def AccSizeNC : OperandSize<0>; // Don't care for accumulator size
-// def AccSize8  : OperandSize<1>; // Needs 8-bit accumulator
-// def AccSize16 : OperandSize<2>; // Needs 16-bit accumulator
-
-//===----------------------------------------------------------------------===//
 // C65 basic instruction formats
 //===----------------------------------------------------------------------===//
 
@@ -37,10 +26,10 @@ class InstC65<dag outs, dag ins, string asmstr, list<dag> pattern>
 
   let DecoderNamespace = "C65";
 
-  bits<2> ZRSize = 0;
-  bit is_ZRInstr = 0;
   bits<2> AccSize = 0;
   bits<2> IxSize = 0;
+  bit is_ZRInstr = 0;
+  bits<2> ZRSize = 0;
 
   let TSFlags{1-0} = AccSize;
   let TSFlags{3-2} = IxSize;
@@ -149,8 +138,8 @@ def addr_is  : ComplexPattern<iPTR, 2, "SelectAddrS", [frameindex], []>;
 
 // 8-bit PC-relative branch target operand
 def brtarget8 : Operand<OtherVT> {
-  let EncoderMethod = "getPCEncoding";
-  let DecoderMethod = "decodePCOperand";
+  let EncoderMethod = "getPCRelEncoding";
+  let DecoderMethod = "decodePCRelOperand";
   let ParserMatchClass = PCRelAsmOperand;
   let MIOperandInfo = (ops i8imm);
 }
@@ -230,21 +219,6 @@ multiclass F01_binary<bits<3> op, string asmstr> {
   def _16ix16 : F01<op, 0b110, (outs), (ins mem_ix16:$addr),
                    !strconcat(asmstr, " $addr"), []>,
                 Acc16Bit, Ix16Bit;
-
-  // def _8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-  //                         !strconcat(asmstr, " $reg+$offset"), []>, Acc8Bit;
-  // def _8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-  //                         !strconcat(asmstr, " $reg+$offset"), []>, Acc8Bit;
-  // def _8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-  //                         !strconcat(asmstr, " $reg+$offset"), []>, Acc8Bit;
-  // def _8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-  //                         !strconcat(asmstr, " $reg+$offset"), []>, Acc8Bit;
-  // def _16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-  //                         !strconcat(asmstr, " $reg+$offset"), []>, Acc16Bit;
-  // def _16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-  //                         !strconcat(asmstr, " $reg+$offset"), []>, Acc16Bit;
-  // def _16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-  //                         !strconcat(asmstr, " $reg+$offset"), []>, Acc16Bit;
 }
 
 defm ORA   : F01_binary<0b000, "ORA">;
@@ -269,20 +243,6 @@ def STA_8ix16  : F01<0b100, 0b110, (outs), (ins mem_ix16:$addr),
                      "STA $addr", []>, Acc8Bit, Ix16Bit;
 def STA_16ix16 : F01<0b100, 0b110, (outs), (ins mem_ix16:$addr),
                      "STA $addr", []>, Acc16Bit, Ix16Bit;
-// def STA_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                      "STA $reg+$offset", []>, Acc8Bit;
-// def STA_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "STA $reg+$offset", []>, Acc8Bit;
-// def STA_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "STA $reg+$offset", []>, Acc8Bit;
-// def STA_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "STA $reg+$offset", []>, Acc8Bit;
-// def STA_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "STA $reg+$offset", []>, Acc16Bit;
-// def STA_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "STA $reg+$offset", []>, Acc16Bit;
-// def STA_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "STA $reg+$offset", []>, Acc16Bit;
 
 def CMP_8imm   : F01<0b110, 0b010, (outs), (ins i8imm:$imm),
                      "CMP $imm", []>, Acc8Bit;
@@ -300,20 +260,6 @@ def CMP_8ix16  : F01<0b110, 0b011, (outs), (ins mem_ix16:$addr),
                      "CMP $addr", []>, Acc8Bit, Ix16Bit;
 def CMP_16ix16 : F01<0b110, 0b011, (outs), (ins mem_ix16:$addr),
                      "CMP $addr", []>, Acc16Bit, Ix16Bit;
-// def CMP_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                      "CMP $reg+$offset", []>, Acc8Bit;
-// def CMP_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "CMP $reg+$offset", []>, Acc8Bit;
-// def CMP_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "CMP $reg+$offset", []>, Acc8Bit;
-// def CMP_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "CMP $reg+$offset", []>, Acc8Bit;
-// def CMP_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "CMP $reg+$offset", []>, Acc16Bit;
-// def CMP_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "CMP $reg+$offset", []>, Acc16Bit;
-// def CMP_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "CMP $reg+$offset", []>, Acc16Bit;
 
 def LDA_8imm   : F01<0b101, 0b010, (outs), (ins i8imm:$imm),
                      "LDA $imm", []>, Acc8Bit;
@@ -326,25 +272,11 @@ def LDA_16zp   : F01<0b101, 0b011, (outs), (ins mem_zp:$addr),
 def LDA_8i     : F01<0b101, 0b011, (outs), (ins mem_a16:$addr),
                      "LDA $addr", []>, Acc8Bit;
 def LDA_16i    : F01<0b101, 0b011, (outs), (ins mem_a16:$addr),
-                     "LDA $addr", []>, Acc8Bit;
+                     "LDA $addr", []>, Acc16Bit;
 def LDA_8ix16  : F01<0b101, 0b110, (outs), (ins mem_ix16:$addr),
                      "LDA $addr", []>, Acc8Bit, Ix16Bit;
 def LDA_16ix16 : F01<0b101, 0b110, (outs), (ins mem_ix16:$addr),
                      "LDA $addr", []>, Acc16Bit, Ix16Bit;
-// def LDA_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                      "LDA $reg+$offset", []>, Acc8Bit;
-// def LDA_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "LDA $reg+$offset", []>, Acc8Bit;
-// def LDA_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "LDA $reg+$offset", []>, Acc8Bit;
-// def LDA_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "LDA $reg+$offset", []>, Acc8Bit;
-// def LDA_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "LDA $reg+$offset", []>, Acc16Bit;
-// def LDA_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "LDA $reg+$offset", []>, Acc16Bit;
-// def LDA_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "LDA $reg+$offset", []>, Acc16Bit;
 
 //===----------------------------------------------------------------------===//
 // Format 10 instructions : asl, rol, lsr, ror, stx, ldx, dec, inc
@@ -371,21 +303,6 @@ multiclass F10_unary<bits<3> op, string asmstr> {
                     !strconcat(asmstr, " $addr"), []>, Acc8Bit, Ix16Bit;
   def _16ix16 : F10<op, 0b111, (outs), (ins mem_ix16:$addr),
                     !strconcat(asmstr, " $addr"), []>, Acc16Bit, Ix16Bit;
-
-  // def _8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-  //                   !strconcat(asmstr, " $reg+$offset"), []>, Acc8Bit;
-  // def _8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-  //                   !strconcat(asmstr, " $reg+$offset"), []>, Acc8Bit;
-  // def _8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-  //                   !strconcat(asmstr, " $reg+$offset"), []>, Acc8Bit;
-  // def _8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-  //                   !strconcat(asmstr, " $reg+$offset"), []>, Acc8Bit;
-  // def _16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-  //                   !strconcat(asmstr, " $reg+$offset"), []>, Acc16Bit;
-  // def _16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-  //                   !strconcat(asmstr, " $reg+$offset"), []>, Acc16Bit;
-  // def _16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-  //                   !strconcat(asmstr, " $reg+$offset"), []>, Acc16Bit;
 }
 
 defm ASL   : F10_unary<0b000, "ASL">;
@@ -428,20 +345,6 @@ def STX_8i     : F10<0b100, 0b011, (outs), (ins mem_a16:$addr),
                      "STX $addr", []>, Ix8Bit;
 def STX_16i    : F10<0b100, 0b011, (outs), (ins mem_a16:$addr),
                      "STX $addr", []>, Ix16Bit;
-// def STX_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                      "STX $reg+$offset", []>, Ix8Bit;
-// def STX_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "STX $reg+$offset", []>, Ix8Bit;
-// def STX_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "STX $reg+$offset", []>, Ix8Bit;
-// def STX_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "STX $reg+$offset", []>, Ix8Bit;
-// def STX_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "STX $reg+$offset", []>, Ix16Bit;
-// def STX_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "STX $reg+$offset", []>, Ix16Bit;
-// def STX_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "STX $reg+$offset", []>, Ix16Bit;
 
 def LDX_8imm   : F10<0b101, 0b000, (outs), (ins i8imm:$imm),
                      "LDX $imm", []>, Ix8Bit;
@@ -459,20 +362,6 @@ def LDX_8iy16  : F10<0b101, 0b111, (outs), (ins mem_iy16:$addr),
                      "LDX $addr", []>, Acc8Bit, Ix16Bit;
 def LDX_16iy16 : F10<0b101, 0b111, (outs), (ins mem_iy16:$addr),
                      "LDX $addr", []>, Acc16Bit, Ix16Bit;
-// def LDX_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                      "LDX $reg+$offset", []>, Ix8Bit;
-// def LDX_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "LDX $reg+$offset", []>, Ix8Bit;
-// def LDX_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "LDX $reg+$offset", []>, Ix8Bit;
-// def LDX_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "LDX $reg+$offset", []>, Ix8Bit;
-// def LDX_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "LDX $reg+$offset", []>, Ix16Bit;
-// def LDX_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "LDX $reg+$offset", []>, Ix16Bit;
-// def LDX_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "LDX $reg+$offset", []>, Ix16Bit;
 
 //===----------------------------------------------------------------------===//
 // Format 00 instructions : bit, (jmp), sty, ldy, cpy, cpx
@@ -492,20 +381,6 @@ def STY_8i     : F00<0b100, 0b011, (outs), (ins mem_a16:$addr),
                      "STY $addr", []>, Ix8Bit;
 def STY_16i    : F00<0b100, 0b011, (outs), (ins mem_a16:$addr),
                      "STY $addr", []>, Ix16Bit;
-// def STY_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                      "STY $reg+$offset", []>, Ix8Bit;
-// def STY_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "STY $reg+$offset", []>, Ix8Bit;
-// def STY_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "STY $reg+$offset", []>, Ix8Bit;
-// def STY_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "STY $reg+$offset", []>, Ix8Bit;
-// def STY_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "STY $reg+$offset", []>, Ix16Bit;
-// def STY_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "STY $reg+$offset", []>, Ix16Bit;
-// def STY_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "STY $reg+$offset", []>, Ix16Bit;
 
 def LDY_8imm   : F00<0b101, 0b000, (outs), (ins i16imm:$imm),
                      "LDY $imm", []>, Ix8Bit;
@@ -523,20 +398,6 @@ def LDY_8ix16  : F00<0b101, 0b111, (outs), (ins mem_ix16:$addr),
                      "LDY $addr", []>, Ix8Bit;
 def LDY_16ix16 : F00<0b101, 0b111, (outs), (ins mem_ix16:$addr),
                      "LDY $addr", []>, Ix16Bit;
-// def LDY_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                      "LDY $reg+$offset", []>, Ix8Bit;
-// def LDY_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "LDY $reg+$offset", []>, Ix8Bit;
-// def LDY_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "LDY $reg+$offset", []>, Ix8Bit;
-// def LDY_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "LDY $reg+$offset", []>, Ix8Bit;
-// def LDY_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "LDY $reg+$offset", []>, Ix16Bit;
-// def LDY_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "LDY $reg+$offset", []>, Ix16Bit;
-// def LDY_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "LDY $reg+$offset", []>, Ix16Bit;
 
 def CPY_8imm   : F00<0b110, 0b000, (outs), (ins i8imm:$imm),
                      "CPY $imm", []>, Ix8Bit;
@@ -550,20 +411,6 @@ def CPY_8i     : F00<0b110, 0b011, (outs), (ins mem_a16:$addr),
                      "CPY $addr", []>, Ix8Bit;
 def CPY_16i    : F00<0b110, 0b011, (outs), (ins mem_a16:$addr),
                      "CPY $addr", []>, Ix16Bit;
-// def CPY_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                      "CPY $reg+$offset", []>, Ix8Bit;
-// def CPY_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "CPY $reg+$offset", []>, Ix8Bit;
-// def CPY_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "CPY $reg+$offset", []>, Ix8Bit;
-// def CPY_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "CPY $reg+$offset", []>, Ix8Bit;
-// def CPY_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "CPY $reg+$offset", []>, Ix16Bit;
-// def CPY_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "CPY $reg+$offset", []>, Ix16Bit;
-// def CPY_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "CPY $reg+$offset", []>, Ix16Bit;
 
 def CPX_8imm   : F00<0b111, 0b000, (outs), (ins i8imm:$imm),
                      "CPX $imm", []>, Ix8Bit;
@@ -577,20 +424,6 @@ def CPX_8i     : F00<0b111, 0b011, (outs), (ins mem_a16:$addr),
                      "CPX $addr", []>, Ix8Bit;
 def CPX_16i    : F00<0b111, 0b011, (outs), (ins mem_a16:$addr),
                      "CPX $addr", []>, Ix16Bit;
-// def CPX_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                      "CPX $reg+$offset", []>, Ix8Bit;
-// def CPX_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "CPX $reg+$offset", []>, Ix8Bit;
-// def CPX_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "CPX $reg+$offset", []>, Ix8Bit;
-// def CPX_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "CPX $reg+$offset", []>, Ix8Bit;
-// def CPX_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                      "CPX $reg+$offset", []>, Ix16Bit;
-// def CPX_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                      "CPX $reg+$offset", []>, Ix16Bit;
-// def CPX_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                      "CPX $reg+$offset", []>, Ix16Bit;
 
 //===----------------------------------------------------------------------===//
 // Format 11 instructions : Extended ora, and, eor, adc, sta, lda, cmp, sbc
@@ -694,20 +527,6 @@ def BIT_8ix16  : FF<0x3c, (outs), (ins mem_ix16:$addr), "BIT $addr", []>,
                  Acc8Bit, Ix16Bit;
 def BIT_16ix16 : FF<0x3c, (outs), (ins mem_ix16:$addr), "BIT $addr", []>,
                  Acc16Bit, Ix16Bit;
-// def BIT_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                         "BIT $reg+$offset", []>, Acc8Bit;
-// def BIT_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                         "BIT $reg+$offset", []>, Acc8Bit;
-// def BIT_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                         "BIT $reg+$offset", []>, Acc8Bit;
-// def BIT_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                         "BIT $reg+$offset", []>, Acc8Bit;
-// def BIT_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                         "BIT $reg+$offset", []>, Acc16Bit;
-// def BIT_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                         "BIT $reg+$offset", []>, Acc16Bit;
-// def BIT_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                         "BIT $reg+$offset", []>, Acc16Bit;
 
 def STZ_8zp    : FF<0x64, (outs), (ins mem_zp:$addr), "STZ $addr", []>,
                  Acc8Bit;
@@ -721,20 +540,6 @@ def STZ_8ix16  : FF<0x9e, (outs), (ins mem_ix16:$addr), "STZ $addr", []>,
                  Acc8Bit, Ix16Bit;
 def STZ_16ix16 : FF<0x9e, (outs), (ins mem_ix16:$addr), "STZ $addr", []>,
                  Acc16Bit, Ix16Bit;
-// def STZ_8zr8   : Pseudo<(outs), (ins ZRC8:$reg, i8imm:$offset),
-//                     "STZ $reg+$offset", []>, Acc8Bit;
-// def STZ_8zr16  : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                     "STZ $reg+$offset", []>, Acc8Bit;
-// def STZ_8zr32  : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                     "STZ $reg+$offset", []>, Acc8Bit;
-// def STZ_8zr64  : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                     "STZ $reg+$offset", []>, Acc8Bit;
-// def STZ_16zr16 : Pseudo<(outs), (ins ZRC16:$reg, i8imm:$offset),
-//                     "STZ $reg+$offset", []>, Acc16Bit;
-// def STZ_16zr32 : Pseudo<(outs), (ins ZRC32:$reg, i8imm:$offset),
-//                     "STZ $reg+$offset", []>, Acc16Bit;
-// def STZ_16zr64 : Pseudo<(outs), (ins ZRC64:$reg, i8imm:$offset),
-//                     "STZ $reg+$offset", []>, Acc16Bit;
 
 def PLA_8  : FF<0x68, (outs), (ins), "PLA", []>, Acc8Bit;
 def PLA_16 : FF<0x68, (outs), (ins), "PLA", []>, Acc16Bit;
@@ -806,9 +611,8 @@ def TXA_16 : FF<0x8a, (outs), (ins), "TXA", []>, Acc16Bit, Ix16Bit;
 def TYA_8  : FF<0xa8, (outs), (ins), "TYA", []>, Acc8Bit, Ix8Bit;
 def TYA_16 : FF<0xa8, (outs), (ins), "TYA", []>, Acc16Bit, Ix16Bit;
 
-def TXS    : FF<0x9b, (outs), (ins), "TXS", []>;
-
-def TSX    : FF<0xbb, (outs), (ins), "TSX", []>;
+def TXS    : FF<0x9a, (outs), (ins), "TXS", []>;
+def TSX    : FF<0xba, (outs), (ins), "TSX", []>;
 
 def TXY_8  : FF<0x9b, (outs), (ins), "TXY", []>, Ix8Bit;
 def TXY_16 : FF<0x9b, (outs), (ins), "TXY", []>, Ix16Bit;
@@ -874,19 +678,23 @@ def REP    : FF<0xc2, (outs), (ins i8imm:$imm), "REP $imm", []>;
 
 def SEP    : FF<0xe2, (outs), (ins i8imm:$imm), "SEP $imm", []>;
 
-def INX    : FF<0xe8, (outs), (ins), "INX", []>;
+def INX_8  : FF<0xe8, (outs), (ins), "INX", []>, Ix8Bit;
+def INX_16 : FF<0xe8, (outs), (ins), "INX", []>, Ix16Bit;
 
-def INY    : FF<0xc8, (outs), (ins), "INY", []>;
+def INY_8  : FF<0xc8, (outs), (ins), "INY", []>, Ix8Bit;
+def INY_16 : FF<0xc8, (outs), (ins), "INY", []>, Ix16Bit;
 
-def DEX    : FF<0xca, (outs), (ins), "DEX", []>;
+def DEX_8  : FF<0xca, (outs), (ins), "DEX", []>, Ix8Bit;
+def DEX_16 : FF<0xca, (outs), (ins), "DEX", []>, Ix16Bit;
 
-def DEY    : FF<0x88, (outs), (ins), "DEY", []>;
+def DEY_8  : FF<0x88, (outs), (ins), "DEY", []>, Ix8Bit;
+def DEY_16 : FF<0x88, (outs), (ins), "DEY", []>, Ix16Bit;
 
-def INCa_8   : FF<0x1a, (outs), (ins), "INC A", []>, Acc8Bit;
-def INCa_16  : FF<0x1a, (outs), (ins), "INC A", []>, Acc16Bit;
+def INC_8  : FF<0x1a, (outs), (ins), "INC A", []>, Acc8Bit;
+def INC_16 : FF<0x1a, (outs), (ins), "INC A", []>, Acc16Bit;
 
-def DECa_8   : FF<0x3a, (outs), (ins), "DEC A", []>, Acc8Bit;
-def DECa_16  : FF<0x3a, (outs), (ins), "DEC A", []>, Acc16Bit;
+def DEC_8  : FF<0x3a, (outs), (ins), "DEC A", []>, Acc8Bit;
+def DEC_16 : FF<0x3a, (outs), (ins), "DEC A", []>, Acc16Bit;
 
 //===----------------------------------------------------------------------===//
 // Pseudo-instructions

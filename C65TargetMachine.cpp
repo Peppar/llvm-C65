@@ -57,7 +57,7 @@ bool C65PassConfig::addPostRegAlloc() {
 
 bool C65PassConfig::addPreEmitPass() {
   addPass(createC65ZInstrExpanderPass());
-  //  addPass(createC65ZInstrExpanderPass());
+  addPass(createC65RegSizeInsertPass());
   return true;
 }
 

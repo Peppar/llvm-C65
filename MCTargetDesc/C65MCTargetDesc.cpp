@@ -72,12 +72,14 @@ static MCCodeGenInfo *createC65MCCodeGenInfo(StringRef TT, Reloc::Model RM,
                                              CodeGenOpt::Level OL) {
   MCCodeGenInfo *X = new MCCodeGenInfo();
 
-  // TODO: Understand how the code model system works
-  switch (CM) {
-  default: break;
-  case CodeModel::Default:
-    CM = CodeModel::Small; break;
-  }
+  // Static code is suitable for use in a dynamic executable; there is no
+  // separate DynamicNoPIC model.
+  if (RM == Reloc::Default || RM == Reloc::DynamicNoPIC)
+    RM = Reloc::Static;
+
+  if (CM == CodeModel::Default)
+    CM = CodeModel::Small;
+
   X->InitMCCodeGenInfo(RM, CM, OL);
   return X;
 }
@@ -110,19 +112,44 @@ static MCInstPrinter *createC65MCInstPrinter(const Target &T,
   return new C65InstPrinter(MAI, MII, MRI, STI);
 }
 
+static MCStreamer *createC65MCObjectStreamer(const Target &T, StringRef TT,
+                                             MCContext &Ctx,
+                                             MCAsmBackend &MAB,
+                                             raw_ostream &OS,
+                                             MCCodeEmitter *Emitter,
+                                             const MCSubtargetInfo &STI,
+                                             bool RelaxAll,
+                                             bool NoExecStack) {
+  return createELFStreamer(Ctx, MAB, OS, Emitter, RelaxAll, NoExecStack);
+}
+
 extern "C" void LLVMInitializeC65TargetMC() {
-  RegisterMCAsmInfoFn X(The65C816Target, createC65MCAsmInfo);
+  //
+  //RegisterMCAsmInfoFn X(The65C816Target, createC65MCAsmInfo);
+  TargetRegistry::RegisterMCAsmInfo(The65C816Target,
+                                    createC65MCAsmInfo);
 
   TargetRegistry::RegisterMCCodeGenInfo(The65C816Target,
                                         createC65MCCodeGenInfo);
 
-  TargetRegistry::RegisterMCInstrInfo(The65C816Target, createC65MCInstrInfo);
+  TargetRegistry::RegisterMCCodeEmitter(The65C816Target,
+                                        createC65MCCodeEmitter);
 
-  TargetRegistry::RegisterMCRegInfo(The65C816Target, createC65MCRegisterInfo);
+  TargetRegistry::RegisterMCInstrInfo(The65C816Target,
+                                      createC65MCInstrInfo);
+
+  TargetRegistry::RegisterMCRegInfo(The65C816Target,
+                                    createC65MCRegisterInfo);
 
   TargetRegistry::RegisterMCSubtargetInfo(The65C816Target,
                                           createC65MCSubtargetInfo);
 
+  TargetRegistry::RegisterMCAsmBackend(The65C816Target,
+                                       createC65MCAsmBackend);
+
   TargetRegistry::RegisterMCInstPrinter(The65C816Target,
                                         createC65MCInstPrinter);
+
+  TargetRegistry::RegisterMCObjectStreamer(The65C816Target,
+                                           createC65MCObjectStreamer);
 }

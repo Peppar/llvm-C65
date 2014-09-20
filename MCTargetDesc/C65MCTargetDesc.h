@@ -31,6 +31,17 @@ class raw_ostream;
 
 extern Target The65C816Target;
 
+  MCCodeEmitter *createC65MCCodeEmitter(const MCInstrInfo &MCII,
+                                        const MCRegisterInfo &MRI,
+                                        const MCSubtargetInfo &STI,
+                                        MCContext &Ctx);
+  MCAsmBackend *createC65MCAsmBackend(const Target &T,
+                                      const MCRegisterInfo &MRI,
+                                      StringRef TT,
+                                      StringRef CPU);
+  MCObjectWriter *createC65WLAKObjectWriter(raw_ostream &OS,
+                                            uint8_t OSABI);
+
 } // End llvm namespace
 
 // Defines symbolic names for C65 registers.  This defines a mapping from

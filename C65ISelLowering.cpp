@@ -300,7 +300,6 @@ C65TargetLowering::EmitBR_CC(MachineInstr *MI,
 
   if (C.Equality) {
     // thisMBB:
-    //   (SEP #$20)
     //   LDA %ZRA
     //   CMP %ZRB
     //   BNE sinkMBB/Dest
@@ -326,18 +325,12 @@ C65TargetLowering::EmitBR_CC(MachineInstr *MI,
     sinkMBB->transferSuccessorsAndUpdatePHIs(MBB);
     thisMBB->addSuccessor(sinkMBB);
 
-    // if (Use8Bit) {
-    //   BuildMI(thisMBB, DL, TII->get(C65::SEP)).addImm(0x20);
-    // }
     for (unsigned I = 0; I < NumBytes; I += AccSize) {
       BuildMI(thisMBB, DL, TII->get(LDAInstr))
         .addImm(RI->getZRAddress(C.Op0.getReg()) + I);
       BuildMI(thisMBB, DL, TII->get(CMPInstr))
         .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
       if (I == NumBytes - AccSize) {
-        // if (Use8Bit) {
-        //   BuildMI(thisMBB, DL, TII->get(C65::REP)).addImm(0x20);
-        // }
         if (C.Bitvalue) {
           BuildMI(thisMBB, DL, TII->get(C65::BEQ)).addMBB(Dest);
         } else {
@@ -359,7 +352,6 @@ C65TargetLowering::EmitBR_CC(MachineInstr *MI,
     return sinkMBB;
   } else if (C.Signed) {
     // thisMBB:
-    //   (SEP #$20)
     //   LDA %ZRA
     //   CMP %ZRB
     //   LDA %ZRA+2
@@ -368,7 +360,6 @@ C65TargetLowering::EmitBR_CC(MachineInstr *MI,
     //   BVC sinkMBB
     //   EOR #$8000
     // sinkMBB:
-    //   (REP #$20)
     //   BPL/BMI %DEST
 
     const unsigned LDAInstr = Use8Bit ? C65::LDA_8zp : C65::LDA_16zp;
@@ -390,13 +381,7 @@ C65TargetLowering::EmitBR_CC(MachineInstr *MI,
     } else {
       BuildMI(*sinkMBB, sinkMBB->begin(), DL, TII->get(C65::BPL)).addMBB(Dest);
     }
-    if (AccSize == 1) {
-      BuildMI(*sinkMBB, sinkMBB->begin(), DL, TII->get(C65::REP)).addImm(0x20);
-    }
 
-    if (Use8Bit) {
-      BuildMI(thisMBB, DL, TII->get(C65::SEP)).addImm(0x20);
-    }
     BuildMI(thisMBB, DL, TII->get(LDAInstr))
       .addImm(RI->getZRAddress(C.Op0.getReg()));
     BuildMI(thisMBB, DL, TII->get(CMPInstr))
@@ -425,13 +410,11 @@ C65TargetLowering::EmitBR_CC(MachineInstr *MI,
 
     return sinkMBB;
   } else {
-    //   (SEP #$20)
     //   LDA %ZRA
     //   CMP %ZRB
     //   LDA %ZRA+2
     //   SBC %ZRB+2
     //   ...
-    //   (REP #$20)
     //   BCS/BCC Dest
     const unsigned LDAInstr = Use8Bit ? C65::LDA_8zp : C65::LDA_16zp;
     const unsigned CMPInstr = Use8Bit ? C65::CMP_8zp : C65::CMP_16zp;
@@ -449,9 +432,6 @@ C65TargetLowering::EmitBR_CC(MachineInstr *MI,
         .addImm(RI->getZRAddress(C.Op0.getReg()) + I);
       BuildMI(*MBB, MBBI, DL, TII->get(SBCInstr))
         .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
-    }
-    if (AccSize == 1) {
-      BuildMI(*MBB, MBBI, DL, TII->get(C65::REP)).addImm(0x20);
     }
     if (C.Bitvalue) {
       BuildMI(*MBB, MBBI, DL, TII->get(C65::BCS)).addMBB(Dest);
@@ -497,7 +477,7 @@ C65TargetLowering::EmitSTzi(MachineInstr *MI, MachineBasicBlock *MBB,
 
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
   const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
-  const unsigned LDAInstr = Use8Bit ? C65::LDA_8zp : C65::STA_16zp;
+  const unsigned LDAInstr = Use8Bit ? C65::LDA_8zp : C65::LDA_16zp;
   const unsigned STAInstr = Use8Bit ? C65::STA_8i  : C65::STA_16i;
 
   DebugLoc DL = MI->getDebugLoc();

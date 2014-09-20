@@ -106,17 +106,11 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
     STAInstr = C65::STA_16zp;
   }
 
-  if (NumBytes == 1) {
-    BuildMI(MBB, MBBI, DL, get(C65::SEP)).addImm(0x20);
-  }
   for (unsigned I = 0; I < NumBytes; I += ByteCapacity) {
     BuildMI(MBB, MBBI, DL, get(LDAInstr))
       .addImm(RI.getZRAddress(SrcReg) + I);
     BuildMI(MBB, MBBI, DL, get(STAInstr))
       .addImm(RI.getZRAddress(DestReg) + I);
-  }
-  if (NumBytes == 1) {
-    BuildMI(MBB, MBBI, DL, get(C65::REP)).addImm(0x20);
   }
 
   DEBUG(dbgs() << "CopyPhysReg from "
@@ -204,198 +198,6 @@ loadRegFromStackSlot(MachineBasicBlock &MBB,
   // }
 }
 
-
-//static GlobalValue
-
-// static C65AsmPrinter::getZRAddr(MCInstBuilder MIB,
-//                                 const MachineOperand &MO,
-//                                 unsigned Offset) {
-//   const C65RegisterInfo &TRI =
-//     *static_cast<const C65RegisterInfo *>
-//     (TM.getSubtargetImpl()->getRegisterInfo());
-//   unsigned Addr = TRI.getZRAddress(MO.getReg());
-//   MIB.addImm(Addr + Offset);
-//   return MIB;
-// }
-
-// static MachineBasicBlock *getSuccessor(MachineBasicBlock *MBB) {
-//   MachineFunction::iterator I(MBB);
-//   return std::next(I);
-// }
-
-// static unsigned getZInstr(MachineInstr *MI) {
-//   switch (MI->getOpcode()) {
-//   case C65::ORA_8zr8:
-//   case C65::ORA_8zr16:
-//   case C65::ORA_8zr32:
-//   case C65::ORA_8zr64: return C65::ORA_8zp);
-//   case C65::ORA_16zr16:
-//   case C65::ORA_16zr32:
-//   case C65::ORA_16zr64: return C65::ORA_16zp);
-//   case C65::AND_8zr8:
-//   case C65::AND_8zr16:
-//   case C65::AND_8zr32:
-//   case C65::AND_8zr64: return C65::AND_8zp);
-//   case C65::AND_16zr16:
-//   case C65::AND_16zr32:
-//   case C65::AND_16zr64: return C65::AND_16zp);
-//   case C65::EOR_8zr8:
-//   case C65::EOR_8zr16:
-//   case C65::EOR_8zr32:
-//   case C65::EOR_8zr64: return C65::EOR_8zp);
-//   case C65::EOR_16zr16:
-//   case C65::EOR_16zr32:
-//   case C65::EOR_16zr64: return C65::EOR_16zp);
-//   case C65::ADC_8zr8:
-//   case C65::ADC_8zr16:
-//   case C65::ADC_8zr32:
-//   case C65::ADC_8zr64: return C65::ADC_8zp);
-//   case C65::ADC_16zr16:
-//   case C65::ADC_16zr32:
-//   case C65::ADC_16zr64: return C65::ADC_16zp);
-//   case C65::SBC_8zr8:
-//   case C65::SBC_8zr16:
-//   case C65::SBC_8zr32:
-//   case C65::SBC_8zr64: return C65::SBC_8zp);
-//   case C65::SBC_16zr16:
-//   case C65::SBC_16zr32:
-//   case C65::SBC_16zr64: return C65::SBC_16zp);
-//   case C65::STA_8zr8:
-//   case C65::STA_8zr16:
-//   case C65::STA_8zr32:
-//   case C65::STA_8zr64: return C65::STA_8zp);
-//   case C65::STA_16zr16:
-//   case C65::STA_16zr32:
-//   case C65::STA_16zr64: return C65::STA_16zp);
-//   case C65::CMP_8zr8:
-//   case C65::CMP_8zr16:
-//   case C65::CMP_8zr32:
-//   case C65::CMP_8zr64: return C65::CMP_8zp);
-//   case C65::CMP_16zr16:
-//   case C65::CMP_16zr32:
-//   case C65::CMP_16zr64: return C65::CMP_16zp);
-//   case C65::LDA_8zr8:
-//   case C65::LDA_8zr16:
-//   case C65::LDA_8zr32:
-//   case C65::LDA_8zr64: return C65::LDA_8zp);
-//   case C65::LDA_16zr16:
-//   case C65::LDA_16zr32:
-//   case C65::LDA_16zr64: return C65::LDA_16zp);
-//   case C65::ASL_8zr8:
-//   case C65::ASL_8zr16:
-//   case C65::ASL_8zr32:
-//   case C65::ASL_8zr64: return C65::ASL_8zp);
-//   case C65::ASL_16zr16:
-//   case C65::ASL_16zr32:
-//   case C65::ASL_16zr64: return C65::ASL_16zp);
-//   case C65::ROL_8zr8:
-//   case C65::ROL_8zr16:
-//   case C65::ROL_8zr32:
-//   case C65::ROL_8zr64: return C65::ROL_8zp);
-//   case C65::ROL_16zr16:
-//   case C65::ROL_16zr32:
-//   case C65::ROL_16zr64: return C65::ROL_16zp);
-//   case C65::LSR_8zr8:
-//   case C65::LSR_8zr16:
-//   case C65::LSR_8zr32:
-//   case C65::LSR_8zr64: return C65::LSR_8zp);
-//   case C65::LSR_16zr16:
-//   case C65::LSR_16zr32:
-//   case C65::LSR_16zr64: return C65::LSR_16zp);
-//   case C65::ROR_8zr8:
-//   case C65::ROR_8zr16:
-//   case C65::ROR_8zr32:
-//   case C65::ROR_8zr64: return C65::ROR_8zp);
-//   case C65::ROR_16zr16:
-//   case C65::ROR_16zr32:
-//   case C65::ROR_16zr64: return C65::ROR_16zp);
-//   case C65::DEC_8zr8:
-//   case C65::DEC_8zr16:
-//   case C65::DEC_8zr32:
-//   case C65::DEC_8zr64: return C65::DEC_8zp);
-//   case C65::DEC_16zr16:
-//   case C65::DEC_16zr32:
-//   case C65::DEC_16zr64: return C65::DEC_16zp);
-//   case C65::INC_8zr8:
-//   case C65::INC_8zr16:
-//   case C65::INC_8zr32:
-//   case C65::INC_8zr64: return C65::INC_8zp);
-//   case C65::INC_16zr16:
-//   case C65::INC_16zr32:
-//   case C65::INC_16zr64: return C65::INC_16zp);
-//   case C65::STX_8zr8:
-//   case C65::STX_8zr16:
-//   case C65::STX_8zr32:
-//   case C65::STX_8zr64: return C65::STX_8zp);
-//   case C65::STX_16zr16:
-//   case C65::STX_16zr32:
-//   case C65::STX_16zr64: return C65::STX_16zp);
-//   case C65::LDX_8zr8:
-//   case C65::LDX_8zr16:
-//   case C65::LDX_8zr32:
-//   case C65::LDX_8zr64: return C65::LDX_8zp);
-//   case C65::LDX_16zr16:
-//   case C65::LDX_16zr32:
-//   case C65::LDX_16zr64: return C65::LDX_16zp);
-//   case C65::STY_8zr8:
-//   case C65::STY_8zr16:
-//   case C65::STY_8zr32:
-//   case C65::STY_8zr64: return C65::STY_8zp);
-//   case C65::STY_16zr16:
-//   case C65::STY_16zr32:
-//   case C65::STY_16zr64: return C65::STY_16zp);
-//   case C65::LDY_8zr8:
-//   case C65::LDY_8zr16:
-//   case C65::LDY_8zr32:
-//   case C65::LDY_8zr64: return C65::LDY_8zp);
-//   case C65::LDY_16zr16:
-//   case C65::LDY_16zr32:
-//   case C65::LDY_16zr64: return C65::LDY_16zp);
-//   case C65::CPY_8zr8:
-//   case C65::CPY_8zr16:
-//   case C65::CPY_8zr32:
-//   case C65::CPY_8zr64: return C65::CPY_8zp);
-//   case C65::CPY_16zr16:
-//   case C65::CPY_16zr32:
-//   case C65::CPY_16zr64: return C65::CPY_16zp);
-//   case C65::CPX_8zr8:
-//   case C65::CPX_8zr16:
-//   case C65::CPX_8zr32:
-//   case C65::CPX_8zr64: return C65::CPX_8zp);
-//   case C65::CPX_16zr16:
-//   case C65::CPX_16zr32:
-//   case C65::CPX_16zr64: return C65::CPX_16zp);
-//   case C65::STZ_8zr8:
-//   case C65::STZ_8zr16:
-//   case C65::STZ_8zr32:
-//   case C65::STZ_8zr64: return C65::STZ_8zp);
-//   case C65::STZ_16zr16:
-//   case C65::STZ_16zr32:
-//   case C65::STZ_16zr64: return C65::STZ_16zp);
-//   }
-
-// }
-
-// bool C65InstrInfo::expandZRInstr(MachineBasicBlock::iterator MBBI,
-//                                  unsigned Instruction) const {
-//   MachineInstrBuilder MIB(*MBBI->getParent()->getParent(), MBBI);
-//   MachineBasicBlock &MBB = *MIB->getParent();
-//   DebugLoc DL = MIB->getDebugLoc();
-//   unsigned ZReg = MIB->getOperand(0).getReg();
-//   unsigned Offset = MIB->getOperand(1).getImm();
-//   MachineBasicBlock::iterator I = MIB;
-
-//   BuildMI(MBB, I, DL, get(Instruction))
-//     .addImm(getRegisterInfo().getZRAddress(ZReg) + Offset);
-
-//   MBBI->eraseFromParent();
-
-//   return true;
-// }
-
-// bool C65InstrInfo::expandZInstr(MachineInstr *MI) {
-// }
-
 bool C65InstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MBBI) const {
   return false;
 }
@@ -472,8 +274,6 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
         Opcode != C65::BRCC64zz)
       return true; // Unknown Opcode.
 
-    //    SPCC::CondCodes BranchCode = (SPCC::CondCodes)I->getOperand(1).getImm();
-
     if (Cond.empty()) {
       // MachineBasicBlock *TargetBB = I->getOperand(0).getMBB();
       // if (AllowModify && UnCondBrIter != MBB.end() &&
@@ -510,12 +310,9 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
       // }
       FBB = TBB;
       Cond.push_back(I->getOperand(0));
-      DEBUG(errs() << "Cond.push_back " << I->getOperand(0).getImm());
       Cond.push_back(I->getOperand(1));
       Cond.push_back(I->getOperand(2));
       TBB = I->getOperand(3).getMBB();
-
-      //      Cond.push_back(MachineOperand::CreateImm(BranchCode));
       continue;
     }
     // FIXME: Handle subsequent conditional branches.
@@ -523,85 +320,6 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
     return true;
   }
   return false;
-
-  // // If the block has no terminators, it just falls into the block after it.
-  // MachineBasicBlock::iterator I = MBB.end();
-  // if (I == MBB.begin())
-  //   return false;
-  // --I;
-  // while (I->isDebugValue()) {
-  //   if (I == MBB.begin())
-  //     return false;
-  //   --I;
-  // }
-  // if (!isUnpredicatedTerminator(I))
-  //   return false;
-
-  // // Get the last instruction in the block.
-  // MachineInstr *LastInst = I;
-
-  // // If there is only one terminator instruction, process it.
-  // if (I == MBB.begin() || !isUnpredicatedTerminator(--I)) {
-  //   if (LastInst->getOpcode() == C65::JMP) {
-  //     if (!LastInst->getOperand(0).isMBB())
-  //       return true;
-  //     TBB = LastInst->getOperand(0).getMBB();
-  //     return false;
-  //   } else if (LastInst->getOpcode() == C65::BRCC8zz ||
-  //              LastInst->getOpcode() == C65::BRCC16zz ||
-  //              LastInst->getOpcode() == C65::BRCC32zz ||
-  //              LastInst->getOpcode() == C65::BRCC64zz) {
-  //     if (!LastInst->getOperand(3).isMBB())
-  //       return true;
-
-  //     // Block ends with fall-through condbranch.
-  //     TBB = LastInst->getOperand(3).getMBB();
-  //     Cond.push_back(LastInst->getOperand(0));
-  //     Cond.push_back(LastInst->getOperand(1));
-  //     Cond.push_back(LastInst->getOperand(2));
-  //     return false;
-  //   }
-  // }
-
-  // // Get the instruction before it if it's a terminator.
-  // MachineInstr *SecondLastInst = I;
-
-  // // If there are three terminators, we don't know what sort of block this is.
-  // if (SecondLastInst && I != MBB.begin() &&
-  //     isUnpredicatedTerminator(--I))
-  //   return true;
-
-  // if ((SecondLastInst->getOpcode() == C65::BRCC8zz ||
-  //      SecondLastInst->getOpcode() == C65::BRCC16zz ||
-  //      SecondLastInst->getOpcode() == C65::BRCC32zz ||
-  //      SecondLastInst->getOpcode() == C65::BRCC64zz) &&
-  //     LastInst->getOpcode() == C65::JMP) {
-  //   if (!SecondLastInst->getOperand(3).isMBB() ||
-  //       !LastInst->getOperand(0).isMBB())
-  //     return true;
-  //   TBB = LastInst->getOperand(3).getMBB();
-  //   Cond.push_back(SecondLastInst->getOperand(0));
-  //   Cond.push_back(SecondLastInst->getOperand(1));
-  //   Cond.push_back(SecondLastInst->getOperand(2));
-  //   FBB = LastInst->getOperand(0).getMBB();
-  //   return false;
-  // }
-
-  // // If the block ends with two C65::JMPs, handle it.  The second one is not
-  // // executed, so remove it.
-  // if (SecondLastInst->getOpcode() == C65::JMP &&
-  //     LastInst->getOpcode() == C65::JMP) {
-  //   if (!SecondLastInst->getOperand(0).isMBB())
-  //     return true;
-  //   TBB = SecondLastInst->getOperand(0).getMBB();
-  //   I = LastInst;
-  //   if (AllowModify)
-  //     I->eraseFromParent();
-  //   return false;
-  // }
-
-  // // Otherwise, can't handle this.
-  // return true;
 }
 
 unsigned C65InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
