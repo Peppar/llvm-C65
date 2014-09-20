@@ -41,12 +41,24 @@ public:
   }
 
   bool addInstSelector() override;
+  bool addPostRegAlloc() override;
+  bool addPreEmitPass() override;
 };
 } // end anonymous namespace
 
 bool C65PassConfig::addInstSelector() {
   addPass(createC65ISelDag(getC65TargetMachine()));
   return false;
+}
+
+bool C65PassConfig::addPostRegAlloc() {
+  return false;
+}
+
+bool C65PassConfig::addPreEmitPass() {
+  addPass(createC65ZInstrExpanderPass());
+  //  addPass(createC65ZInstrExpanderPass());
+  return true;
 }
 
 TargetPassConfig *C65TargetMachine::createPassConfig(PassManagerBase &PM) {

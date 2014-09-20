@@ -17,6 +17,7 @@ add_llvm_target(C65CodeGen
   C65SelectionDAGInfo.cpp
   C65Subtarget.cpp
   C65TargetMachine.cpp
+  C65ZInstrExpander.cpp
   )
 
 add_subdirectory(InstPrinter)

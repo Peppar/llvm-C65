@@ -174,3 +174,75 @@ Shift
 
 
 PPCISelLowering has some nice MBB-manipulating routines
+
+REP, SEP can be pushed through
+     Fall-through
+     Branches
+
+Crossings
+        Input nodes (MBBI:s)
+        Output nodes (MBB:s)
+
+
+Insert REP, SEP before:
+       Fall-through, linked to size of MBB
+       BMI, BPL, .. etc; linked to size of MBB
+       JMP, linked to size of MBB
+
+       RTS;
+       RTI;
+       JSR; are all 16-bit
+       JSL;
+
+First MBB: Entry_16BIT
+
+Last MBB: Exit_16BIT
+
+RTS, CALL : 16_BIT
+
+MBB:
+        ALL_NC
+        Entry_NC
+        Entry_8BIT
+        Entry_16BIT
+        Exit_8BIT
+        Exit_16BI
+
+Edges (branches, fall-through):
+      Edge_NC
+      Edge_8BIT
+      Edge_16BIT
+
+
+Edge_16BIT->Entry_16BIT OK
+Edge_8BIT->Entry_8BIT OK
+
+Edge_16BIT->Entry_8BIT not OK
+Edge_8BIT->Entry_16BIT not OK
+
+#0  llvm::C65InstrInfo::AnalyzeBranch (this=0x1c661c8, MBB=..., TBB=@0x7fffffffdf98: 0x0, 
+    FBB=@0x7fffffffdf90: 0x0, Cond=..., AllowModify=false)
+    at /home/peppar/llvm/lib/Target/C65/C65InstrInfo.cpp:425
+#1  0x0000000000c2f37e in llvm::MachineBasicBlock::canFallThrough (this=0x1ca3880)
+    at /home/peppar/llvm/lib/CodeGen/MachineBasicBlock.cpp:651
+#2  0x0000000000dc629c in (anonymous namespace)::TailDuplicatePass::shouldTailDuplicate (this=0x1c7fee0, 
+    MF=..., IsSimple=false, TailBB=...) at /home/peppar/llvm/lib/CodeGen/TailDuplication.cpp:551
+#3  0x0000000000dc5b21 in (anonymous namespace)::TailDuplicatePass::TailDuplicateBlocks (this=0x1c7fee0, 
+    MF=...) at /home/peppar/llvm/lib/CodeGen/TailDuplication.cpp:332
+#4  0x0000000000dc592d in (anonymous namespace)::TailDuplicatePass::runOnMachineFunction (this=0x1c7fee0, 
+    MF=...) at /home/peppar/llvm/lib/CodeGen/TailDuplication.cpp:151
+#5  0x0000000000c7893e in llvm::MachineFunctionPass::runOnFunction (this=0x1c7fee0, F=...)
+    at /home/peppar/llvm/lib/CodeGen/MachineFunctionPass.cpp:33
+#6  0x00000000013006bb in llvm::FPPassManager::runOnFunction (this=0x1c7b910, F=...)
+    at /home/peppar/llvm/lib/IR/LegacyPassManager.cpp:1545
+#7  0x00000000013009c8 in llvm::FPPassManager::runOnModule (this=0x1c7b910, M=...)
+    at /home/peppar/llvm/lib/IR/LegacyPassManager.cpp:1565
+#8  0x000000000130109a in (anonymous namespace)::MPPassManager::runOnModule (this=0x1c62550, M=...)
+    at /home/peppar/llvm/lib/IR/LegacyPassManager.cpp:1623
+#9  0x0000000001300c7e in llvm::legacy::PassManagerImpl::run (this=0x1c60a80, M=...)
+    at /home/peppar/llvm/lib/IR/LegacyPassManager.cpp:1730
+#10 0x0000000001301661 in llvm::legacy::PassManager::run (this=0x7fffffffe660, M=...)
+    at /home/peppar/llvm/lib/IR/LegacyPassManager.cpp:1767
+#11 0x0000000000621d67 in compileModule (argv=0x7fffffffeac8, Context=...)
+    at /home/peppar/llvm/tools/llc/llc.cpp:364
+#12 0x0000000000620df2 in main (argc=5, argv=0x7fffffffeac8) at /home/peppar/llvm/tools/llc/llc.c

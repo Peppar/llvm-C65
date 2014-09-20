@@ -27,25 +27,42 @@ namespace llvm {
 namespace C65 {
 
 enum {
+  AccNA = 0,
+  Acc8Bit = 2,
+  Acc16Bit = 3,
+
+  IxNA = 0,
+  Ix8Bit = 2,
+  Ix16Bit = 3
+};
+
+enum {
   // This needs to be kept in sync with C65InstrInfo.td TSFlags
 
-  // Is shift-type instruction
-  ZRShift = (1 << 0),
+  // AccSize
+  AccSize = (3 << 0),
+  AccSizeShift = 0,
 
-  // Register size
-  ZROpSize = (3 << 1),
-  ZROpSizeShift = 1,
-  ZROpSize8 = 0,
-  ZROpSize16 = 1,
-  ZROpSize32 = 2,
-  ZROpSize64 = 2,
+  // IxSize
+  IxSize = (3 << 2),
+  IxSizeShift = 2,
 
   // Is a ZR instruction
-  ZRInstr = (1 << 3),
+  ZRInstr = (1 << 4),
 
-  // Is a control flow instruction
-  ZRCtrl = (1 << 4)
+  // ZR operand size
+  ZROpSize = (3 << 5),
+  ZROpSizeShift = 5
 };
+
+static inline unsigned getAccSize(unsigned int Flags) {
+  return (Flags & AccSize) >> AccSizeShift;
+}
+
+static inline unsigned getIxSize(unsigned int Flags) {
+  return (Flags & IxSize) >> IxSizeShift;
+}
+
 static inline unsigned getZROpSize(unsigned int Flags) {
   return (Flags & ZROpSize) >> ZROpSizeShift;
 }
@@ -91,10 +108,28 @@ public:
   bool ExpandBR_CC(MachineInstr *MI,
                    unsigned NumBytes) const;
 
-  bool expandZRInstr(MachineBasicBlock::iterator MBBI,
-                     unsigned Instruction) const;
-
   bool expandPostRAPseudo(MachineBasicBlock::iterator MBBI) const override;
+
+  // Predication support.
+  bool isPredicated(const MachineInstr *MI) const override;
+
+  bool isUnpredicatedTerminator(const MachineInstr *MI) const override;
+
+  // Branch analysis.
+  bool AnalyzeBranch(MachineBasicBlock &MBB, MachineBasicBlock *&TBB,
+                     MachineBasicBlock *&FBB,
+                     SmallVectorImpl<MachineOperand> &Cond,
+                     bool AllowModify) const override;
+  unsigned RemoveBranch(MachineBasicBlock &MBB) const override;
+  unsigned InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
+                        MachineBasicBlock *FBB,
+                        const SmallVectorImpl<MachineOperand> &Cond,
+                        DebugLoc DL) const override;
+
+  // bool expandZRInstr(MachineBasicBlock::iterator MBBI,
+  //                    unsigned Instruction) const;
+
+  // bool expandZInstr(MachineInstr *MI) const override;
 };
 } // end namespace llvm
 

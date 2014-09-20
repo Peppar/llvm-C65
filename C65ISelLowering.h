@@ -62,12 +62,13 @@ namespace llvm {
                                        const SelectionDAG &DAG,
                                        unsigned Depth = 0) const override;
 
-    MachineBasicBlock *EmitSimpleZI(MachineInstr *MI,
-                                    MachineBasicBlock *MBB,
-                                    unsigned NumBytes) const;
-    MachineBasicBlock *EmitBinaryZI(MachineInstr *MI, MachineBasicBlock *MBB,
-                                    unsigned NumBytes, unsigned OP,
-                                    bool clc = false, bool stc = false) const;
+    MachineBasicBlock *
+      EmitSimpleZI(MachineInstr *MI, MachineBasicBlock *MBB,
+                   unsigned NumBytes) const;
+    MachineBasicBlock *
+      EmitBinaryZI(MachineInstr *MI, MachineBasicBlock *MBB,
+                   unsigned NumBytes, unsigned Instr8, unsigned Instr16,
+                   bool clc = false, bool stc = false) const;
     MachineBasicBlock *EmitBR_CC(MachineInstr *MI, MachineBasicBlock *MBB,
                                  unsigned NumBytes) const;
     MachineBasicBlock *EmitSTZz(MachineInstr *MI, MachineBasicBlock *MBB,
@@ -80,6 +81,10 @@ namespace llvm {
                                   unsigned NumBytes) const;
     MachineBasicBlock *EmitMOVzz(MachineInstr *MI, MachineBasicBlock *MBB,
                                  unsigned NumBytes) const;
+
+    MachineBasicBlock *EmitZInstr(MachineInstr *MI,
+                                  MachineBasicBlock *MBB) const;
+
     MachineBasicBlock *
       EmitInstrWithCustomInserter(MachineInstr *MI,
                                   MachineBasicBlock *MBB) const override;

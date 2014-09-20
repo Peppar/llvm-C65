@@ -26,6 +26,8 @@ namespace llvm {
 
   FunctionPass *createC65ISelDag(C65TargetMachine &TM);
 
+  FunctionPass *createC65ZInstrExpanderPass();
+
   void LowerC65MachineInstrToMCInst(const MachineInstr *MI, MCInst &OutMI,
                                     AsmPrinter &AP, bool isDarwin);
 } // end namespace llvm;

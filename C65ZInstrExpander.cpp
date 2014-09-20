@@ -1,4 +1,4 @@
-//===-- C65InstrComposer.cpp - Zero-page instruction composer -------------===//
+//===-- C65ZInstrExpander.cpp - Zero-page instruction expander ------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -7,12 +7,13 @@
 //
 //===----------------------------------------------------------------------===//
 //
+// Expand Z instructions.
+//
 //===----------------------------------------------------------------------===//
 
 #include "C65.h"
 #include "C65InstrInfo.h"
 #include "C65Subtarget.h"
-#include "llvm/ADT/Statistic.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -22,295 +23,62 @@
 #include "llvm/Target/TargetInstrInfo.h"
 using namespace llvm;
 
-#define DEBUG_TYPE "c65-z-instr-composer"
-
-//STATISTIC(NumVZU, "Number of vzeroupper instructions inserted");
+#define DEBUG_TYPE "c65-z-instr-expander"
 
 namespace {
 
   class ZInstrExpander : public MachineFunctionPass {
   public:
+    static char ID;
 
     ZInstrExpander() : MachineFunctionPass(ID) {}
-    bool runOnMachineFunction(MachineFunction &MF) override;
-    const char *getPassName() const override {return "C65 Z instruction expander";}
+    const char *getPassName() const override {
+      return "C65 Z instruction expander";
+    }
 
   private:
+    bool runOnMachineFunction(MachineFunction &MF) override;
 
-    void processBasicBlock(MachineBasicBlock &MBB);
-    void insertVZeroUpper(MachineBasicBlock::iterator I,
-                          MachineBasicBlock &MBB);
-    //void addDirtySuccessor(MachineBasicBlock &MBB);
-
-    //typedef enum { PASS_THROUGH, EXITS_CLEAN, EXITS_DIRTY } BlockExitState;
-    //static const char* getBlockExitStateName(BlockExitState ST);
-
-    // Core algorithm state:
-    // BlockState - Each block is either:
-    //   - PASS_THROUGH: There are neither YMM dirtying instructions nor
-    //                   vzeroupper instructions in this block.
-    //   - EXITS_CLEAN: There is (or will be) a vzeroupper instruction in this
-    //                  block that will ensure that YMM is clean on exit.
-    //   - EXITS_DIRTY: An instruction in the block dirties YMM and no
-    //                  subsequent vzeroupper in the block clears it.
-    //
-    // AddedToDirtySuccessors - This flag is raised when a block is added to the
-    //                          DirtySuccessors list to ensure that it's not
-    //                          added multiple times.
-    //
-    // FirstUnguardedCall - Records the location of the first unguarded call in
-    //                      each basic block that may need to be guarded by a
-    //                      vzeroupper. We won't know whether it actually needs
-    //                      to be guarded until we discover a predecessor that
-    //                      is DIRTY_OUT.
-    //    struct BlockState {
-    //      BlockState() : ExitState(PASS_THROUGH), AddedToDirtySuccessors(false) {}
-    //      BlockExitState ExitState;
-    //      bool AddedToDirtySuccessors;
-    //      MachineBasicBlock::iterator FirstUnguardedCall;
-    //    };
-    //    typedef SmallVector<BlockState, 8> BlockStateMap;
-    //    typedef SmallVector<MachineBasicBlock*, 8> DirtySuccessorsWorkList;
-
-    //    BlockStateMap BlockStates;
-    //    DirtySuccessorsWorkList DirtySuccessors;
-
-    bool EverMadeChange;
-
-    const TargetInstrInfo *TII;
-
-    static char ID;
+    void getAnalysisUsage(AnalysisUsage &AU) const override {
+      MachineFunctionPass::getAnalysisUsage(AU);
+    }
   };
-
   char ZInstrExpander::ID = 0;
 }
 
-FunctionPass *llvm::createC65IssueZInstrExpanderPass() {
+FunctionPass *llvm::createC65ZInstrExpanderPass() {
   return new ZInstrExpander();
-}
-
-// const char* ZInstrExpander::getBlockExitStateName(BlockExitState ST) {
-//   switch (ST) {
-//     case PASS_THROUGH: return "Pass-through";
-//     case EXITS_DIRTY: return "Exits-dirty";
-//     case EXITS_CLEAN: return "Exits-clean";
-//   }
-//   llvm_unreachable("Invalid block exit state.");
-// }
-
-// static bool isYmmReg(unsigned Reg) {
-//   return (Reg >= X86::YMM0 && Reg <= X86::YMM15);
-// }
-
-// static bool checkFnHasLiveInYmm(MachineRegisterInfo &MRI) {
-//   for (MachineRegisterInfo::livein_iterator I = MRI.livein_begin(),
-//        E = MRI.livein_end(); I != E; ++I)
-//     if (isYmmReg(I->first))
-//       return true;
-
-//   return false;
-// }
-
-// static bool clobbersAllYmmRegs(const MachineOperand &MO) {
-//   for (unsigned reg = X86::YMM0; reg <= X86::YMM15; ++reg) {
-//     if (!MO.clobbersPhysReg(reg))
-//       return false;
-//   }
-//   return true;
-// }
-
-// static bool hasYmmReg(MachineInstr *MI) {
-//   for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
-//     const MachineOperand &MO = MI->getOperand(i);
-//     if (MI->isCall() && MO.isRegMask() && !clobbersAllYmmRegs(MO))
-//       return true;
-//     if (!MO.isReg())
-//       continue;
-//     if (MO.isDebug())
-//       continue;
-//     if (isYmmReg(MO.getReg()))
-//       return true;
-//   }
-//   return false;
-// }
-
-// /// clobbersAnyYmmReg() - Check if any YMM register will be clobbered by this
-// /// instruction.
-// static bool callClobbersAnyYmmReg(MachineInstr *MI) {
-//   assert(MI->isCall() && "Can only be called on call instructions.");
-//   for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
-//     const MachineOperand &MO = MI->getOperand(i);
-//     if (!MO.isRegMask())
-//       continue;
-//     for (unsigned reg = X86::YMM0; reg <= X86::YMM15; ++reg) {
-//       if (MO.clobbersPhysReg(reg))
-//         return true;
-//     }
-//   }
-//   return false;
-// }
-
-// Insert a vzeroupper instruction before I.
-void VZeroUpperInserter::insertVZeroUpper(MachineBasicBlock::iterator I,
-                                              MachineBasicBlock &MBB) {
-  DebugLoc dl = I->getDebugLoc();
-  BuildMI(MBB, I, dl, TII->get(X86::VZEROUPPER));
-  ++NumVZU;
-  EverMadeChange = true;
-}
-
-// Add MBB to the DirtySuccessors list if it hasn't already been added.
-void VZeroUpperInserter::addDirtySuccessor(MachineBasicBlock &MBB) {
-  if (!BlockStates[MBB.getNumber()].AddedToDirtySuccessors) {
-    DirtySuccessors.push_back(&MBB);
-    BlockStates[MBB.getNumber()].AddedToDirtySuccessors = true;
-  }
-}
-
-/// processBasicBlock - Loop over all of the instructions in the basic block,
-/// inserting vzero upper instructions before function calls.
-void VZeroUpperInserter::processBasicBlock(MachineBasicBlock &MBB) {
-
-  // Start by assuming that the block PASS_THROUGH, which implies no unguarded
-  // calls.
-  // BlockExitState CurState = PASS_THROUGH;
-  // BlockStates[MBB.getNumber()].FirstUnguardedCall = MBB.end();
-
-  for (MachineBasicBlock::iterator I = MBB.begin(); I != MBB.end(); ++I) {
-    MachineInstr *MI = I;
-    // bool isControlFlow = MI->isCall() || MI->isReturn();
-
-
-
-    // Shortcut: don't need to check regular instructions in dirty state.
-    if (!isControlFlow && CurState == EXITS_DIRTY)
-      continue;
-
-    if (hasYmmReg(MI)) {
-      // We found a ymm-using instruction; this could be an AVX instruction,
-      // or it could be control flow.
-      CurState = EXITS_DIRTY;
-      continue;
-    }
-
-    // Check for control-flow out of the current function (which might
-    // indirectly execute SSE instructions).
-    if (!isControlFlow)
-      continue;
-
-    // If the call won't clobber any YMM register, skip it as well. It usually
-    // happens on helper function calls (such as '_chkstk', '_ftol2') where
-    // standard calling convention is not used (RegMask is not used to mark
-    // register clobbered and register usage (def/imp-def/use) is well-dfined
-    // and explicitly specified.
-    if (MI->isCall() && !callClobbersAnyYmmReg(MI))
-      continue;
-
-    // The VZEROUPPER instruction resets the upper 128 bits of all Intel AVX
-    // registers. This instruction has zero latency. In addition, the processor
-    // changes back to Clean state, after which execution of Intel SSE
-    // instructions or Intel AVX instructions has no transition penalty. Add
-    // the VZEROUPPER instruction before any function call/return that might
-    // execute SSE code.
-    // FIXME: In some cases, we may want to move the VZEROUPPER into a
-    // predecessor block.
-    if (CurState == EXITS_DIRTY) {
-      // After the inserted VZEROUPPER the state becomes clean again, but
-      // other YMM may appear before other subsequent calls or even before
-      // the end of the BB.
-      insertVZeroUpper(I, MBB);
-      CurState = EXITS_CLEAN;
-    } else if (CurState == PASS_THROUGH) {
-      // If this block is currently in pass-through state and we encounter a
-      // call then whether we need a vzeroupper or not depends on whether this
-      // block has successors that exit dirty. Record the location of the call,
-      // and set the state to EXITS_CLEAN, but do not insert the vzeroupper yet.
-      // It will be inserted later if necessary.
-      BlockStates[MBB.getNumber()].FirstUnguardedCall = I;
-      CurState = EXITS_CLEAN;
-    }
-  }
-
-  DEBUG(dbgs() << "MBB #" << MBB.getNumber() << " exit state: "
-               << getBlockExitStateName(CurState) << '\n');
-
-  if (CurState == EXITS_DIRTY)
-    for (MachineBasicBlock::succ_iterator SI = MBB.succ_begin(),
-                                          SE = MBB.succ_end();
-         SI != SE; ++SI)
-      addDirtySuccessor(**SI);
-
-  BlockStates[MBB.getNumber()].ExitState = CurState;
 }
 
 /// runOnMachineFunction - Loop over all of the basic blocks, expanding
 /// Z instructions
-bool C65ZInstrExpander::runOnMachineFunction(MachineFunction &MF) {
+bool ZInstrExpander::runOnMachineFunction(MachineFunction &MF) {
+  bool Changed = false;
   const C65Subtarget &ST = MF.getTarget().getSubtarget<C65Subtarget>();
-  //  if (!ST.hasAVX() || ST.hasAVX512())
-  //    return false;
-  TII = MF.getSubtarget().getInstrInfo();
-  MachineRegisterInfo &MRI = MF.getRegInfo();
-  //  EverMadeChange = false;
+  const C65TargetLowering *TL = ST.getTargetLowering();
 
-  // // Fast check: if the function doesn't use any ymm registers, we don't need
-  // // to insert any VZEROUPPER instructions.  This is constant-time, so it is
-  // // cheap in the common case of no ymm use.
-  // bool YMMUsed = false;
-  // const TargetRegisterClass *RC = &X86::VR256RegClass;
-  // for (TargetRegisterClass::iterator i = RC->begin(), e = RC->end();
-  //      i != e; i++) {
-  //   if (!MRI.reg_nodbg_empty(*i)) {
-  //     YMMUsed = true;
-  //     break;
-  //   }
-  // }
-  // if (!YMMUsed) {
-  //   return false;
-  // }
-
-  // assert(BlockStates.empty() && DirtySuccessors.empty() &&
-  //        "X86VZeroUpper state should be clear");
-  // BlockStates.resize(MF.getNumBlockIDs());
-
-  // Process all blocks. This will compute block exit states, record the first
-  // unguarded call in each block, and add successors of dirty blocks to the
-  // DirtySuccessors list.
+  // Iterate through each instruction in the function, looking for pseudos.
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
-    processBasicBlock(*I);
+    MachineBasicBlock *MBB = I;
+    for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
+         MBBI != MBBE; ) {
+      MachineInstr *MI = MBBI++;
+
+      // If MI is a Z instruction, expand it.
+      if (MI->getDesc().TSFlags & C65::ZRInstr) {
+        Changed = true;
+        MachineBasicBlock *NewMBB =
+          TL->EmitZInstr(MI, MBB);
+        // The expansion may involve new basic blocks.
+        if (NewMBB != MBB) {
+          MBB = NewMBB;
+          I = NewMBB;
+          MBBI = NewMBB->begin();
+          MBBE = NewMBB->end();
+        }
+      }
+    }
   }
 
-  // If any YMM regs are live in to this function, add the entry block to the
-  // DirtySuccessors list
-  // if (checkFnHasLiveInYmm(MRI))
-  //   addDirtySuccessor(MF.front());
-
-  // Re-visit all blocks that are successors of EXITS_DIRTY bsocks. Add
-  // vzeroupper instructions to unguarded calls, and propagate EXITS_DIRTY
-  // through PASS_THROUGH blocks.
-  // while (!DirtySuccessors.empty()) {
-  //   MachineBasicBlock &MBB = *DirtySuccessors.back();
-  //   DirtySuccessors.pop_back();
-  //   BlockState &BBState = BlockStates[MBB.getNumber()];
-
-  //   // MBB is a successor of a dirty block, so its first call needs to be
-  //   // guarded.
-  //   if (BBState.FirstUnguardedCall != MBB.end())
-  //     insertVZeroUpper(BBState.FirstUnguardedCall, MBB);
-
-  //   // If this successor was a pass-through block then it is now dirty, and its
-  //   // successors need to be added to the worklist (if they haven't been
-  //   // already).
-  //   if (BBState.ExitState == PASS_THROUGH) {
-  //     DEBUG(dbgs() << "MBB #" << MBB.getNumber()
-  //                  << " was Pass-through, is now Dirty-out.\n");
-  //     for (MachineBasicBlock::succ_iterator SI = MBB.succ_begin(),
-  //                                           SE = MBB.succ_end();
-  //          SI != SE; ++SI)
-  //       addDirtySuccessor(**SI);
-  //   }
-  // }
-
-  // BlockStates.clear();
-  return EverMadeChange;
+  return Changed;
 }
