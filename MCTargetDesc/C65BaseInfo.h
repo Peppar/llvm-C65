@@ -51,7 +51,14 @@ namespace C65II {
 
     // Machine code operand byte size
     OpSize = (3 << 7),
-    OpSizeShift = 7
+    OpSizeShift = 7,
+
+    // Machine Opcode
+    Opcode = (255 << 9),
+    OpcodeShift = 9,
+
+    // Machine operand is PC relative
+    OpPCRel = (1 << 17)
   };
 
   static inline unsigned getAccSize(unsigned int Flags) {
@@ -65,6 +72,9 @@ namespace C65II {
   }
   static inline unsigned getOpSize(unsigned int Flags) {
     return (Flags & OpSize) >> C65II::OpSizeShift;
+  }
+  static inline unsigned getOpcode(unsigned int Flags) {
+    return (Flags & Opcode) >> C65II::OpcodeShift;
   }
 }
 

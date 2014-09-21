@@ -51,6 +51,7 @@ public:
   // Complex pattern selectors
   bool SelectAddrZP(SDValue N, SDValue &Addr);
   bool SelectAddrZY(SDValue N, SDValue &Base, SDValue &Offset);
+  bool SelectAddrZ(SDValue N, SDValue &Base, SDValue &Offset);
   bool SelectAddrXY(SDValue N, SDValue &Base, SDValue &Offset);
   bool SelectAddrS(SDValue N, SDValue &Base, SDValue &Offset);
 
@@ -106,20 +107,49 @@ bool C65DAGToDAGISel::SelectAddrZP(SDValue Addr, SDValue &Offset) {
   return false;
 }
 
-/// Select address for ZR+Y
-///
-bool C65DAGToDAGISel::SelectAddrZY(SDValue Addr, SDValue &Z, SDValue &Y) {
-  if (Addr.getOpcode() == ISD::ADD) {
-    Z = Addr.getOperand(0);
-    Y = Addr.getOperand(1);
-    return true;
-  }
-  return false;
-}
+// /// Select address for ZR+Y
+// ///
+// bool C65DAGToDAGISel::SelectAddrZY(SDValue Addr, SDValue &Z, SDValue &Y) {
+//   if (Addr.getOpcode() == ISD::ADD) {
+//     Z = Addr.getOperand(0);
+//     Y = Addr.getOperand(1);
+//     return true;
+//   }
+//   return false;
+// }
 
-/// Select address for imm16+X and imm16+Y
+// /// Select address for ZR+Imm
+// ///
+// bool C65DAGToDAGISel::SelectAddrZ(SDValue Addr, SDValue &Base,
+//                                   SDValue &Offset) {
+//   if (Addr.getOpcode() == ISD::FrameIndex ||
+//       Addr.getOpcode() == ISD::TargetExternalSymbol ||
+//       Addr.getOpcode() == ISD::TargetGlobalAddress ||
+//       Addr.getOpcode() == ISD::TargetGlobalTLSAddress) {
+//     return false;
+//   }
+//   if (Addr.getOpcode() == ISD::ADD) {
+//     ConstantSDNode *CN;
+//     if ((CN = dyn_cast<ConstantSDNode>(Addr.getOperand(1))) &&
+//          isInt<16>(CN->getSExtValue())) {
+//       FrameIndexSDNode *FIN;
+//       if ((FIN =
+// 	   dyn_cast<FrameIndexSDNode>(Addr.getOperand(0)))) {
+//           // Constant offset from frame ref.
+// 	return false;
+//       } else {
+// 	Base = Addr.getOperand(0);
+//       }
+//       Offset = CurDAG->getTargetConstant(CN->getZExtValue(), MVT::i16);
+//       return true;
+//     }
+//   }
+//   return false;
+// }
+
+/// Select address for reg16 + imm16
 ///
-bool C65DAGToDAGISel::SelectAddrXY(SDValue Addr, SDValue &Base,
+bool C65DAGToDAGISel::SelectAddrRI(SDValue Addr, SDValue &Base,
                                    SDValue &Offset) {
   if (Addr.getOpcode() == ISD::FrameIndex ||
       Addr.getOpcode() == ISD::TargetExternalSymbol ||
@@ -141,6 +171,30 @@ bool C65DAGToDAGISel::SelectAddrXY(SDValue Addr, SDValue &Base,
       }
       Offset = CurDAG->getTargetConstant(CN->getZExtValue(), MVT::i16);
       return true;
+    }
+  }
+  return false;
+}
+
+/// Select address for reg16 + reg16
+///
+bool C65DAGToDAGISel::SelectAddrRR(SDValue Addr, SDValue &R1,
+                                   SDValue &R2) {
+  if (Addr.getOpcode() == ISD::FrameIndex ||
+      Addr.getOpcode() == ISD::TargetExternalSymbol ||
+      Addr.getOpcode() == ISD::TargetGlobalAddress ||
+      Addr.getOpcode() == ISD::TargetGlobalTLSAddress) {
+    return false;
+  }
+  if (Addr.getOpcode() == ISD::ADD) {
+    ConstantSDNode *CN;
+    FrameIndexSDNode *FIN;
+    if ((FIN = dyn_cast<FrameIndexSDNode>(Addr.getOperand(0)))) {
+      // Constant offset from frame ref.
+      return false;
+    } else {
+      R1 = Addr.getOperand(0);
+      R2 = Addr.getOperand(1);
     }
   }
   return false;
