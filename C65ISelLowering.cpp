@@ -83,6 +83,14 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   // Expand BRCOND into a BR_CC (see above).
   setOperationAction(ISD::BRCOND, MVT::Other, Expand);
 
+  // We don't (yet) accept any truncstore of integer registers.
+  setTruncStoreAction(MVT::i64, MVT::i32, Expand);
+  setTruncStoreAction(MVT::i64, MVT::i16, Expand);
+  setTruncStoreAction(MVT::i64, MVT::i8 , Expand);
+  setTruncStoreAction(MVT::i32, MVT::i16, Expand);
+  setTruncStoreAction(MVT::i32, MVT::i8 , Expand);
+  setTruncStoreAction(MVT::i16, MVT::i8,  Expand);
+
   // Custom legalize GlobalAddress nodes
   setOperationAction(ISD::GlobalAddress, getPointerTy(), Custom);
 
@@ -153,90 +161,6 @@ LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   }
 }
 
-// MCInstrDesc C65TargetLowering::getOp(unsigned Op) const {
-//   const TargetInstrInfo &TII = *Subtarget->getInstrInfo();
-//   return TII.get(Op);
-// }
-
-// uint8_t C65TargetLowering::getZRAddress(MachineOperand Val) const {
-//   const C65RegisterInfo &TRI =
-//       *static_cast<const C65RegisterInfo *>(Subtarget->getRegisterInfo());
-//   return TRI.getZRAddress(Val.getReg());
-// }
-
-/// Get the operand size of the function. This should be replaced by a
-/// more declarative approach.
-///
-// static unsigned getOpByteSize(unsigned Op) {
-//   switch (Op) {
-//   default: llvm_unreachable("Unknown opcode!");
-//     return 8;
-//   }
-// }
-
-// unsigned static getInstr(unsigned InstrClass, unsigned AccSize,
-//                          unsigned RegSize) {
-//   static const unsigned InstructionMatrix[21][7] = {
-//     { C65::ORA_8zr8,   C65::ORA_8zr16,  C65::ORA_8zr32, C65::ORA_8zr64,
-//       C65::ORA_16zr16, C65::ORA_16zr32, C65::ORA_16zr64 },
-//     { C65::AND_8zr8,   C65::AND_8zr16,  C65::AND_8zr32, C65::AND_8zr64,
-//       C65::AND_16zr16, C65::AND_16zr32, C65::AND_16zr64 },
-//     { C65::EOR_8zr8,   C65::EOR_8zr16,  C65::EOR_8zr32, C65::EOR_8zr64,
-//       C65::EOR_16zr16, C65::EOR_16zr32, C65::EOR_16zr64 },
-//     { C65::ADC_8zr8,   C65::ADC_8zr16,  C65::ADC_8zr32, C65::ADC_8zr64,
-//       C65::ADC_16zr16, C65::ADC_16zr32, C65::ADC_16zr64 },
-//     { C65::SBC_8zr8,   C65::SBC_8zr16,  C65::SBC_8zr32, C65::SBC_8zr64,
-//       C65::SBC_16zr16, C65::SBC_16zr32, C65::SBC_16zr64 },
-//     { C65::STA_8zr8,   C65::STA_8zr16,  C65::STA_8zr32, C65::STA_8zr64,
-//       C65::STA_16zr16, C65::STA_16zr32, C65::STA_16zr64 },
-//     { C65::CMP_8zr8,   C65::CMP_8zr16,  C65::CMP_8zr32, C65::CMP_8zr64,
-//       C65::CMP_16zr16, C65::CMP_16zr32, C65::CMP_16zr64 },
-//     { C65::LDA_8zr8,   C65::LDA_8zr16,  C65::LDA_8zr32, C65::LDA_8zr64,
-//       C65::LDA_16zr16, C65::LDA_16zr32, C65::LDA_16zr64 },
-//     { C65::ASL_8zr8,   C65::ASL_8zr16,  C65::ASL_8zr32, C65::ASL_8zr64,
-//       C65::ASL_16zr16, C65::ASL_16zr32, C65::ASL_16zr64 },
-//     { C65::ROL_8zr8,   C65::ROL_8zr16,  C65::ROL_8zr32, C65::ROL_8zr64,
-//       C65::ROL_16zr16, C65::ROL_16zr32, C65::ROL_16zr64 },
-//     { C65::LSR_8zr8,   C65::LSR_8zr16,  C65::LSR_8zr32, C65::LSR_8zr64,
-//       C65::LSR_16zr16, C65::LSR_16zr32, C65::LSR_16zr64 },
-//     { C65::ROR_8zr8,   C65::ROR_8zr16,  C65::ROR_8zr32, C65::ROR_8zr64,
-//       C65::ROR_16zr16, C65::ROR_16zr32, C65::ROR_16zr64 },
-//     { C65::DEC_8zr8,   C65::DEC_8zr16,  C65::DEC_8zr32, C65::DEC_8zr64,
-//       C65::DEC_16zr16, C65::DEC_16zr32, C65::DEC_16zr64 },
-//     { C65::INC_8zr8,   C65::INC_8zr16,  C65::INC_8zr32, C65::INC_8zr64,
-//       C65::INC_16zr16, C65::INC_16zr32, C65::INC_16zr64 },
-//     { C65::STX_8zr8,   C65::STX_8zr16,  C65::STX_8zr32, C65::STX_8zr64,
-//       C65::STX_16zr16, C65::STX_16zr32, C65::STX_16zr64 },
-//     { C65::LDX_8zr8,   C65::LDX_8zr16,  C65::LDX_8zr32, C65::LDX_8zr64,
-//       C65::LDX_16zr16, C65::LDX_16zr32, C65::LDX_16zr64 },
-//     { C65::STY_8zr8,   C65::STY_8zr16,  C65::STY_8zr32, C65::STY_8zr64,
-//       C65::STY_16zr16, C65::STY_16zr32, C65::STY_16zr64 },
-//     { C65::LDY_8zr8,   C65::LDY_8zr16,  C65::LDY_8zr32, C65::LDY_8zr64,
-//       C65::LDY_16zr16, C65::LDY_16zr32, C65::LDY_16zr64 },
-//     { C65::CPY_8zr8,   C65::CPY_8zr16,  C65::CPY_8zr32, C65::CPY_8zr64,
-//       C65::CPY_16zr16, C65::CPY_16zr32, C65::CPY_16zr64 },
-//     { C65::CPX_8zr8,   C65::CPX_8zr16,  C65::CPX_8zr32, C65::CPX_8zr64,
-//       C65::CPX_16zr16, C65::CPX_16zr32, C65::CPX_16zr64 },
-//     { C65::STZ_8zr8,   C65::STZ_8zr16,  C65::STZ_8zr32, C65::STZ_8zr64,
-//       C65::STZ_16zr16, C65::STZ_16zr32, C65::STZ_16zr64 }
-//   };
-//   unsigned Idx;
-
-//   assert(InstrClass < C65IC::INSTR_CLASS_END && "InstrClass invalid");
-
-//   if (AccSize == 1 && RegSize == 1)      Idx = 0;
-//   else if (AccSize == 1 && RegSize == 2) Idx = 1;
-//   else if (AccSize == 1 && RegSize == 4) Idx = 2;
-//   else if (AccSize == 1 && RegSize == 8) Idx = 3;
-//   else if (AccSize == 2 && RegSize == 2) Idx = 4;
-//   else if (AccSize == 2 && RegSize == 4) Idx = 5;
-//   else if (AccSize == 2 && RegSize == 8) Idx = 6;
-//   else {
-//     llvm_unreachable("Impossible accumulator and register size combination.");
-//   }
-//   return InstructionMatrix[InstrClass][Idx];
-// }
-
 struct Comparison {
   // The operands to the comparison.
   const MachineOperand Op0, Op1;
@@ -278,11 +202,11 @@ static struct Comparison getComparison(const MachineInstr *MI) {
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitBR_CC(MachineInstr *MI,
+C65TargetLowering::EmitZBRCC(MachineInstr *MI,
                              MachineBasicBlock *MBB,
                              unsigned NumBytes) const {
 
-  bool Use8Bit = NumBytes == 1 || !Subtarget->is16bit();
+  bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
   DebugLoc DL = MI->getDebugLoc();
@@ -447,75 +371,62 @@ C65TargetLowering::EmitBR_CC(MachineInstr *MI,
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitSTZz(MachineInstr *MI, MachineBasicBlock *MBB,
-                            unsigned NumBytes) const {
-  const bool Use8Bit = NumBytes == 1 || !Subtarget->is16bit();
-  const unsigned AccSize = Use8Bit ? 1 : 2;
+C65TargetLowering::EmitZST(MachineInstr *MI,
+                           MachineBasicBlock *MBB,
+                           unsigned NumBytes) const {
+  bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
+  unsigned AccSize = Use8Bit ? 1 : 2;
+
+  unsigned NumOperands = MI->getNumOperands();
+  const MachineOperand *Src = &MI->getOperand(0);
+  const MachineOperand *Op1 = &MI->getOperand(1);
+  const MachineOperand *Op2;
 
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
   const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
-  const unsigned Instr = Use8Bit ? C65::STZ_8zp : C65::STZ_16zp;
+  unsigned LDAInstr = Use8Bit ? C65::LDA_8zp : C65::LDA_16zp;
+  unsigned STAInstr;
+
   DebugLoc DL = MI->getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
-  const unsigned Reg = MI->getOperand(0).getReg();
+  bool YIndirect;
 
-  for (unsigned I = 0; I < NumBytes; I += AccSize) {
-    BuildMI(*MBB, MBBI, DL, TII->get(Instr))
-      .addImm(RI->getZRAddress(Reg) + I);
+  if (NumOperands == 2) {
+    assert(!Op1->isReg());
+
+    STAInstr = Use8Bit ? C65::STA_8i  : C65::STA_16i;
+    YIndirect = false;
+  } else /* NumOperands == 3 */ {
+    assert(Op1->isReg());
+    Op2 = &MI->getOperand(2);
+
+    STAInstr = Use8Bit ? C65::STA_8zpy16 : C65::STA_16zpy16;
+    if (Op2->isReg()) {
+      BuildMI(*MBB, MBBI, DL, TII->get(C65::LDY_16zp))
+        .addImm(RI->getZRAddress(Op2->getReg()));
+    } else {
+      BuildMI(*MBB, MBBI, DL, TII->get(C65::LDY_16imm))
+        .addImm(Op2->getImm());
+    }
+    YIndirect = true;
   }
-
-  MI->eraseFromParent();
-
-  return MBB;
-}
-
-MachineBasicBlock *
-C65TargetLowering::EmitSTzi(MachineInstr *MI, MachineBasicBlock *MBB,
-                            unsigned NumBytes) const {
-  const bool Use8Bit = NumBytes == 1 || !Subtarget->is16bit();
-  const unsigned AccSize = Use8Bit ? 1 : 2;
-
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
-  const unsigned LDAInstr = Use8Bit ? C65::LDA_8zp : C65::LDA_16zp;
-  const unsigned STAInstr = Use8Bit ? C65::STA_8i  : C65::STA_16i;
-
-  DebugLoc DL = MI->getDebugLoc();
-  MachineBasicBlock::iterator MBBI = MI;
-
-  for (unsigned I = 0; I < NumBytes; I += AccSize) {
-    BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
-      .addImm(RI->getZRAddress(MI->getOperand(0).getReg()) + I);
-    BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
-      .addDisp(MI->getOperand(1), I);
-  }
-
-  MI->eraseFromParent();
-
-  return MBB;
-}
-
-MachineBasicBlock *
-C65TargetLowering::EmitLDzi(MachineInstr *MI,
-                            MachineBasicBlock *MBB,
-                            unsigned NumBytes) const {
-  const bool Use8Bit = NumBytes == 1 || !Subtarget->is16bit();
-  const unsigned AccSize = Use8Bit ? 1 : 2;
-
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
-  const unsigned LDAInstr = Use8Bit ? C65::LDA_8i  : C65::LDA_16i;
-  const unsigned STAInstr = Use8Bit ? C65::STA_8zp : C65::STA_16zp;
-
-  DebugLoc DL = MI->getDebugLoc();
-  MachineBasicBlock::iterator MBBI = MI;
 
   for (unsigned I = 0; I < NumBytes; I += AccSize) {
     BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
-      .addDisp(MI->getOperand(1), I);
-    BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
-      .addImm(RI->getZRAddress(MI->getOperand(0).getReg()) + I);
+      .addImm(RI->getZRAddress(Src->getReg()) + I);
+    if (YIndirect) {
+      BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
+        .addImm(RI->getZRAddress(Op1->getReg()));
+    } else {
+      BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
+        .addDisp(MI->getOperand(1), I);
+    }
+    if (YIndirect && I != NumBytes - AccSize) {
+      BuildMI(*MBB, MBBI, DL, TII->get(C65::INY_16));
+      if (!Use8Bit)
+        BuildMI(*MBB, MBBI, DL, TII->get(C65::INY_16));
+    }
   }
 
   MI->eraseFromParent();
@@ -524,10 +435,74 @@ C65TargetLowering::EmitLDzi(MachineInstr *MI,
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitLDzimm(MachineInstr *MI,
+C65TargetLowering::EmitZLD(MachineInstr *MI,
+                           MachineBasicBlock *MBB,
+                           unsigned NumBytes) const {
+  bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
+  unsigned AccSize = Use8Bit ? 1 : 2;
+
+  unsigned NumOperands = MI->getNumOperands();
+  const MachineOperand *Dest = &MI->getOperand(0);
+  const MachineOperand *Op1 = &MI->getOperand(1);
+  const MachineOperand *Op2;
+
+  const C65InstrInfo *TII = Subtarget->getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  unsigned STAInstr = Use8Bit ? C65::STA_8zp : C65::STA_16zp;
+  unsigned LDAInstr;
+
+  DebugLoc DL = MI->getDebugLoc();
+  MachineBasicBlock::iterator MBBI = MI;
+
+  bool YIndirect;
+
+  if (NumOperands == 2) {
+    assert(!Op1->isReg());
+
+    LDAInstr = Use8Bit ? C65::LDA_8i  : C65::LDA_16i;
+    YIndirect = false;
+  } else /* NumOperands == 3 */ {
+    assert(Op1->isReg());
+    Op2 = &MI->getOperand(2);
+
+    LDAInstr = Use8Bit ? C65::LDA_8zpy16 : C65::LDA_16zpy16;
+    if (Op2->isReg()) {
+      BuildMI(*MBB, MBBI, DL, TII->get(C65::LDY_16zp))
+        .addImm(RI->getZRAddress(Op2->getReg()));
+    } else {
+      BuildMI(*MBB, MBBI, DL, TII->get(C65::LDY_16imm))
+        .addImm(Op2->getImm());
+    }
+    YIndirect = true;
+  }
+
+  for (unsigned I = 0; I < NumBytes; I += AccSize) {
+    if (YIndirect) {
+      BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
+        .addImm(RI->getZRAddress(Op1->getReg()));
+    } else {
+      BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
+        .addDisp(MI->getOperand(1), I);
+    }
+    BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
+      .addImm(RI->getZRAddress(Dest->getReg()) + I);
+    if (YIndirect && I != NumBytes - AccSize) {
+      BuildMI(*MBB, MBBI, DL, TII->get(C65::INY_16));
+      if (!Use8Bit)
+        BuildMI(*MBB, MBBI, DL, TII->get(C65::INY_16));
+    }
+  }
+
+  MI->eraseFromParent();
+
+  return MBB;
+}
+
+MachineBasicBlock *
+C65TargetLowering::EmitZLDimm(MachineInstr *MI,
                               MachineBasicBlock *MBB,
                               unsigned NumBytes) const {
-  const bool Use8Bit = NumBytes == 1 || !Subtarget->is16bit();
+  const bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
   const unsigned AccSize = Use8Bit ? 1 : 2;
 
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
@@ -567,7 +542,7 @@ C65TargetLowering::EmitBinaryZI(MachineInstr *MI, MachineBasicBlock *MBB,
                                 unsigned NumBytes,
                                 unsigned Instr8, unsigned Instr16,
                                 bool clc, bool stc) const {
-  const bool Use8Bit = NumBytes == 1 || !Subtarget->is16bit();
+  const bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
   const unsigned AccSize = Use8Bit ? 1 : 2;
 
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
@@ -598,10 +573,10 @@ C65TargetLowering::EmitBinaryZI(MachineInstr *MI, MachineBasicBlock *MBB,
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitMOVzz(MachineInstr *MI,
+C65TargetLowering::EmitZMOV(MachineInstr *MI,
                              MachineBasicBlock *MBB,
                              unsigned NumBytes) const {
-  const bool Use8Bit = NumBytes == 1 || !Subtarget->is16bit();
+  const bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
   const unsigned AccSize = Use8Bit ? 1 : 2;
 
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
@@ -627,61 +602,80 @@ MachineBasicBlock *
 C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
   unsigned OpSize = 1 << C65II::getZROpSize(MI->getDesc().TSFlags);
   switch (MI->getOpcode()) {
-  case C65::BRCC8zz:
-  case C65::BRCC16zz:
-  case C65::BRCC32zz:
-  case C65::BRCC64zz:
-    return EmitBR_CC(MI, MBB, OpSize);
-  case C65::STZ8z:
-  case C65::STZ16z:
-  case C65::STZ32z:
-  case C65::STZ64z:
-    return EmitSTZz(MI, MBB, OpSize);
-  case C65::ST8zi:
-  case C65::ST16zi:
-  case C65::ST32zi:
-  case C65::ST64zi:
-    return EmitSTzi(MI, MBB, OpSize);
-  case C65::LD8zi:
-  case C65::LD16zi:
-  case C65::LD32zi:
-  case C65::LD64zi:
-    return EmitLDzi(MI, MBB, OpSize);
-  case C65::LD8zimm:
-  case C65::LD16zimm:
-  case C65::LD32zimm:
-  case C65::LD64zimm:
-    return EmitLDzimm(MI, MBB, OpSize);
-  case C65::MOV8zz:
-  case C65::MOV16zz:
-  case C65::MOV32zz:
-  case C65::MOV64zz:
-    return EmitMOVzz(MI, MBB, OpSize);
-  case C65::AND8zz:
-  case C65::AND16zz:
-  case C65::AND32zz:
-  case C65::AND64zz:
+  case C65::ZBRCC_8:
+  case C65::ZBRCC_16:
+  case C65::ZBRCC_32:
+  case C65::ZBRCC_64:
+    return EmitZBRCC(MI, MBB, OpSize);
+  case C65::ZST_8zp:
+  case C65::ZST_16zp:
+  case C65::ZST_32zp:
+  case C65::ZST_64zp:
+  case C65::ZST_8i16:
+  case C65::ZST_16i16:
+  case C65::ZST_32i16:
+  case C65::ZST_64i16:
+  case C65::ZST_8iz16:
+  case C65::ZST_16iz16:
+  case C65::ZST_32iz16:
+  case C65::ZST_64iz16:
+  case C65::ZST_8zz16:
+  case C65::ZST_16zz16:
+  case C65::ZST_32zz16:
+  case C65::ZST_64zz16:
+    return EmitZST(MI, MBB, OpSize);
+  case C65::ZLD_8zp:
+  case C65::ZLD_16zp:
+  case C65::ZLD_32zp:
+  case C65::ZLD_64zp:
+  case C65::ZLD_8i16:
+  case C65::ZLD_16i16:
+  case C65::ZLD_32i16:
+  case C65::ZLD_64i16:
+  case C65::ZLD_8iz16:
+  case C65::ZLD_16iz16:
+  case C65::ZLD_32iz16:
+  case C65::ZLD_64iz16:
+  case C65::ZLD_8zz16:
+  case C65::ZLD_16zz16:
+  case C65::ZLD_32zz16:
+  case C65::ZLD_64zz16:
+    return EmitZLD(MI, MBB, OpSize);
+  case C65::ZLD_8imm:
+  case C65::ZLD_16imm:
+  case C65::ZLD_32imm:
+  case C65::ZLD_64imm:
+    return EmitZLDimm(MI, MBB, OpSize);
+  case C65::ZMOV_8:
+  case C65::ZMOV_16:
+  case C65::ZMOV_32:
+  case C65::ZMOV_64:
+    return EmitZMOV(MI, MBB, OpSize);
+  case C65::ZAND_8:
+  case C65::ZAND_16:
+  case C65::ZAND_32:
+  case C65::ZAND_64:
     return EmitBinaryZI(MI, MBB, OpSize, C65::AND_8zp, C65::AND_16zp);
-  case C65::OR8zz:
-  case C65::OR16zz:
-  case C65::OR32zz:
-  case C65::OR64zz:
+  case C65::ZOR_8:
+  case C65::ZOR_16:
+  case C65::ZOR_32:
+  case C65::ZOR_64:
     return EmitBinaryZI(MI, MBB, OpSize, C65::ORA_8zp, C65::ORA_16zp);
-  case C65::XOR8zz:
-  case C65::XOR16zz:
-  case C65::XOR32zz:
-  case C65::XOR64zz:
+  case C65::ZXOR_8:
+  case C65::ZXOR_16:
+  case C65::ZXOR_32:
+  case C65::ZXOR_64:
     return EmitBinaryZI(MI, MBB, OpSize, C65::EOR_8zp, C65::EOR_16zp);
-  case C65::ADD8zz:
-  case C65::ADD16zz:
-  case C65::ADD32zz:
-  case C65::ADD64zz:
+  case C65::ZADD_8:
+  case C65::ZADD_16:
+  case C65::ZADD_32:
+  case C65::ZADD_64:
     return EmitBinaryZI(MI, MBB, OpSize, C65::ADC_8zp, C65::ADC_16zp,
                         true, false);
-  case C65::SUB8zz:
-  case C65::SUB16zz:
-  case C65::SUB32zz:
-  case C65::SUB64zz:
+  case C65::ZSUB_8:
+  case C65::ZSUB_16:
+  case C65::ZSUB_32:
+  case C65::ZSUB_64:
     return EmitBinaryZI(MI, MBB, OpSize, C65::ADC_8zp, C65::ADC_16zp,
                         false, true);
   }

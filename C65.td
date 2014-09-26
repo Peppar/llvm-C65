@@ -11,21 +11,25 @@ include "llvm/Target/Target.td"
 // 6502 compatible subtarget features.
 //
 
-//def Mode16Bit : SubtargetFeature<"16bit-mode", "In16BitMode", "true",
-//                                 "16-bit mode (65C816)">;
-//def Mode8Bit : SubtargetFeature<"8bit-mode, "In8BitMode, "true",
-//                                "8-bit mode (6502)">;
-
+def ModeAcc8Bit  : SubtargetFeature<"acc8-mode", "InAcc8Mode", "true",
+                                    "8-bit accumulator mode">;
+def ModeAcc16Bit : SubtargetFeature<"acc16-mode", "InAcc16Mode", "true",
+                                    "16-bit accumulator mode">;
+def ModeIx8Bit   : SubtargetFeature<"ix8-mode", "InIx8Mode", "true",
+                                    "8-bit index mode">;
+def ModeIx16Bit  : SubtargetFeature<"ix16-mode", "InIx16Mode", "true",
+                                    "16-bit index mode">;
 def Feature65C02 : SubtargetFeature<"65C02", "Has65C02", "true",
                                     "Enable 65C02 instructions">;
-def Feature65C816 : SubtargetFeature<"65C816", "Has65C816", "true",
-                                    "Enable 65C816 instructions",
+def Feature65802 : SubtargetFeature<"65802", "Has65802", "true",
+                                    "Enable 65802 instructions",
                                     [Feature65C02]>;
-
-// TODO : Implement additional instructions found on some 65C02s
+def Feature65816 : SubtargetFeature<"65816", "Has65816", "true",
+                                    "Enable 65816 instructions",
+                                    [Feature65802]>;
 //def FeatureBitManip<"bit-manip", "HasBitManip", "BitManip",
-//                   "Enable Rockwell and WDC bit manipulation functions",
-//                   [Feature65C02]>;
+//                    "Enable Rockwell and WDC bit manipulation functions",
+//                    [Feature65C02]>;
 //def FeatureSTP : SubtargetFeature<"stp", "HasSTP", "true",
 //                                  "Enable STP instruction",
 //                                  [Feature65C02]>;
@@ -36,9 +40,10 @@ def Feature65C816 : SubtargetFeature<"65C816", "Has65C816", "true",
 class Proc<string Name, list<SubtargetFeature> Features>
   : Processor<Name, NoItineraries, Features>;
 
-def : Proc<"6502",   []>;
-def : Proc<"65C02",  [Feature65C02]>;
-def : Proc<"65C816", [Feature65C816]>;
+def : Proc<"6502",  []>;
+def : Proc<"65C02", [Feature65C02]>;
+def : Proc<"65802", [Feature65802]>;
+def : Proc<"65816", [Feature65816]>;
 
 //===----------------------------------------------------------------------===//
 // Register File, Calling Conv, Instruction Descriptions
@@ -46,7 +51,6 @@ def : Proc<"65C816", [Feature65C816]>;
 
 include "C65RegisterInfo.td"
 include "C65CallingConv.td"
-
 include "C65InstrInfo.td"
 
 def C65InstrInfo : InstrInfo;

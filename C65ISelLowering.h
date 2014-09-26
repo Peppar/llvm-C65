@@ -69,22 +69,18 @@ namespace llvm {
       EmitBinaryZI(MachineInstr *MI, MachineBasicBlock *MBB,
                    unsigned NumBytes, unsigned Instr8, unsigned Instr16,
                    bool clc = false, bool stc = false) const;
-    MachineBasicBlock *EmitBR_CC(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZBRCC(MachineInstr *MI, MachineBasicBlock *MBB,
                                  unsigned NumBytes) const;
-    MachineBasicBlock *EmitSTZz(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZST(MachineInstr *MI, MachineBasicBlock *MBB,
                                 unsigned NumBytes) const;
-    MachineBasicBlock *EmitSTzi(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZLD(MachineInstr *MI, MachineBasicBlock *MBB,
                                 unsigned NumBytes) const;
-    MachineBasicBlock *EmitLDzi(MachineInstr *MI, MachineBasicBlock *MBB,
-                                unsigned NumBytes) const;
-    MachineBasicBlock *EmitLDzimm(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZLDimm(MachineInstr *MI, MachineBasicBlock *MBB,
                                   unsigned NumBytes) const;
-    MachineBasicBlock *EmitMOVzz(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZMOV(MachineInstr *MI, MachineBasicBlock *MBB,
                                  unsigned NumBytes) const;
-
     MachineBasicBlock *EmitZInstr(MachineInstr *MI,
                                   MachineBasicBlock *MBB) const;
-
     MachineBasicBlock *
       EmitInstrWithCustomInserter(MachineInstr *MI,
                                   MachineBasicBlock *MBB) const override;

@@ -47,11 +47,6 @@ namespace {
 
     void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
 
-    void printMemOperandAbs(const MachineInstr *MI, int opNum,
-                            raw_ostream &OS, const char *Modifier = nullptr);
-    void printMemOperandIndex(const MachineInstr *MI, int opNum,
-                              raw_ostream &OS, const char *Modifier = nullptr);
-
     MCOperand LowerSymbolOperand(const MachineOperand &MO);
 
     MCOperand LowerOperand(const MachineOperand &MO);

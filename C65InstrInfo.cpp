@@ -268,46 +268,13 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
     }
 
     unsigned Opcode = I->getOpcode();
-    if (Opcode != C65::BRCC8zz &&
-        Opcode != C65::BRCC16zz &&
-        Opcode != C65::BRCC32zz &&
-        Opcode != C65::BRCC64zz)
+    if (Opcode != C65::ZBRCC_8 &&
+        Opcode != C65::ZBRCC_16 &&
+        Opcode != C65::ZBRCC_32 &&
+        Opcode != C65::ZBRCC_64)
       return true; // Unknown Opcode.
 
     if (Cond.empty()) {
-      // MachineBasicBlock *TargetBB = I->getOperand(0).getMBB();
-      // if (AllowModify && UnCondBrIter != MBB.end() &&
-      //     MBB.isLayoutSuccessor(TargetBB)) {
-
-      //   // Transform the code
-      //   //
-      //   //    brCC L1
-      //   //    ba L2
-      //   // L1:
-      //   //    ..
-      //   // L2:
-      //   //
-      //   // into
-      //   //
-      //   //   brnCC L2
-      //   // L1:
-      //   //   ...
-      //   // L2:
-      //   //
-      //   BranchCode = GetOppositeBranchCondition(BranchCode);
-      //   MachineBasicBlock::iterator OldInst = I;
-      //   BuildMI(MBB, UnCondBrIter, MBB.findDebugLoc(I), get(Opcode))
-      //     .addMBB(UnCondBrIter->getOperand(0).getMBB()).addImm(BranchCode);
-      //   BuildMI(MBB, UnCondBrIter, MBB.findDebugLoc(I), get(SP::BA))
-      //     .addMBB(TargetBB);
-
-      //   OldInst->eraseFromParent();
-      //   UnCondBrIter->eraseFromParent();
-
-      //   UnCondBrIter = MBB.end();
-      //   I = MBB.end();
-      //   continue;
-      // }
       FBB = TBB;
       Cond.push_back(I->getOperand(0));
       Cond.push_back(I->getOperand(1));
@@ -331,9 +298,9 @@ unsigned C65InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
     while (I->isDebugValue())
       continue;
 
-    if (I->getOpcode() != C65::JMP && I->getOpcode() != C65::BRCC8zz &&
-        I->getOpcode() != C65::BRCC16zz && I->getOpcode() != C65::BRCC32zz &&
-        I->getOpcode() != C65::BRCC64zz)
+    if (I->getOpcode() != C65::JMP && I->getOpcode() != C65::ZBRCC_8 &&
+        I->getOpcode() != C65::ZBRCC_16 && I->getOpcode() != C65::ZBRCC_32 &&
+        I->getOpcode() != C65::ZBRCC_64)
       break;
 
     I->eraseFromParent();
@@ -361,13 +328,13 @@ C65InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
   unsigned Instr;
 
   if (C65::ZRC8RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::BRCC8zz;
+    Instr = C65::ZBRCC_8;
   else if (C65::ZRC16RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::BRCC16zz;
+    Instr = C65::ZBRCC_16;
   else if (C65::ZRC32RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::BRCC32zz;
+    Instr = C65::ZBRCC_32;
   else if (C65::ZRC64RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::BRCC64zz;
+    Instr = C65::ZBRCC_64;
   else
     llvm_unreachable("Unexpected BRCC operands.");
 

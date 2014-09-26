@@ -34,10 +34,14 @@ class StringRef;
 class C65Subtarget : public C65GenSubtargetInfo {
   virtual void anchor();
 protected:
+  bool InAcc8Mode;
+  bool InAcc16Mode;
+  bool InIx8Mode;
+  bool InIx16Mode;
   bool Has65C02;
-  bool Has65C816;
+  bool Has65802;
+  bool Has65816;
   C65Subtarget &initializeSubtargetDependencies(StringRef CPU, StringRef FS);
-
 private:
   Triple TargetTriple;
   const DataLayout DL;
@@ -75,12 +79,23 @@ public:
   // Return true if the target has 65C02 capabilities
   bool has65C02() const { return Has65C02; }
 
-  // Return true if the target has 65C816 capabilities
-  bool has65C816() const { return Has65C816; }
+  // Return true if the target has 65802 capabilities
+  bool has65802() const { return Has65802; }
 
-  // Return true if the target has a 16-bit accumulator
-  bool is16bit() const { return true; }
-    //return Has65C816; }
+  // Return true if the target has 65816 capabilities
+  bool has65816() const { return Has65816; }
+
+  // Return true if the accumulator register is currently 8-bit
+  bool isAcc8Bit() const { return InAcc8Mode; }
+
+  // Return true if the accumulator register is currently 16-bit
+  bool isAcc16bit() const { return InAcc16Mode; }
+
+  // Return true if the index registers are currently 8-bit
+  bool isIx8Bit() const { return InIx8Mode; }
+
+  // Return true if the index registers are currently 16-bit
+  bool isIx16bit() const { return InIx16Mode; }
 };
 } // end namespace llvm
 
