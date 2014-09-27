@@ -246,3 +246,8 @@ Edge_8BIT->Entry_16BIT not OK
 #11 0x0000000000621d67 in compileModule (argv=0x7fffffffeac8, Context=...)
     at /home/peppar/llvm/tools/llc/llc.cpp:364
 #12 0x0000000000620df2 in main (argc=5, argv=0x7fffffffeac8) at /home/peppar/llvm/tools/llc/llc.c
+
+
+BREAKING NEWS: Instruction mnemonics must be specified in lower-case,
+otherwise the generated instruction matcher will fail to match
+incoming operands..!
