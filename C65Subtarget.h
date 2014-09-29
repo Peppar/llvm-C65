@@ -89,13 +89,13 @@ public:
   bool isAcc8Bit() const { return InAcc8Mode; }
 
   // Return true if the accumulator register is currently 16-bit
-  bool isAcc16bit() const { return InAcc16Mode; }
+  bool isAcc16Bit() const { return InAcc16Mode; }
 
   // Return true if the index registers are currently 8-bit
   bool isIx8Bit() const { return InIx8Mode; }
 
   // Return true if the index registers are currently 16-bit
-  bool isIx16bit() const { return InIx16Mode; }
+  bool isIx16Bit() const { return InIx16Mode; }
 };
 } // end namespace llvm
 

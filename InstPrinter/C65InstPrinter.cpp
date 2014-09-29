@@ -138,8 +138,8 @@ void C65InstPrinter::printZPYOperand(const MCInst *MI, int OpNum,
                                      raw_ostream &OS) {
   return printAddress(MI, OpNum, 0, 'Y', 0, 8, OS);
 }
-void C65InstPrinter::printZPPostIXOperand(const MCInst *MI, int OpNum,
-                                          raw_ostream &OS) {
+void C65InstPrinter::printZPPreIXOperand(const MCInst *MI, int OpNum,
+                                         raw_ostream &OS) {
   return printAddress(MI, OpNum, 1, 'X', 0, 8, OS);
 }
 void C65InstPrinter::printZPIndOperand(const MCInst *MI, int OpNum,

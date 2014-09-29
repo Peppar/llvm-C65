@@ -51,7 +51,7 @@ public:
   void printZPOperand(const MCInst *MI, int OpNum, raw_ostream &OS);
   void printZPXOperand(const MCInst *MI, int OpNum, raw_ostream &OS);
   void printZPYOperand(const MCInst *MI, int OpNum, raw_ostream &OS);
-  void printZPPostIXOperand(const MCInst *MI, int OpNum, raw_ostream &OS);
+  void printZPPreIXOperand(const MCInst *MI, int OpNum, raw_ostream &OS);
   void printZPIndOperand(const MCInst *MI, int OpNum, raw_ostream &OS);
   void printDPIndLOperand(const MCInst *MI, int OpNum, raw_ostream &OS);
   void printZPPostIYOperand(const MCInst *MI, int OpNum, raw_ostream &OS);

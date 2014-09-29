@@ -220,7 +220,7 @@ bool C65DAGToDAGISel::SelectAddrRR(SDValue Addr, SDValue &R1,
     ConstantSDNode *CN;
     FrameIndexSDNode *FIN;
     if ((CN = dyn_cast<ConstantSDNode>(Addr.getOperand(1)))) {
-      // Constant, let reg16 + imm16 capture this.
+      // Constant offset, let reg16 + imm16 capture this.
     } else if ((FIN = dyn_cast<FrameIndexSDNode>(Addr.getOperand(0)))) {
       // Constant offset from frame ref.
     } else {

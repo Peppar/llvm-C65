@@ -99,11 +99,11 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   }
 
   if (NumBytes == 1 || ByteCapacity == 1) {
-    LDAInstr = C65::LDA_8zp;
-    STAInstr = C65::STA_8zp;
+    LDAInstr = C65::LDA8zp;
+    STAInstr = C65::STA8zp;
   } else {
-    LDAInstr = C65::LDA_16zp;
-    STAInstr = C65::STA_16zp;
+    LDAInstr = C65::LDA16zp;
+    STAInstr = C65::STA16zp;
   }
 
   for (unsigned I = 0; I < NumBytes; I += ByteCapacity) {
@@ -222,8 +222,6 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
                                  MachineBasicBlock *&FBB,
                                  SmallVectorImpl<MachineOperand> &Cond,
                                  bool AllowModify) const {
-
-
   MachineBasicBlock::iterator I = MBB.end();
   MachineBasicBlock::iterator UnCondBrIter = MBB.end();
   while (I != MBB.begin()) {
@@ -241,7 +239,10 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
       return true;
 
     // Handle Unconditional branches.
-    if (I->getOpcode() == C65::JMP) {
+    if (I->getOpcode() == C65::BRA ||
+        I->getOpcode() == C65::BRL ||
+        I->getOpcode() == C65::JMPabs ||
+        I->getOpcode() == C65::JMLabsl) {
       UnCondBrIter = I;
 
       if (!AllowModify) {
@@ -268,10 +269,10 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
     }
 
     unsigned Opcode = I->getOpcode();
-    if (Opcode != C65::ZBRCC_8 &&
-        Opcode != C65::ZBRCC_16 &&
-        Opcode != C65::ZBRCC_32 &&
-        Opcode != C65::ZBRCC_64)
+    if (Opcode != C65::ZBRCC8 &&
+        Opcode != C65::ZBRCC16 &&
+        Opcode != C65::ZBRCC32 &&
+        Opcode != C65::ZBRCC64)
       return true; // Unknown Opcode.
 
     if (Cond.empty()) {
@@ -298,9 +299,10 @@ unsigned C65InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
     while (I->isDebugValue())
       continue;
 
-    if (I->getOpcode() != C65::JMP && I->getOpcode() != C65::ZBRCC_8 &&
-        I->getOpcode() != C65::ZBRCC_16 && I->getOpcode() != C65::ZBRCC_32 &&
-        I->getOpcode() != C65::ZBRCC_64)
+    if (I->getOpcode() != C65::BRA && I->getOpcode() != C65::BRL &&
+        I->getOpcode() != C65::JMPabs && I->getOpcode() != C65::JMLabsl &&
+        I->getOpcode() != C65::ZBRCC8 && I->getOpcode() != C65::ZBRCC16 &&
+        I->getOpcode() != C65::ZBRCC32 && I->getOpcode() != C65::ZBRCC64)
       break;
 
     I->eraseFromParent();
@@ -321,20 +323,20 @@ C65InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
 
   if(Cond.empty()) {
     assert(!FBB && "Unconditional branch with multiple successors!");
-    BuildMI(&MBB, DL, get(C65::JMP)).addMBB(TBB);
+    BuildMI(&MBB, DL, get(C65::JMPabs)).addMBB(TBB);
     return 1;
   }
 
   unsigned Instr;
 
   if (C65::ZRC8RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::ZBRCC_8;
+    Instr = C65::ZBRCC8;
   else if (C65::ZRC16RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::ZBRCC_16;
+    Instr = C65::ZBRCC16;
   else if (C65::ZRC32RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::ZBRCC_32;
+    Instr = C65::ZBRCC32;
   else if (C65::ZRC64RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::ZBRCC_64;
+    Instr = C65::ZBRCC64;
   else
     llvm_unreachable("Unexpected BRCC operands.");
 
@@ -347,6 +349,6 @@ C65InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
   if (!FBB)
     return 1;
 
-  BuildMI(&MBB, DL, get(C65::JMP)).addMBB(FBB);
+  BuildMI(&MBB, DL, get(C65::JMPabs)).addMBB(FBB);
   return 2;
 }

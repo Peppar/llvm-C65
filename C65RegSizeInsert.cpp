@@ -82,6 +82,36 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
         ++MBBI;
       }
     }
+    for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
+         MBBI != MBBE; ) {
+      MachineInstr *MI = MBBI++;
+      DebugLoc DL = MI->getDebugLoc();
+      if (MI->getOpcode() == C65::REP) {
+        if (MI->getOperand(0).isImm()) {
+          unsigned Reset = MI->getOperand(0).getImm();
+          if (Reset & 0x20) {
+            MBBI = BuildMI(*MBB, std::next(MBBI), DL, TII->get(C65::LONGA_ON));
+            ++MBBI;
+          }
+          if (Reset & 0x10) {
+            MBBI = BuildMI(*MBB, std::next(MBBI), DL, TII->get(C65::LONGI_ON));
+            ++MBBI;
+          }
+        }
+      } else if (MI->getOpcode() == C65::SEP) {
+        if (MI->getOperand(0).isImm()) {
+          unsigned Set = MI->getOperand(0).getImm();
+          if (Set & 0x20) {
+            BuildMI(*MBB, std::next(MBBI), DL, TII->get(C65::LONGA_OFF));
+            ++MBBI;
+          }
+          if (Set & 0x10) {
+            BuildMI(*MBB, std::next(MBBI), DL, TII->get(C65::LONGI_OFF));
+            ++MBBI;
+          }
+        }
+      }
+    }
   }
 
   return Changed;

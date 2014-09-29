@@ -32,10 +32,28 @@ C65Subtarget &
 C65Subtarget::initializeSubtargetDependencies(StringRef CPU, StringRef FS) {
   std::string CPUName = CPU;
   if (CPUName.empty()) {
-    CPUName = "generic";
+    CPUName = "65816";
   }
   // Parse features string.
   ParseSubtargetFeatures(CPUName, FS);
+
+  // Default to 8-bit accumulator and index registers
+  if (!InAcc8Mode && !InAcc16Mode)
+    InAcc8Mode = true;
+  if (!InIx8Mode && !InIx16Mode)
+    InIx8Mode = true;
+
+  // It's important to keep the MCSubtargetInfo feature bits in sync with
+  // target data structure which is shared with MC code emitter, etc.
+  if (InAcc8Mode)
+    ToggleFeature(C65::ModeAcc8Bit);
+  if (InAcc16Mode)
+    ToggleFeature(C65::ModeAcc16Bit);
+  if (InIx8Mode)
+    ToggleFeature(C65::ModeIx8Bit);
+  if (InIx16Mode)
+    ToggleFeature(C65::ModeIx16Bit);
+
   return *this;
 }
 

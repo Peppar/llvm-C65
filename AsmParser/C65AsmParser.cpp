@@ -212,13 +212,32 @@ private:
   MCSubtargetInfo &STI;
   MCAsmParser &Parser;
 
-  //  bool parseAddress(unsigned &Base, const MCExpr *&Disp,
-  //                    unsigned &Index, const MCExpr *&Length,
-  //                    const unsigned *Regs, RegisterKind RegKind);
+  // This structure is used to parse all possible addresses once,
+  // since they are impossible to distinguish without either a
+  // backtracking lexer or extended peeking capabilities.
+  struct C65AddressMatch {
+    SMLoc StartLoc, EndLoc;
+    bool Valid, Lexed, Match;
+    const MCExpr *Addr;
+    unsigned Indirection;
+    unsigned LengthConstraint;
+    char PreIndexReg;
+    char PostIndexReg;
+  } AddressMatch;
 
-  //  OperandMatchResultTy parseAddress(OperandVector &Operands,
-  //                                    const unsigned *Regs, RegisterKind RegKind,
-  //                                    MemoryKind MemKind);
+  // This function is used to parse an address structure.
+  OperandMatchResultTy
+  parseAddress();
+
+  OperandMatchResultTy
+  parseAddress(OperandVector &Operands, MemoryKind MemKind,
+               unsigned Length, bool AllowZExt, unsigned Indirection,
+               char PreIndexReg, char PostIndexReg);
+
+  bool matchRegister(char Reg);
+
+  bool parseRegister(char &Reg);
+
   bool parseOperand(OperandVector &Operands, StringRef Mnemonic);
 
 public:
@@ -240,17 +259,6 @@ public:
                                OperandVector &Operands, MCStreamer &Out,
                                uint64_t &ErrorInfo,
                                bool MatchingInlineAsm) override;
-
-  OperandMatchResultTy
-  parseAddress(OperandVector &Operands, MemoryKind MemKind,
-               unsigned Length, bool AllowZExt, unsigned Indirection,
-               char PreIndexReg, char PostIndexReg);
-
-  bool matchRegister(char Reg);
-
-  bool parseAddress(const MCExpr *&Addr, unsigned Length,
-                    bool AllowZExt, unsigned Indirection,
-                    char PreIndexReg, char PostIndexReg);
 
   // Used by the TableGen code to parse particular operand types.
   OperandMatchResultTy parsePCRel8Operand(OperandVector &Operands) {
@@ -357,19 +365,71 @@ public:
 #include "C65GenAsmMatcher.inc"
 
 void C65Operand::print(raw_ostream &OS) const {
-  llvm_unreachable("Not implemented");
+  if (isMem()) {
+    switch(Mem.Kind) {
+    case MemPCRel8: OS << "PCRel8"; break;
+    case MemPCRel16: OS << "PCRel16"; break;
+    case MemAbs: OS << "Abs"; break;
+    case MemAbsX: OS << "AbsX"; break;
+    case MemAbsY: OS << "AbsY"; break;
+    case MemAbsPreIX: OS << "AbsPreIX"; break;
+    case MemAbsInd: OS << "AbsInd"; break;
+    case MemAbsIndL: OS << "AbsIndL"; break;
+    case MemAbsL: OS << "AbsL"; break;
+    case MemAbsXL: OS << "AbsXL"; break;
+    case MemZP: OS << "ZP"; break;
+    case MemZPX: OS << "ZPX"; break;
+    case MemZPY: OS << "ZPY"; break;
+    case MemZPPreIX: OS << "ZPPreIX"; break;
+    case MemZPInd: OS << "ZPInd"; break;
+    case MemDPIndL: OS << "DPIndL"; break;
+    case MemZPPostIY: OS << "ZPPostIY"; break;
+    case MemDPPostIYL: OS << "DPPostIYL"; break;
+    case MemSRel: OS << "SRel"; break;
+    case MemSPostIY: OS << "SPostIY"; break;
+    case MemIZ: OS << "IZ"; break;
+    case MemZZ: OS << "ZZ"; break;
+    default: llvm_unreachable("Unexpected memory kind.");
+    }
+    OS << "(";
+    getMemAddr()->print(OS);
+    OS << ")";
+  } else if (isImm()) {
+    OS << '#';
+    getImm()->print(OS);
+  } else if (isToken()) {
+    OS << getToken();
+  } else {
+    llvm_unreachable("Unexpected operand type.");
+  }
 }
 
-bool C65AsmParser::matchRegister(char Reg) {
-  // Expect a register name.
-  if (Parser.getTok().isNot(AsmToken::Identifier))
-    return true;
+// bool C65AsmParser::matchRegister(char Reg) {
+//   // Expect a register name.
+//   if (Parser.getTok().isNot(AsmToken::Identifier))
+//     return true;
 
-  // Check that there's a prefix.
-  StringRef Name = Parser.getTok().getString();
-  if (Name.size() != 1 || Name[0] != Reg)
-    return true;
+//   // Check that there's a prefix.
+//   StringRef Name = Parser.getTok().getString();
+//   if (Name.size() != 1 || Name[0] != Reg)
+//     return true;
 
+//   Parser.Lex();
+//   return false;
+// }
+
+bool C65AsmParser::parseRegister(char &Reg) {
+  if (Parser.getTok().isNot(AsmToken::Identifier)) {
+    return Error(Parser.getTok().getLoc(), "expected identifier");
+  }
+  Reg = StringSwitch<char>(Parser.getTok().getString())
+    .Cases("x", "X", 'X')
+    .Cases("y", "Y", 'Y')
+    .Cases("s", "S", 'S')
+    .Default(0);
+  if (!Reg) {
+    return Error(Parser.getTok().getLoc(), "expected indexing register name");
+  }
   Parser.Lex();
   return false;
 }
@@ -379,87 +439,153 @@ bool C65AsmParser::matchRegister(char Reg) {
 // indicated with parentheses, while an indirection of 2 implies a
 // 24-bit indirection, indicated with brackets.
 //
-bool C65AsmParser::parseAddress(const MCExpr *&Addr, unsigned Length,
-                                bool AllowZExt, unsigned Indirection,
-                                char PreIndexReg, char PostIndexReg) {
-  unsigned LengthConstraint;
+C65AsmParser::OperandMatchResultTy
+C65AsmParser::parseAddress() {
+  if (AddressMatch.Valid) {
+    if (AddressMatch.Match)
+      return MatchOperand_Success;
+    else
+      return MatchOperand_NoMatch;
+  }
+  AddressMatch.StartLoc = Parser.getTok().getLoc();
+  AddressMatch.Valid = true;
+  AddressMatch.Lexed = false;
+  AddressMatch.Match = false;
 
+  // Hash indicates immediate constant
+  if (getLexer().is(AsmToken::Hash))
+    return MatchOperand_NoMatch;
   // Opening parenthesis or bracket
-  if (Indirection == 1) {
-    if (!getLexer().is(AsmToken::LParen))
-      return true;
-  } else if (Indirection == 2) {
-    if (!getLexer().is(AsmToken::LBrac))
-      return true;
+  if (getLexer().is(AsmToken::LParen)) {
+    AddressMatch.Indirection = 1;
+    Parser.Lex();
+  } else if (getLexer().is(AsmToken::LBrac)) {
+    AddressMatch.Indirection = 2;
+    Parser.Lex();
+  } else {
+    AddressMatch.Indirection = 0;
   }
   // Length contraint token
   if (getLexer().is(AsmToken::Less)) {
-    LengthConstraint = 8;
+    AddressMatch.LengthConstraint = 8;
     Parser.Lex();
   } else if (getLexer().is(AsmToken::Exclaim)) {
-    LengthConstraint = 16;
+    AddressMatch.LengthConstraint = 16;
     Parser.Lex();
   } else if (getLexer().is(AsmToken::Greater)) {
-    LengthConstraint = 24;
+    AddressMatch.LengthConstraint = 24;
     Parser.Lex();
+  } else {
+    AddressMatch.LengthConstraint = 0;
   }
+  AddressMatch.Lexed = true;
   // Parse the address
-  if (getParser().parseExpression(Addr))
-    return true;
-  int64_t Address;
-  if (LengthConstraint && LengthConstraint != Length) {
-    return true;
-  } else if (Addr->EvaluateAsAbsolute(Address) && Address >= 0) {
-    if (Address >= (1 << Length))
-      return true;
-    if (!AllowZExt && !(Address >> (Length - 8)))
-      return true;
-  }
+  if (getParser().parseExpression(AddressMatch.Addr))
+    return MatchOperand_ParseFail;
   // Pre-index register
-  if (PreIndexReg) {
-    if (!getLexer().is(AsmToken::Comma))
-      return true;
-    if (matchRegister(PreIndexReg))
-      return true;
+  if (getLexer().is(AsmToken::Comma)) {
+    Parser.Lex();
+    if (parseRegister(AddressMatch.PreIndexReg))
+      return MatchOperand_ParseFail;
+  } else {
+    AddressMatch.PreIndexReg = 0;
   }
   // Closing parenthesis or bracket
-  if (Indirection == 1) {
-    if (!getLexer().is(AsmToken::RParen))
-      return true;
-  } else if (Indirection == 2) {
-    if (!getLexer().is(AsmToken::RBrac))
-      return true;
+  if (AddressMatch.Indirection == 1) {
+    if (!getLexer().is(AsmToken::RParen)) {
+      Error(Parser.getTok().getLoc(), "expected closing parenthesis ')'");
+      return MatchOperand_ParseFail;
+    }
+    Parser.Lex();
+  } else if (AddressMatch.Indirection == 2) {
+    if (!getLexer().is(AsmToken::RBrac)) {
+      Error(Parser.getTok().getLoc(), "expected closing bracket ']'");
+      return MatchOperand_ParseFail;
+    }
+    Parser.Lex();
   }
   // Post-index register
-  if (PostIndexReg) {
-    if (!getLexer().is(AsmToken::Comma))
-      return true;
-    if (matchRegister(PostIndexReg))
-      return true;
+  if (getLexer().is(AsmToken::Comma)) {
+    Parser.Lex();
+    if (parseRegister(AddressMatch.PostIndexReg))
+      return MatchOperand_ParseFail;
+  } else {
+    AddressMatch.PostIndexReg = 0;
   }
-  return false;
+  AddressMatch.EndLoc =
+    SMLoc::getFromPointer(Parser.getTok().getLoc().getPointer() - 1);
+  AddressMatch.Match = true;
+  return MatchOperand_Success;
 }
 
-// Parse a memory operand and add it to Operands.  The other arguments
-// are as above.
+// Parse a memory operand and add it to Operands.
 C65AsmParser::OperandMatchResultTy
 C65AsmParser::parseAddress(OperandVector &Operands, MemoryKind MemKind,
-                           unsigned Length,
-                           bool AllowZExt, unsigned Indirection,
-                           char PreIndexReg, char PostIndexReg) {
-  SMLoc StartLoc = Parser.getTok().getLoc();
-  const MCExpr *Addr;
-  if (parseAddress(Addr, Length, AllowZExt,
-                   Indirection, PreIndexReg, PostIndexReg))
-    return MatchOperand_ParseFail;
+                           unsigned Length, bool AllowZExt,
+                           unsigned Indirection, char PreIndexReg,
+                           char PostIndexReg) {
+  OperandMatchResultTy Result;
 
-  SMLoc EndLoc =
-    SMLoc::getFromPointer(Parser.getTok().getLoc().getPointer() - 1);
-  Operands.push_back(C65Operand::createMem(Addr, MemKind, StartLoc, EndLoc));
+  Result = parseAddress();
+  if (Result == MatchOperand_ParseFail ||
+      Result == MatchOperand_NoMatch)
+    return Result;
+
+  if (Indirection != AddressMatch.Indirection ||
+      PreIndexReg != AddressMatch.PreIndexReg ||
+      PostIndexReg != AddressMatch.PostIndexReg)
+    return MatchOperand_NoMatch;
+
+  int64_t Address;
+  if (AddressMatch.LengthConstraint) {
+    if (AddressMatch.LengthConstraint != Length)
+      return MatchOperand_NoMatch;
+  } else if (AddressMatch.Addr->EvaluateAsAbsolute(Address) && Address >= 0) {
+    if (Address >= (1 << Length))
+      return MatchOperand_NoMatch;
+    if (!AllowZExt && !(Address >> (Length - 8)))
+      return MatchOperand_NoMatch;
+  }
+
+  Operands.push_back(C65Operand::createMem(AddressMatch.Addr, MemKind,
+                                           AddressMatch.StartLoc,
+                                           AddressMatch.EndLoc));
   return MatchOperand_Success;
 }
 
 bool C65AsmParser::ParseDirective(AsmToken DirectiveID) {
+  StringRef IDVal = DirectiveID.getIdentifier();
+  if (IDVal == ".accu") {
+    StringRef Size = Parser.getTok().getString();
+    if (Size == "8") {
+      Parser.Lex();
+      if (!isAcc8Bit())
+        SwitchAccMode(C65::ModeAcc8Bit);
+      return false;
+    } else if (Size == "16") {
+      Parser.Lex();
+      if (!isAcc16Bit())
+        SwitchAccMode(C65::ModeAcc16Bit);
+      return false;
+    } else {
+      return Error(Parser.getTok().getLoc(), "expected 8 or 16");
+    }
+  } else if (IDVal == ".index") {
+    StringRef Size = Parser.getTok().getString();
+    if (Size == "8") {
+      Parser.Lex();
+      if (!isIx8Bit())
+        SwitchIxMode(C65::ModeIx8Bit);
+      return false;
+    } else if (Size == "16") {
+      Parser.Lex();
+      if (!isIx16Bit())
+        SwitchIxMode(C65::ModeIx16Bit);
+      return false;
+    } else {
+      return Error(Parser.getTok().getLoc(), "expected 8 or 16");
+    }
+  }
   return true;
 }
 
@@ -503,40 +629,43 @@ bool C65AsmParser::ParseInstruction(ParseInstructionInfo &Info,
 
 bool C65AsmParser::parseOperand(OperandVector &Operands,
                                 StringRef Mnemonic) {
-  // Check if the current operand has a custom associated parser, if so, try to
-  // custom parse the operand, or fallback to the general approach.
+  // New operand; force a new address to be parsed if requested.
+  AddressMatch.Valid = false;
+
+  // Check if the current operand has a custom associated parser. The
+  // custom associated parsers used by C65 are all addresses; the
+  // first one called will fill out the AddressMatch structure.
   OperandMatchResultTy ResTy = MatchOperandParserImpl(Operands, Mnemonic);
   if (ResTy == MatchOperand_Success)
     return false;
+
+  // If there was a parse fail, we need to exit now, since we have
+  // already supplied an appropriate error.
+  if (ResTy == MatchOperand_ParseFail)
+    return true;
+
+  // If we consumed tokens to parse an address, and none of the custom
+  // parser matched it, then we need to flag this as a match
+  // fail. Otherwise, try parsing an immediate operand below.
+  if (AddressMatch.Valid && AddressMatch.Lexed) {
+    return Error(AddressMatch.StartLoc,
+                 "instruction does not support this addressing mode");
+  }
+
+  // The only remaining possibility is an immediate operand, starting
+  // with a hash.
+  if (Parser.getTok().is(AsmToken::Hash)) {
+    Parser.Lex();
+    SMLoc StartLoc = Parser.getTok().getLoc();
+    const MCExpr *Expr;
+    if (getParser().parseExpression(Expr))
+      return true;
+    SMLoc EndLoc =
+      SMLoc::getFromPointer(Parser.getTok().getLoc().getPointer() - 1);
+    Operands.push_back(C65Operand::createImm(Expr, StartLoc, EndLoc));
+    return false;
+  }
   return true;
-  // if (ResTy == MatchOperand_ParseFail)
-  //   return true;
-
-  // If there wasn't a custom match, try the generic matcher below. Otherwise,
-  // there was a match, but an error occurred, in which case, just return that
-  // the operand parsing failed.
-
-  // C65 doesn't have explicit registers; they are always part of
-  // addressing modes.
-  // if (Parser.getTok().is(AsmToken::Percent))
-  //   return true;
-
-  // The only other type of operand is an immediate or address.  As above,
-  // real address operands should have used a context-dependent parse routine,
-  // so we treat any plain expression as an immediate.
-  //  SMLoc StartLoc = Parser.getTok().getLoc();
-  //  unsigned Base, Index;
-  //  const MCExpr *Expr, *Length;
-  //  if (parseAddress(Base, Expr, Index, Length, C65MC::GR64Regs, ADDR64Reg))
-  //    return true;
-
-  // SMLoc EndLoc =
-  //   SMLoc::getFromPointer(Parser.getTok().getLoc().getPointer() - 1);
-  // if (Base || Index || Length)
-  //   Operands.push_back(C65Operand::createInvalid(StartLoc, EndLoc));
-  // else
-  //   Operands.push_back(C65Operand::createImm(Expr, StartLoc, EndLoc));
-  // return false;
 }
 
 bool C65AsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
@@ -554,6 +683,17 @@ bool C65AsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
   case Match_Success:
     Inst.setLoc(IDLoc);
     Out.EmitInstruction(Inst, STI);
+    // Accumulator and index register size selection directives for
+    // 65802 and 65816
+    if (Inst.getOpcode() == C65::LONGA_ON) {
+      SwitchAccMode(C65::ModeAcc16Bit);
+    } else if (Inst.getOpcode() == C65::LONGA_OFF) {
+      SwitchAccMode(C65::ModeAcc8Bit);
+    } else if (Inst.getOpcode() == C65::LONGI_ON) {
+      SwitchIxMode(C65::ModeIx16Bit);
+    } else if (Inst.getOpcode() == C65::LONGI_OFF) {
+      SwitchIxMode(C65::ModeIx8Bit);
+    }
     return false;
 
   case Match_MissingFeature: {

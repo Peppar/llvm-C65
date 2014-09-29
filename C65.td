@@ -8,7 +8,7 @@
 include "llvm/Target/Target.td"
 
 //===----------------------------------------------------------------------===//
-// 6502 compatible subtarget features.
+// 6502 subtarget state
 //
 
 def ModeAcc8Bit  : SubtargetFeature<"acc8-mode", "InAcc8Mode", "true",
@@ -19,11 +19,16 @@ def ModeIx8Bit   : SubtargetFeature<"ix8-mode", "InIx8Mode", "true",
                                     "8-bit index mode">;
 def ModeIx16Bit  : SubtargetFeature<"ix16-mode", "InIx16Mode", "true",
                                     "16-bit index mode">;
+
+//===----------------------------------------------------------------------===//
+// 6502 subtarget features.
+//
+
 def Feature65C02 : SubtargetFeature<"65C02", "Has65C02", "true",
                                     "Enable 65C02 instructions">;
 def Feature65802 : SubtargetFeature<"65802", "Has65802", "true",
                                     "Enable 65802 instructions",
-                                    [Feature65C02]>;
+                                    [Feature65C02, ModeAcc16Bit, ModeIx16Bit]>;
 def Feature65816 : SubtargetFeature<"65816", "Has65816", "true",
                                     "Enable 65816 instructions",
                                     [Feature65802]>;
