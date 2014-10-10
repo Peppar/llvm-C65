@@ -49,7 +49,8 @@ namespace llvm {
   public:
     C65TargetLowering(TargetMachine &TM);
 
-    SDValue lowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerShift(SDValue Op, SelectionDAG &DAG) const;
 
     SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
 
@@ -72,9 +73,13 @@ namespace llvm {
     MachineBasicBlock *EmitZBRCC(MachineInstr *MI, MachineBasicBlock *MBB,
                                  unsigned NumBytes) const;
     MachineBasicBlock *EmitZST(MachineInstr *MI, MachineBasicBlock *MBB,
-                                unsigned NumBytes) const;
+                               bool Stack,
+                               unsigned NumBytes) const;
     MachineBasicBlock *EmitZLD(MachineInstr *MI, MachineBasicBlock *MBB,
-                                unsigned NumBytes) const;
+                               bool Stack,
+                               unsigned NumBytes,
+                               unsigned ExtendBegin,
+                               bool Signed = false) const;
     MachineBasicBlock *EmitZLDimm(MachineInstr *MI, MachineBasicBlock *MBB,
                                   unsigned NumBytes) const;
     MachineBasicBlock *EmitZMOV(MachineInstr *MI, MachineBasicBlock *MBB,
@@ -89,7 +94,7 @@ namespace llvm {
 
     bool isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const override;
 
-    MVT getScalarShiftAmountTy(EVT LHSTy) const override { return MVT::i32; }
+    MVT getScalarShiftAmountTy(EVT LHSTy) const override { return MVT::i8; }
 
     /// getSetCCResultType - Return the ISD::SETCC ValueType
     EVT getSetCCResultType(LLVMContext &Context, EVT VT) const override;
@@ -121,6 +126,15 @@ namespace llvm {
                 const SmallVectorImpl<ISD::OutputArg> &Outs,
                 const SmallVectorImpl<SDValue> &OutVals,
                 SDLoc dl, SelectionDAG &DAG) const override;
+
+
+    std::pair<SDValue, SDValue>
+    makeC65LibCall(SelectionDAG &DAG,
+                   const char *LCName, EVT RetVT,
+                   const SDValue *Ops, unsigned NumOps,
+                   bool isSigned, SDLoc DL,
+                   bool doesNotReturn = false,
+                   bool isReturnValueUsed = true) const;
 
     void ReplaceNodeResults(SDNode *N,
                             SmallVectorImpl<SDValue>& Results,

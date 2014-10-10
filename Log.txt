@@ -251,3 +251,8 @@ Edge_8BIT->Entry_16BIT not OK
 BREAKING NEWS: Instruction mnemonics must be specified in lower-case,
 otherwise the generated instruction matcher will fail to match
 incoming operands..!
+
+
+Concerning DataLayout: It is important to specify integer alignments
+with 'i' (-i8:8:8-i16:8:8) for the integer types as well as specifying
+native capability with 'n' (-n8:16:32:64).

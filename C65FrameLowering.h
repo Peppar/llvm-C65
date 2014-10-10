@@ -27,6 +27,11 @@ protected:
 public:
   explicit C65FrameLowering(const C65Subtarget &ST);
 
+  void emitSAdjustment(MachineFunction &MF,
+                       MachineBasicBlock &MBB,
+                       MachineBasicBlock::iterator MBBI,
+                       int NumBytes) const;
+
   void
   eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
                                 MachineBasicBlock::iterator I) const;

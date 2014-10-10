@@ -58,24 +58,6 @@ namespace {
       return C65InstPrinter::getRegisterName(RegNo);
     }
 
-    // uint8_t getZRAddress(MachineOperand Val) const;
-
-    // MCInstBuilder AddGA(MCInstBuilder MIB,
-    //                     const MachineOperand &MO,
-    //                     unsigned Offset);
-
-    // MCInstBuilder AddZR(MCInstBuilder MIB,
-    //                     const MachineOperand &MO,
-    //                     unsigned Offset);
-
-    // void EmitBR_CC(const MachineInstr *MI, unsigned NumBytes);
-
-    // void EmitShift(const MachineInstr *MI, unsigned NumBytes, bool Right);
-
-    // void EmitShiftOne(const MachineOperand &MO, unsigned NumBytes, bool Right);
-
-    //    void EmitInstructionFinal(MCInst &Inst);
-
     virtual void EmitInstruction(const MachineInstr *) override;
 
     bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
@@ -87,59 +69,6 @@ namespace {
                                raw_ostream &O) override;
   };
 } // end of anonymous namespace
-
-// static void EmitCall(MCStreamer &OutStreamer,
-//                      MCOperand &Callee,
-//                      const MCSubtargetInfo &STI) {
-//   MCInst CallInst;
-//   CallInst.setOpcode(C65::CALL);
-//   CallInst.addOperand(Callee);
-//   OutStreamer.EmitInstruction(CallInst, STI);
-// }
-
-// static void EmitBinary(MCStreamer &OutStreamer, unsigned Opcode,
-//                        MCOperand &RS1, MCOperand &Src2, MCOperand &RD,
-//                        const MCSubtargetInfo &STI)
-// {
-//   MCInst Inst;
-//   Inst.setOpcode(Opcode);
-//   Inst.addOperand(RD);
-//   Inst.addOperand(RS1);
-//   Inst.addOperand(Src2);
-//   OutStreamer.EmitInstruction(Inst, STI);
-// }
-
-// static void EmitOR(MCStreamer &OutStreamer,
-//                    MCOperand &RS1, MCOperand &Imm, MCOperand &RD,
-//                    const MCSubtargetInfo &STI) {
-//   EmitBinary(OutStreamer, SP::ORri, RS1, Imm, RD, STI);
-// }
-
-// static void EmitADD(MCStreamer &OutStreamer,
-//                     MCOperand &RS1, MCOperand &RS2, MCOperand &RD,
-//                     const MCSubtargetInfo &STI) {
-//   EmitBinary(OutStreamer, SP::ADDrr, RS1, RS2, RD, STI);
-// }
-
-// static void EmitSHL(MCStreamer &OutStreamer,
-//                     MCOperand &RS1, MCOperand &Imm, MCOperand &RD,
-//                     const MCSubtargetInfo &STI) {
-//   EmitBinary(OutStreamer, SP::SLLri, RS1, Imm, RD, STI);
-// }
-
-
-// static void EmitHiLo(MCStreamer &OutStreamer,  MCSymbol *GOTSym,
-//                      C65MCExpr::VariantKind HiKind,
-//                      C65MCExpr::VariantKind LoKind,
-//                      MCOperand &RD,
-//                      MCContext &OutContext,
-//                      const MCSubtargetInfo &STI) {
-
-//   MCOperand hi = createC65MCOperand(HiKind, GOTSym, OutContext);
-//   MCOperand lo = createC65MCOperand(LoKind, GOTSym, OutContext);
-//   EmitSETHI(OutStreamer, hi, RD, STI);
-//   EmitOR(OutStreamer, RD, lo, RD, STI);
-// }
 
 MCOperand C65AsmPrinter::LowerSymbolOperand(const MachineOperand &MO) {
   const MCSymbol *Symbol = nullptr;
@@ -227,53 +156,6 @@ void C65AsmPrinter::LowerC65MachineInstrToMCInst(const MachineInstr *MI,
   }
 }
 
-/// Additions and subtractions require a clear carry
-///
-// static bool getOpRequiresCLC(unsigned Op) {
-//   switch (Op) {
-//   default: return false;
-//   case C65::ADD8zz:
-//   case C65::ADD16zz:
-//   case C65::ADD32zz:
-//   case C65::ADD64zz:
-//   case C65::SUB8zz:
-//   case C65::SUB16zz:
-//   case C65::SUB32zz:
-//   case C65::SUB64zz:
-//     return true;
-//   }
-// }
-
-/// Get the operand size of the function.
-///
-// static unsigned getOpByteSize(const MachineInstr *MI) {
-//   return 1 << C65::getZROpSize(MI->getDesc().TSFlags);
-// }
-
-/// Shift-type instructions are emitted with a special form
-///
-// static bool isInstrShiftType(const MachineInstr *MI) {
-//   return MI->getDesc().TSFlags & C65::ZRShift;
-// }
-
-/// Control flow instructions are emitted with a special form
-///
-// static bool isInstrCtrlType(const MachineInstr *MI) {
-//   return MI->getDesc().TSFlags & C65::ZRCtrl;
-// }
-
-/// ZR instructions are treated separately
-///
-// static bool isZRInstr(const MachineInstr *MI) {
-//   return MI->getDesc().TSFlags & C65::ZRInstr;
-// }
-
-/// Post-Z-instruction emit
-///
-//void C65AsmPrinter::EmitInstructionFinal(MCInst &Inst) {
-//  OutStreamer.EmitInstruction(Inst, getSubtargetInfo());
-//}
-
 /// Emit an instruction
 ///
 void C65AsmPrinter::EmitInstruction(const MachineInstr *MI) {
@@ -281,6 +163,18 @@ void C65AsmPrinter::EmitInstruction(const MachineInstr *MI) {
   if (MI->getOpcode() == TargetOpcode::DBG_VALUE) {
     // FIXME: Debug Value.
     return;
+  } else if (MI->getOpcode() == C65::LONGA_ON) {
+    if (OutStreamer.hasRawTextSupport())
+      OutStreamer.EmitRawText(".accu 16\n");
+  } else if (MI->getOpcode() == C65::LONGA_OFF) {
+    if (OutStreamer.hasRawTextSupport())
+      OutStreamer.EmitRawText(".accu 8\n");
+  } else if (MI->getOpcode() == C65::LONGI_ON) {
+    if (OutStreamer.hasRawTextSupport())
+      OutStreamer.EmitRawText(".index 16\n");
+  } else if (MI->getOpcode() == C65::LONGI_OFF) {
+    if (OutStreamer.hasRawTextSupport())
+      OutStreamer.EmitRawText(".index 8\n");
   } else {
     // Normal instruction, emitted as-is
     MCInst TmpInst;

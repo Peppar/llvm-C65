@@ -54,7 +54,7 @@ public:
   bool SelectAddrL(SDValue N, SDValue &Addr);
   bool SelectAddrRR(SDValue N, SDValue &R1, SDValue &R2);
   bool SelectAddrRI(SDValue N, SDValue &Base, SDValue &Offset);
-  bool SelectAddrS(SDValue N, SDValue &Base, SDValue &Offset);
+  bool SelectAddrS(SDValue N, SDValue &Index, SDValue &Offset);
 
   /// SelectInlineAsmMemoryOperand - Implement addressing mode selection for
   /// inline asm expressions.
@@ -74,12 +74,12 @@ public:
 
 /// Select address for imm8+S
 ///
-bool C65DAGToDAGISel::SelectAddrS(SDValue Addr, SDValue &Base,
+bool C65DAGToDAGISel::SelectAddrS(SDValue Addr, SDValue &Index,
                                   SDValue &Offset) {
   // Allow only frame indices with S indexing
   FrameIndexSDNode *FIN = nullptr;
   if ((FIN = dyn_cast<FrameIndexSDNode>(Addr))) {
-    Base = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i16);
+    Index = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i16);
     Offset = CurDAG->getTargetConstant(0, MVT::i8);
     return true;
   }
@@ -89,8 +89,8 @@ bool C65DAGToDAGISel::SelectAddrS(SDValue Addr, SDValue &Base,
         (CN = dyn_cast<ConstantSDNode>(Addr.getOperand(1))) &&
         (isInt<8>(CN->getSExtValue()))) {
       // Constant positive word offset from frame index
-      Base = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i16);
-      Offset = CurDAG->getTargetConstant(CN->getSExtValue(), MVT::i8);
+      Index = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i16);
+      Offset = CurDAG->getTargetConstant(CN->getZExtValue(), MVT::i8);
       return true;
     }
   }
@@ -113,7 +113,12 @@ bool C65DAGToDAGISel::SelectAddrZP(SDValue Addr, SDValue &Offset) {
 ///
 bool C65DAGToDAGISel::SelectAddrI(SDValue Addr, SDValue &Offset) {
   ConstantSDNode *CN;
-  if ((CN = dyn_cast<ConstantSDNode>(Addr))) {
+  if (Addr.getOpcode() == ISD::TargetExternalSymbol ||
+      Addr.getOpcode() == ISD::TargetGlobalAddress ||
+      Addr.getOpcode() == ISD::TargetGlobalTLSAddress) {
+    Offset = Addr;
+    return true;
+  } else if ((CN = dyn_cast<ConstantSDNode>(Addr))) {
     if (isInt<8>(CN->getSExtValue())) {
       // Let the zero-page address capture this
     } else if (isInt<16>(CN->getSExtValue())) {
@@ -186,7 +191,9 @@ bool C65DAGToDAGISel::SelectAddrRI(SDValue Addr, SDValue &Base,
   if (Addr.getOpcode() == ISD::FrameIndex ||
       Addr.getOpcode() == ISD::TargetExternalSymbol ||
       Addr.getOpcode() == ISD::TargetGlobalAddress ||
-      Addr.getOpcode() == ISD::TargetGlobalTLSAddress) {
+      Addr.getOpcode() == ISD::TargetGlobalTLSAddress ||
+      dyn_cast<ConstantSDNode>(Addr)) {
+    // Let zp, abs16 or abs24 handle this
     return false;
   }
   if (Addr.getOpcode() == ISD::ADD) {
@@ -203,7 +210,9 @@ bool C65DAGToDAGISel::SelectAddrRI(SDValue Addr, SDValue &Base,
       }
     }
   }
-  return false;
+  Base = Addr;
+  Offset = CurDAG->getTargetConstant(0, MVT::i16);
+  return true;
 }
 
 /// Select address for reg16 + reg16

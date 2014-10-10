@@ -31,6 +31,7 @@ public:
    : MCInstPrinter(MAI, MII, MRI), STI(sti) {}
 
   void printRegName(raw_ostream &OS, unsigned RegNo) const override;
+  void printComments(const MCInst *MI, raw_ostream &O);
   void printInst(const MCInst *MI, raw_ostream &O, StringRef Annot) override;
   void printOperand(const MCInst *MI, int OpNum, raw_ostream &OS,
                     bool Imm = false);

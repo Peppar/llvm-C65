@@ -41,7 +41,7 @@ namespace llvm {
       // TODO: Make use of TT (triple string)
       PointerSize = 2;
       CalleeSaveStackSlotSize = 1;
-      IsLittleEndian = false;
+      IsLittleEndian = true;
 
       Data8bitsDirective = "\t.db\t";
       Data16bitsDirective = "\t.dw\t";

@@ -78,18 +78,89 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
       // BR_CC is custom inserted.
       setOperationAction(ISD::BR_CC, VT, Custom);
     }
+
+    // Custom libcalls for these
+    setOperationAction(ISD::SHL, VT, Custom);
+    setOperationAction(ISD::SRA, VT, Custom);
+    setOperationAction(ISD::SRL, VT, Custom);
+    setOperationAction(ISD::ROTL, VT, Custom);
+    setOperationAction(ISD::ROTR, VT, Custom);
+    //    setOperationAction(ISD::SIGN_EXTEND, VT, Custom);
+    //    setOperationAction(ISD::ZERO_EXTEND, VT, Custom);
+    //    setOperationAction(ISD::ANY_EXTEND, VT, Custom);
+    //    setOperationAction(ISD::TRUNCATE, VT, Custom);
+
+    // These are operations that the 6502 compatibles cannot perform
+    // natively; extend to libcalls.
+    setOperationAction(ISD::MUL, VT, Expand);
+    setOperationAction(ISD::SDIV, VT, Expand);
+    setOperationAction(ISD::UDIV, VT, Expand);
+    setOperationAction(ISD::SREM, VT, Expand);
+    setOperationAction(ISD::UREM, VT, Expand);
+    setOperationAction(ISD::SMUL_LOHI, VT, Expand);
+    setOperationAction(ISD::UMUL_LOHI, VT, Expand);
+    setOperationAction(ISD::SDIVREM, VT, Expand);
+    setOperationAction(ISD::UDIVREM, VT, Expand);
+    setOperationAction(ISD::CARRY_FALSE, VT, Expand);
+    setOperationAction(ISD::ADDC, VT, Expand);
+    setOperationAction(ISD::SUBC, VT, Expand);
+    setOperationAction(ISD::ADDE, VT, Expand);
+    setOperationAction(ISD::SUBE, VT, Expand);
+    setOperationAction(ISD::SADDO, VT, Expand);
+    setOperationAction(ISD::UADDO, VT, Expand);
+    setOperationAction(ISD::SSUBO, VT, Expand);
+    setOperationAction(ISD::USUBO, VT, Expand);
+    setOperationAction(ISD::SMULO, VT, Expand);
+    setOperationAction(ISD::UMULO, VT, Expand);
+    setOperationAction(ISD::MULHU, VT, Expand);
+    setOperationAction(ISD::MULHS, VT, Expand);
+    setOperationAction(ISD::BSWAP, VT, Expand);
+    setOperationAction(ISD::CTTZ, VT, Expand);
+    setOperationAction(ISD::CTLZ, VT, Expand);
+    setOperationAction(ISD::CTPOP, VT, Expand);
+    setOperationAction(ISD::CTTZ_ZERO_UNDEF, VT, Expand);
+    setOperationAction(ISD::CTLZ_ZERO_UNDEF, VT, Expand);
+    setOperationAction(ISD::SHL_PARTS, VT, Expand);
+    setOperationAction(ISD::SRA_PARTS, VT, Expand);
+    //    setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Expand);
   }
+
+  // setOperationAction(ISD::ZERO_EXTEND_INREG, MVT::i32, Expand);
+  // setOperationAction(ISD::ZERO_EXTEND_INREG, MVT::i16, Expand);
+  // setOperationAction(ISD::ZERO_EXTEND_INREG, MVT::i8, Expand);
+  // setOperationAction(ISD::ZERO_EXTEND_INREG, MVT::i1, Expand);
+  // setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i32, Expand);
+  // setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i16, Expand);
+  // setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i8, Expand);
+  // setOperationAction(ISD::SIGN_EXTEND_INREG, MVT::i1, Expand);
 
   // Expand BRCOND into a BR_CC (see above).
   setOperationAction(ISD::BRCOND, MVT::Other, Expand);
 
-  // We don't (yet) accept any truncstore of integer registers.
-  setTruncStoreAction(MVT::i64, MVT::i32, Expand);
-  setTruncStoreAction(MVT::i64, MVT::i16, Expand);
-  setTruncStoreAction(MVT::i64, MVT::i8 , Expand);
-  setTruncStoreAction(MVT::i32, MVT::i16, Expand);
-  setTruncStoreAction(MVT::i32, MVT::i8 , Expand);
-  setTruncStoreAction(MVT::i16, MVT::i8,  Expand);
+  // Truncate store are custom lowered
+  // setTruncStoreAction(MVT::i16, MVT::i8,  Custom);
+  // setTruncStoreAction(MVT::i32, MVT::i8 , Custom);
+  // setTruncStoreAction(MVT::i32, MVT::i16, Custom);
+  // setTruncStoreAction(MVT::i64, MVT::i8 , Custom);
+  // setTruncStoreAction(MVT::i64, MVT::i16, Custom);
+  // setTruncStoreAction(MVT::i64, MVT::i32, Custom);
+
+  // Extending loads are custom lowered
+  setLoadExtAction(ISD::EXTLOAD,  MVT::i1,  Promote);
+  // setLoadExtAction(ISD::EXTLOAD,  MVT::i8,  Custom);
+  // setLoadExtAction(ISD::EXTLOAD,  MVT::i16, Custom);
+  // setLoadExtAction(ISD::EXTLOAD,  MVT::i32, Custom);
+  setLoadExtAction(ISD::SEXTLOAD, MVT::i1,  Promote);
+  // setLoadExtAction(ISD::SEXTLOAD, MVT::i8,  Custom);
+  // setLoadExtAction(ISD::SEXTLOAD, MVT::i16, Custom);
+  // setLoadExtAction(ISD::SEXTLOAD, MVT::i32, Custom);
+  setLoadExtAction(ISD::ZEXTLOAD, MVT::i1,  Promote);
+  // setLoadExtAction(ISD::ZEXTLOAD, MVT::i8,  Custom);
+  // setLoadExtAction(ISD::ZEXTLOAD, MVT::i16, Custom);
+  // setLoadExtAction(ISD::ZEXTLOAD, MVT::i32, Custom);
+
+  setOperationAction(ISD::STACKSAVE,          MVT::Other, Expand);
+  setOperationAction(ISD::STACKRESTORE,       MVT::Other, Expand);
 
   // Custom legalize GlobalAddress nodes
   setOperationAction(ISD::GlobalAddress, getPointerTy(), Custom);
@@ -129,8 +200,7 @@ SDValue C65TargetLowering::LowerGlobalAddress(GlobalAddressSDNode *Node,
   return DAG.getTargetGlobalAddress(Node->getGlobal(), DL, getPointerTy());
 }
 
-SDValue C65TargetLowering::
-lowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
+SDValue C65TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
   SDLoc DL(Op);
   SDValue Chain    = Op.getOperand(0);
   ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(1))->get();
@@ -143,19 +213,90 @@ lowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
                      CmpOp0, CmpOp1, Dest);
 }
 
+SDValue C65TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
+  EVT VT = Op.getValueType();
+  SDLoc DL(Op);
+
+  // Emit a libcall.
+  const char *LCName = 0;
+  bool isSigned;
+  if (Op.getOpcode() == ISD::SHL) {
+    isSigned = false; /*sign irrelevant*/
+    if (VT == MVT::i8)
+      LCName = "c65_ashl8";
+    else if (VT == MVT::i16)
+      LCName = "c65_ashl16";
+    else if (VT == MVT::i32)
+      LCName = "c65_ashl32";
+    else if (VT == MVT::i64)
+      LCName = "c65_ashl64";
+  } else if (Op.getOpcode() == ISD::SRL) {
+    isSigned = false;
+    if (VT == MVT::i8)
+      LCName = "c65_lshr8";
+    else if (VT == MVT::i16)
+      LCName = "c65_lshr16";
+    else if (VT == MVT::i32)
+      LCName = "c65_lshr32";
+    else if (VT == MVT::i64)
+      LCName = "c65_lshr64";
+  } else if (Op.getOpcode() == ISD::SRA) {
+    isSigned = true;
+    if (VT == MVT::i8)
+      LCName = "c65_ashr8";
+    if (VT == MVT::i16)
+      LCName = "c65_ashr16";
+    else if (VT == MVT::i32)
+      LCName = "c65_ashr32";
+    else if (VT == MVT::i64)
+      LCName = "c65_ashr64";
+  } else if (Op.getOpcode() == ISD::ROTL) {
+    isSigned = false;
+    if (VT == MVT::i8)
+      LCName = "c65_rotl8";
+    if (VT == MVT::i16)
+      LCName = "c65_rotl16";
+    else if (VT == MVT::i32)
+      LCName = "c65_rotl32";
+    else if (VT == MVT::i64)
+      LCName = "c65_rotl64";
+  } else {
+    isSigned = false;
+    if (VT == MVT::i8)
+      LCName = "c65_rotr8";
+    if (VT == MVT::i16)
+      LCName = "c65_rotr16";
+    else if (VT == MVT::i32)
+      LCName = "c65_rotr32";
+    else if (VT == MVT::i64)
+      LCName = "c65_rotr64";
+  }
+
+  if (LCName) {
+    SDValue Ops[2] = { Op.getOperand(0), Op.getOperand(1) };
+    return makeC65LibCall(DAG, LCName, VT, Ops, 2, isSigned, DL).first;
+  } else {
+    llvm_unreachable("Unable to expand shift/rotate.");
+  }
+}
+
 /// This callback is invoked for operations that are unsupported by
 /// the target, which are registered to use 'custom' lowering, and
-/// whose defined values are all legal. If the target has no
-/// operations that require custom lowering, it need not implement
-/// this.  The default implementation of this aborts.
+/// whose defined values are all legal.
 ///
 SDValue C65TargetLowering::
 LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   switch(Op.getOpcode()) {
   default:
     llvm_unreachable("Unexpected node to lower");
+  case ISD::SHL:
+  case ISD::SRA:
+  case ISD::SRL:
+  case ISD::ROTL:
+  case ISD::ROTR:
+    return LowerShift(Op, DAG);
   case ISD::BR_CC:
-    return lowerBR_CC(Op, DAG);
+    return LowerBR_CC(Op, DAG);
   case ISD::GlobalAddress:
     return LowerGlobalAddress(cast<GlobalAddressSDNode>(Op), DAG);
   }
@@ -211,7 +352,7 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
 
   DebugLoc DL = MI->getDebugLoc();
   MachineFunction *MF = MBB->getParent();
-  MachineRegisterInfo &MRI = MF->getRegInfo();
+  //  MachineRegisterInfo &MRI = MF->getRegInfo();
 
   const BasicBlock *BB = MBB->getBasicBlock();
   MachineFunction::iterator MFI = MBB;
@@ -249,6 +390,7 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
                     std::next(MachineBasicBlock::iterator(MI)), MBB->end());
     sinkMBB->transferSuccessorsAndUpdatePHIs(MBB);
     thisMBB->addSuccessor(sinkMBB);
+    thisMBB->addSuccessor(Dest);
 
     for (unsigned I = 0; I < NumBytes; I += AccSize) {
       BuildMI(thisMBB, DL, TII->get(LDAInstr))
@@ -270,10 +412,7 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
       }
     }
 
-    thisMBB->addSuccessor(sinkMBB);
-
     MI->eraseFromParent();
-
     return sinkMBB;
   } else if (C.Signed) {
     // thisMBB:
@@ -300,6 +439,7 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
                     std::next(MachineBasicBlock::iterator(MI)), MBB->end());
     sinkMBB->transferSuccessorsAndUpdatePHIs(MBB);
     thisMBB->addSuccessor(sinkMBB);
+    thisMBB->addSuccessor(Dest);
 
     if (C.Bitvalue) {
       BuildMI(*sinkMBB, sinkMBB->begin(), DL, TII->get(C65::BMI)).addMBB(Dest);
@@ -328,8 +468,6 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
       BuildMI(thisMBB, DL, TII->get(C65::EOR16imm))
         .addImm(0x8000);
     }
-
-    thisMBB->addSuccessor(sinkMBB);
 
     MI->eraseFromParent();
 
@@ -373,6 +511,7 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
 MachineBasicBlock *
 C65TargetLowering::EmitZST(MachineInstr *MI,
                            MachineBasicBlock *MBB,
+                           bool Stack,
                            unsigned NumBytes) const {
   bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
   unsigned AccSize = Use8Bit ? 1 : 2;
@@ -395,13 +534,16 @@ C65TargetLowering::EmitZST(MachineInstr *MI,
   if (NumOperands == 2) {
     assert(!Op1->isReg());
 
-    STAInstr = Use8Bit ? C65::STA8abs  : C65::STA16abs;
+    if (Stack)
+      STAInstr = Use8Bit ? C65::STA8srel  : C65::STA16srel;
+    else
+      STAInstr = Use8Bit ? C65::STA8abs  : C65::STA16abs;
     YIndirect = false;
   } else /* NumOperands == 3 */ {
     assert(Op1->isReg());
     Op2 = &MI->getOperand(2);
 
-    STAInstr = Use8Bit ? C65::STA8zppostiy16 : C65::STA8zppostiy16;
+    STAInstr = Use8Bit ? C65::STA8zppostiy16 : C65::STA16zppostiy16;
     if (Op2->isReg()) {
       BuildMI(*MBB, MBBI, DL, TII->get(C65::LDY16zp))
         .addImm(RI->getZRAddress(Op2->getReg()));
@@ -437,8 +579,11 @@ C65TargetLowering::EmitZST(MachineInstr *MI,
 MachineBasicBlock *
 C65TargetLowering::EmitZLD(MachineInstr *MI,
                            MachineBasicBlock *MBB,
-                           unsigned NumBytes) const {
-  bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
+                           bool Stack,
+                           unsigned NumBytes,
+                           unsigned ExtendBegin,
+                           bool Signed) const {
+  bool Use8Bit = ExtendBegin == 1 || !Subtarget->has65802();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
   unsigned NumOperands = MI->getNumOperands();
@@ -449,6 +594,7 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
   const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
   unsigned STAInstr = Use8Bit ? C65::STA8zp : C65::STA16zp;
+  unsigned STZInstr = Use8Bit ? C65::STZ8zp  : C65::STZ16zp;
   unsigned LDAInstr;
 
   DebugLoc DL = MI->getDebugLoc();
@@ -458,8 +604,10 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
 
   if (NumOperands == 2) {
     assert(!Op1->isReg());
-
-    LDAInstr = Use8Bit ? C65::LDA8abs  : C65::LDA16abs;
+    if (Stack)
+      LDAInstr = Use8Bit ? C65::LDA8srel : C65::LDA16srel;
+    else
+      LDAInstr = Use8Bit ? C65::LDA8abs  : C65::LDA16abs;
     YIndirect = false;
   } else /* NumOperands == 3 */ {
     assert(Op1->isReg());
@@ -476,7 +624,7 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
     YIndirect = true;
   }
 
-  for (unsigned I = 0; I < NumBytes; I += AccSize) {
+  for (unsigned I = 0; I < ExtendBegin; I += AccSize) {
     if (YIndirect) {
       BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
         .addImm(RI->getZRAddress(Op1->getReg()));
@@ -493,9 +641,62 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
     }
   }
 
-  MI->eraseFromParent();
+  if (ExtendBegin == NumBytes) {
+    // No extend
+    MI->eraseFromParent();
+    return MBB;
+  } else if (Signed) {
+    MachineFunction *MF = MBB->getParent();
+    const BasicBlock *BB = MBB->getBasicBlock();
+    MachineFunction::iterator MFI = MBB;
+    ++MFI;
 
-  return MBB;
+    MachineBasicBlock *thisMBB = MBB;
+    MachineBasicBlock *sextMBB = MF->CreateMachineBasicBlock(BB);
+    MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
+    MF->insert(MFI, sextMBB);
+    MF->insert(MFI, sinkMBB);
+
+    // Transfer the remainder of the MBB and its successor edges to sinkMBB.
+    sinkMBB->splice(sinkMBB->begin(), MBB,
+                    std::next(MachineBasicBlock::iterator(MI)), MBB->end());
+    sinkMBB->transferSuccessorsAndUpdatePHIs(MBB);
+
+    // If minus then jump
+    BuildMI(thisMBB, DL, TII->get(C65::BMI))
+      .addMBB(sextMBB);
+
+    // Extend with zeroes and then jump to sinkMBB
+    for (unsigned I = ExtendBegin; I < NumBytes; I += AccSize) {
+      BuildMI(thisMBB, DL, TII->get(STZInstr))
+        .addImm(RI->getZRAddress(Dest->getReg()) + I);
+    }
+    BuildMI(thisMBB, DL, TII->get(Subtarget->has65C02() ?
+                                  C65::BRA : C65::JMPabs))
+      .addMBB(sinkMBB);
+
+    // Extend with ones and then fallthrough to sinkMBB
+    BuildMI(sextMBB, DL, TII->get(Use8Bit ? C65::LDA8imm : C65::LDA16imm))
+      .addImm(Use8Bit ? 0xFF : 0xFFFF);
+    for (unsigned I = ExtendBegin; I < NumBytes; I += AccSize) {
+      BuildMI(sextMBB, DL, TII->get(Use8Bit ? C65::STA8zp : C65::STA16zp))
+        .addImm(RI->getZRAddress(Dest->getReg()) + I);
+    }
+
+    thisMBB->addSuccessor(sextMBB);
+    sextMBB->addSuccessor(sinkMBB);
+
+    MI->eraseFromParent();
+    return sinkMBB;
+  } else {
+    // Always extend with zeroes
+    for (unsigned I = ExtendBegin; I < NumBytes; I += AccSize) {
+      BuildMI(*MBB, MBBI, DL, TII->get(STZInstr))
+        .addImm(RI->getZRAddress(Dest->getReg()) + I);
+    }
+    MI->eraseFromParent();
+    return MBB;
+  }
 }
 
 MachineBasicBlock *
@@ -602,11 +803,20 @@ MachineBasicBlock *
 C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
   unsigned OpSize = 1 << C65II::getZROpSize(MI->getDesc().TSFlags);
   switch (MI->getOpcode()) {
+  default: llvm_unreachable("unknown Z instruction to emit");
+    // BR_CC
   case C65::ZBRCC8:
   case C65::ZBRCC16:
   case C65::ZBRCC32:
   case C65::ZBRCC64:
     return EmitZBRCC(MI, MBB, OpSize);
+
+    // ZST
+  case C65::ZST8s:
+  case C65::ZST16s:
+  case C65::ZST32s:
+  case C65::ZST64s:
+    return EmitZST(MI, MBB, true, OpSize);
   case C65::ZST8zp:
   case C65::ZST16zp:
   case C65::ZST32zp:
@@ -623,7 +833,52 @@ C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
   case C65::ZST16zz16:
   case C65::ZST32zz16:
   case C65::ZST64zz16:
-    return EmitZST(MI, MBB, OpSize);
+    return EmitZST(MI, MBB, false, OpSize);
+
+    // ZST truncating
+  case C65::ZST16trunc8s:
+  case C65::ZST32trunc8s:
+  case C65::ZST64trunc8s:
+    return EmitZST(MI, MBB, true, 1);
+  case C65::ZST16trunc8zp:
+  case C65::ZST16trunc8i16:
+  case C65::ZST16trunc8iz16:
+  case C65::ZST16trunc8zz16:
+  case C65::ZST32trunc8zp:
+  case C65::ZST32trunc8i16:
+  case C65::ZST32trunc8iz16:
+  case C65::ZST32trunc8zz16:
+  case C65::ZST64trunc8zp:
+  case C65::ZST64trunc8i16:
+  case C65::ZST64trunc8iz16:
+  case C65::ZST64trunc8zz16:
+    return EmitZST(MI, MBB, false, 1);
+  case C65::ZST32trunc16s:
+  case C65::ZST64trunc16s:
+    return EmitZST(MI, MBB, true, 2);
+  case C65::ZST32trunc16zp:
+  case C65::ZST32trunc16i16:
+  case C65::ZST32trunc16iz16:
+  case C65::ZST32trunc16zz16:
+  case C65::ZST64trunc16zp:
+  case C65::ZST64trunc16i16:
+  case C65::ZST64trunc16iz16:
+  case C65::ZST64trunc16zz16:
+    return EmitZST(MI, MBB, false, 2);
+  case C65::ZST64trunc32s:
+    return EmitZST(MI, MBB, true, 4);
+  case C65::ZST64trunc32zp:
+  case C65::ZST64trunc32i16:
+  case C65::ZST64trunc32iz16:
+  case C65::ZST64trunc32zz16:
+    return EmitZST(MI, MBB, false, 4);
+
+    // ZLD
+  case C65::ZLD8s:
+  case C65::ZLD16s:
+  case C65::ZLD32s:
+  case C65::ZLD64s:
+    return EmitZLD(MI, MBB, true, OpSize, OpSize);
   case C65::ZLD8zp:
   case C65::ZLD16zp:
   case C65::ZLD32zp:
@@ -640,38 +895,166 @@ C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
   case C65::ZLD16zz16:
   case C65::ZLD32zz16:
   case C65::ZLD64zz16:
-    return EmitZLD(MI, MBB, OpSize);
+    return EmitZLD(MI, MBB, false, OpSize, OpSize);
+
+    // ZLD any extend
+  case C65::ZLD16ext8s:
+  case C65::ZLD32ext8s:
+  case C65::ZLD64ext8s:
+    return EmitZLD(MI, MBB, true, 1, 1);
+  case C65::ZLD16ext8zp:
+  case C65::ZLD16ext8i16:
+  case C65::ZLD16ext8iz16:
+  case C65::ZLD16ext8zz16:
+  case C65::ZLD32ext8zp:
+  case C65::ZLD32ext8i16:
+  case C65::ZLD32ext8iz16:
+  case C65::ZLD32ext8zz16:
+  case C65::ZLD64ext8zp:
+  case C65::ZLD64ext8i16:
+  case C65::ZLD64ext8iz16:
+  case C65::ZLD64ext8zz16:
+    return EmitZLD(MI, MBB, false, 1, 1);
+  case C65::ZLD32ext16s:
+  case C65::ZLD64ext16s:
+    return EmitZLD(MI, MBB, true, 2, 2);
+  case C65::ZLD32ext16zp:
+  case C65::ZLD32ext16i16:
+  case C65::ZLD32ext16iz16:
+  case C65::ZLD32ext16zz16:
+  case C65::ZLD64ext16zp:
+  case C65::ZLD64ext16i16:
+  case C65::ZLD64ext16iz16:
+  case C65::ZLD64ext16zz16:
+    return EmitZLD(MI, MBB, false, 2, 2);
+  case C65::ZLD64ext32s:
+    return EmitZLD(MI, MBB, true, 4, 4);
+  case C65::ZLD64ext32zp:
+  case C65::ZLD64ext32i16:
+  case C65::ZLD64ext32iz16:
+  case C65::ZLD64ext32zz16:
+    return EmitZLD(MI, MBB, false, 4, 4);
+
+    // ZLD sign extend
+  case C65::ZLD16sext8s:
+  case C65::ZLD32sext8s:
+  case C65::ZLD64sext8s:
+    return EmitZLD(MI, MBB, true, OpSize, 1, true);
+  case C65::ZLD16sext8zp:
+  case C65::ZLD16sext8i16:
+  case C65::ZLD16sext8iz16:
+  case C65::ZLD16sext8zz16:
+  case C65::ZLD32sext8zp:
+  case C65::ZLD32sext8i16:
+  case C65::ZLD32sext8iz16:
+  case C65::ZLD32sext8zz16:
+  case C65::ZLD64sext8zp:
+  case C65::ZLD64sext8i16:
+  case C65::ZLD64sext8iz16:
+  case C65::ZLD64sext8zz16:
+    return EmitZLD(MI, MBB, false, OpSize, 1, true);
+  case C65::ZLD32sext16s:
+  case C65::ZLD64sext16s:
+    return EmitZLD(MI, MBB, true, OpSize, 2, true);
+  case C65::ZLD32sext16zp:
+  case C65::ZLD32sext16i16:
+  case C65::ZLD32sext16iz16:
+  case C65::ZLD32sext16zz16:
+  case C65::ZLD64sext16zp:
+  case C65::ZLD64sext16i16:
+  case C65::ZLD64sext16iz16:
+  case C65::ZLD64sext16zz16:
+    return EmitZLD(MI, MBB, false, OpSize, 2, true);
+  case C65::ZLD64sext32s:
+    return EmitZLD(MI, MBB, true, OpSize, 4, true);
+  case C65::ZLD64sext32zp:
+  case C65::ZLD64sext32i16:
+  case C65::ZLD64sext32iz16:
+  case C65::ZLD64sext32zz16:
+    return EmitZLD(MI, MBB, false, OpSize, 4, true);
+
+    // ZLD zero extend
+  case C65::ZLD16zext8s:
+  case C65::ZLD32zext8s:
+  case C65::ZLD64zext8s:
+    return EmitZLD(MI, MBB, true, OpSize, 1, false);
+  case C65::ZLD16zext8zp:
+  case C65::ZLD16zext8i16:
+  case C65::ZLD16zext8iz16:
+  case C65::ZLD16zext8zz16:
+  case C65::ZLD32zext8zp:
+  case C65::ZLD32zext8i16:
+  case C65::ZLD32zext8iz16:
+  case C65::ZLD32zext8zz16:
+  case C65::ZLD64zext8zp:
+  case C65::ZLD64zext8i16:
+  case C65::ZLD64zext8iz16:
+  case C65::ZLD64zext8zz16:
+    return EmitZLD(MI, MBB, false, OpSize, 1, false);
+  case C65::ZLD32zext16s:
+  case C65::ZLD64zext16s:
+    return EmitZLD(MI, MBB, true, OpSize, 2, false);
+  case C65::ZLD32zext16zp:
+  case C65::ZLD32zext16i16:
+  case C65::ZLD32zext16iz16:
+  case C65::ZLD32zext16zz16:
+  case C65::ZLD64zext16zp:
+  case C65::ZLD64zext16i16:
+  case C65::ZLD64zext16iz16:
+  case C65::ZLD64zext16zz16:
+    return EmitZLD(MI, MBB, false, OpSize, 2, false);
+  case C65::ZLD64zext32s:
+    return EmitZLD(MI, MBB, true, OpSize, 4, false);
+  case C65::ZLD64zext32zp:
+  case C65::ZLD64zext32i16:
+  case C65::ZLD64zext32iz16:
+  case C65::ZLD64zext32zz16:
+    return EmitZLD(MI, MBB, false, OpSize, 4, false);
+
+    // ZLD immediate
   case C65::ZLD8imm:
   case C65::ZLD16imm:
   case C65::ZLD32imm:
   case C65::ZLD64imm:
     return EmitZLDimm(MI, MBB, OpSize);
+
+    // ZMOV
   case C65::ZMOV8:
   case C65::ZMOV16:
   case C65::ZMOV32:
   case C65::ZMOV64:
     return EmitZMOV(MI, MBB, OpSize);
+
+    // ZAND
   case C65::ZAND8:
   case C65::ZAND16:
   case C65::ZAND32:
   case C65::ZAND64:
     return EmitBinaryZI(MI, MBB, OpSize, C65::AND8zp, C65::AND16zp);
+
+    // ZOR
   case C65::ZOR8:
   case C65::ZOR16:
   case C65::ZOR32:
   case C65::ZOR64:
     return EmitBinaryZI(MI, MBB, OpSize, C65::ORA8zp, C65::ORA16zp);
+
+    // ZXOR
   case C65::ZXOR8:
   case C65::ZXOR16:
   case C65::ZXOR32:
   case C65::ZXOR64:
     return EmitBinaryZI(MI, MBB, OpSize, C65::EOR8zp, C65::EOR16zp);
+
+    // ZADD
   case C65::ZADD8:
   case C65::ZADD16:
   case C65::ZADD32:
   case C65::ZADD64:
     return EmitBinaryZI(MI, MBB, OpSize, C65::ADC8zp, C65::ADC16zp,
                         true, false);
+
+    // ZSUB
   case C65::ZSUB8:
   case C65::ZSUB16:
   case C65::ZSUB32:
@@ -744,7 +1127,7 @@ C65TargetLowering::LowerReturn(SDValue Chain,
                  RVLocs, *DAG.getContext());
 
   // Analyze return values.
-  CCInfo.AnalyzeReturn(Outs, RetCC_65c816);
+  CCInfo.AnalyzeReturn(Outs, RetCC_C65);
 
   assert(!IsVarArg && "Var args not supported.");
   assert(RVLocs.size() <= 1 && "Maximum of 1 return value supported.");
@@ -788,7 +1171,7 @@ LowerFormalArguments(SDValue Chain,
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
                  ArgLocs, *DAG.getContext());
 
-  CCInfo.AnalyzeFormalArguments(Ins, CC_65c816);
+  CCInfo.AnalyzeFormalArguments(Ins, CC_C65);
 
   for (unsigned i = 0, e = ArgLocs.size(); i != e; ++i) {
     SDValue ArgValue;
@@ -861,7 +1244,7 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
                  ArgLocs, *DAG.getContext());
-  CCInfo.AnalyzeCallOperands(Outs, CC_65c816);
+  CCInfo.AnalyzeCallOperands(Outs, CC_C65);
 
   // No support for tail calls
   CLI.IsTailCall = false;
@@ -917,20 +1300,13 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
   SDValue Glue;
 
-  // // Accept direct calls by converting symbolic call addresses to the
-  // // associated Target* opcodes.  Force %r1 to be used for indirect
-  // // tail calls.
-  // if (auto *G = dyn_cast<GlobalAddressSDNode>(Callee)) {
-  //   Callee = DAG.getTargetGlobalAddress(G->getGlobal(), DL, PtrVT);
-  //   Callee = DAG.getNode(SystemZISD::PCREL_WRAPPER, DL, PtrVT, Callee);
-  // } else if (auto *E = dyn_cast<ExternalSymbolSDNode>(Callee)) {
-  //   Callee = DAG.getTargetExternalSymbol(E->getSymbol(), PtrVT);
-  //   Callee = DAG.getNode(SystemZISD::PCREL_WRAPPER, DL, PtrVT, Callee);
-  // } else if (IsTailCall) {
-  //   Chain = DAG.getCopyToReg(Chain, DL, SystemZ::R1D, Callee, Glue);
-  //   Glue = Chain.getValue(1);
-  //   Callee = DAG.getRegister(SystemZ::R1D, Callee.getValueType());
-  // }
+  // Accept direct calls by converting symbolic call addresses to the
+  // associated Target* opcodes.
+  if (auto *G = dyn_cast<GlobalAddressSDNode>(Callee)) {
+    Callee = DAG.getTargetGlobalAddress(G->getGlobal(), DL, PtrVT);
+  } else if (auto *E = dyn_cast<ExternalSymbolSDNode>(Callee)) {
+    Callee = DAG.getTargetExternalSymbol(E->getSymbol(), PtrVT);
+  }
 
   // Build a sequence of copy-to-reg nodes, chained and glued together.
   for (unsigned i = 0, e = RegsToPass.size(); i != e; ++i) {
@@ -995,7 +1371,7 @@ C65TargetLowering::LowerCallResult(SDValue Chain, SDValue Glue,
 
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
                  RVLocs, *DAG.getContext());
-  CCInfo.AnalyzeCallResult(Ins, RetCC_65c816);
+  CCInfo.AnalyzeCallResult(Ins, RetCC_C65);
 
   // Copy all of the result registers out of their specified physreg.
   for (unsigned I = 0, E = RVLocs.size(); I != E; ++I) {
@@ -1013,6 +1389,166 @@ C65TargetLowering::LowerCallResult(SDValue Chain, SDValue Glue,
   return Chain;
 }
 
+// SDValue
+// SparcTargetLowering::LowerF128_LibCallArg(SDValue Chain, ArgListTy &Args,
+//                                           SDValue Arg, SDLoc DL,
+//                                           SelectionDAG &DAG) const {
+//   MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
+//   EVT ArgVT = Arg.getValueType();
+//   Type *ArgTy = ArgVT.getTypeForEVT(*DAG.getContext());
+
+//   ArgListEntry Entry;
+//   Entry.Node = Arg;
+//   Entry.Ty   = ArgTy;
+
+//   if (ArgTy->isFP128Ty()) {
+//     // Create a stack object and pass the pointer to the library function.
+//     int FI = MFI->CreateStackObject(16, 8, false);
+//     SDValue FIPtr = DAG.getFrameIndex(FI, getPointerTy());
+//     Chain = DAG.getStore(Chain,
+//                          DL,
+//                          Entry.Node,
+//                          FIPtr,
+//                          MachinePointerInfo(),
+//                          false,
+//                          false,
+//                          8);
+
+//     Entry.Node = FIPtr;
+//     Entry.Ty   = PointerType::getUnqual(ArgTy);
+//   }
+//   Args.push_back(Entry);
+//   return Chain;
+// }
+
+// SDValue
+// C65TargetLowering::LowerLibCall(SDValue Op, SelectionDAG &DAG,
+//                                 const char *LibFuncName,
+//                                 unsigned numArgs) const {
+//   ArgListTy Args;
+
+//   MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
+
+//   SDValue Callee = DAG.getExternalSymbol(LibFuncName, getPointerTy());
+//   Type *RetTy = Op.getValueType().getTypeForEVT(*DAG.getContext());
+//   Type *RetTyABI = RetTy;
+//   SDValue Chain = DAG.getEntryNode();
+//   SDValue RetPtr;
+
+//   // if (RetTy->isFP128Ty()) {
+//   //   // Create a Stack Object to receive the return value of type f128.
+//   //   ArgListEntry Entry;
+//   //   int RetFI = MFI->CreateStackObject(16, 8, false);
+//   //   RetPtr = DAG.getFrameIndex(RetFI, getPointerTy());
+//   //   Entry.Node = RetPtr;
+//   //   Entry.Ty   = PointerType::getUnqual(RetTy);
+//   //   if (!Subtarget->is64Bit())
+//   //     Entry.isSRet = true;
+//   //   Entry.isReturned = false;
+//   //   Args.push_back(Entry);
+//   //   RetTyABI = Type::getVoidTy(*DAG.getContext());
+//   // }
+
+//   assert(Op->getNumOperands() >= numArgs && "Not enough operands!");
+//   for (unsigned i = 0, e = numArgs; i != e; ++i) {
+//     Chain = LowerF128_LibCallArg(Chain, Args, Op.getOperand(i), SDLoc(Op), DAG);
+//   }
+//   TargetLowering::CallLoweringInfo CLI(DAG);
+//   CLI.setDebugLoc(SDLoc(Op)).setChain(Chain)
+//     .setCallee(CallingConv::C, RetTyABI, Callee, std::move(Args), 0);
+
+//   std::pair<SDValue, SDValue> CallInfo = LowerCallTo(CLI);
+
+//   // chain is in second result.
+//   if (RetTyABI == RetTy)
+//     return CallInfo.first;
+
+//   assert (RetTy->isFP128Ty() && "Unexpected return type!");
+
+//   Chain = CallInfo.second;
+
+//   // Load RetPtr to get the return value.
+//   return DAG.getLoad(Op.getValueType(),
+//                      SDLoc(Op),
+//                      Chain,
+//                      RetPtr,
+//                      MachinePointerInfo(),
+//                      false, false, false, 8);
+// }
+
+
+// SDValue C65::LowerShiftRotate(SDValue Op, SelectionDAG &DAG,
+//                               const C65TargetLowering &TLI) {
+//   EVT *VT = Op.getValueType();
+//   SDLoc DL(Op);
+
+//   RTLIB::Libcall LC = RTLIB::UNKNOWN_LIBCALL;
+//   if (VT == MVT::i16)
+//     LC = RTLIB::MUL_I16;
+//   else if (VT == MVT::i32)
+//     LC = RTLIB::MUL_I32;
+//   else if (VT == MVT::i64)
+//     LC = RTLIB::MUL_I64;
+//   else if (VT == MVT::i128)
+//     LC = RTLIB::MUL_I128;
+//   assert(LC != RTLIB::UNKNOWN_LIBCALL && "Unsupported MUL!");
+
+//   unsigned opcode = Op.getOpcode();
+// //  assert((opcode == ISD::UMULO || opcode == ISD::SMULO) && "Invalid Opcode.");
+
+// //  bool isSigned = (opcode == ISD::SMULO);
+//   EVT VT = MVT::i64;
+//   EVT WideVT = MVT::i128;
+//   SDLoc DL(Op);
+//   SDValue LHS = Op.getOperand(0);
+
+//   if (LHS.getValueType() != VT)
+//     return Op;
+
+//   SDValue ShiftAmt = DAG.getConstant(63, VT);
+
+//   SDValue RHS = Op.getOperand(1);
+//   SDValue Args[] = { Op.getOperand(1), Op.getOperand(2) };
+//   return makeLibCall(DAG, 
+//   //HiLHS, LHS, HiRHS, RHS };
+//   // SDValue MulResult = makeC65LibCall(Op, DAG,
+//   //                                    "__CALL_HEJ",
+//   //                                    Args, 4, isSigned).first;
+// }
+
+
+
+// Generate a libcall taking the given operands as arguments and returning a
+// result of type RetVT.
+std::pair<SDValue, SDValue>
+C65TargetLowering::makeC65LibCall(SelectionDAG &DAG,
+                                  const char *LCName, EVT RetVT,
+                                  const SDValue *Ops, unsigned NumOps,
+                                  bool isSigned, SDLoc DL,
+                                  bool doesNotReturn,
+                                  bool isReturnValueUsed) const {
+  TargetLowering::ArgListTy Args;
+  Args.reserve(NumOps);
+
+  TargetLowering::ArgListEntry Entry;
+  for (unsigned i = 0; i != NumOps; ++i) {
+    Entry.Node = Ops[i];
+    Entry.Ty = Entry.Node.getValueType().getTypeForEVT(*DAG.getContext());
+    Entry.isSExt = isSigned;
+    Entry.isZExt = !isSigned;
+    Args.push_back(Entry);
+  }
+  SDValue Callee = DAG.getExternalSymbol(LCName, getPointerTy());
+
+  Type *RetTy = RetVT.getTypeForEVT(*DAG.getContext());
+  TargetLowering::CallLoweringInfo CLI(DAG);
+  CLI.setDebugLoc(DL).setChain(DAG.getEntryNode())
+    .setCallee(CallingConv::C, RetTy, Callee, std::move(Args), 0)
+    .setNoReturn(doesNotReturn).setDiscardResult(!isReturnValueUsed)
+    .setSExtResult(isSigned).setZExtResult(!isSigned);
+  return LowerCallTo(CLI);
+}
+
 /// This callback is invoked when a node result type is illegal for
 /// the target, and the operation was registered to use 'custom'
 /// lowering for that result type.  The target places new result
@@ -1028,16 +1564,12 @@ void C65TargetLowering::ReplaceNodeResults(SDNode *N,
                                            SmallVectorImpl<SDValue>& Results,
                                            SelectionDAG &DAG) const {
 
-  llvm_unreachable("Do not know how to custom type legalize this operation!");
+  DEBUG(errs() << "Legalize operation " << N->getOpcode());
+  N->dump();
 
-  // SDLoc DL(N);
+  switch (N->getOpcode()) {
+  default:
+    llvm_unreachable("Do not know how to custom type legalize this operation!");
 
-  // RTLIB::Libcall libCall = RTLIB::UNKNOWN_LIBCALL;
-
-  // DEBUG(errs() << "Legalize operation " << N->getOpcode());
-  // N->dump();
-
-  // switch (N->getOpcode()) {
-  // default:
-  // }
+  }
 }

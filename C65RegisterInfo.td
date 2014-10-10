@@ -12,7 +12,7 @@ let Namespace = "C65" in {
   def sub_8bit     : SubRegIndex<8>;
   def sub_8bit_hi  : SubRegIndex<8, 8>;
   def sub_16bit    : SubRegIndex<16>;
-  def sub_16bit_hi : SubRegIndex<16>;
+  def sub_16bit_hi : SubRegIndex<16, 16>;
   def sub_32bit    : SubRegIndex<32>;
   def sub_32bit_hi : SubRegIndex<32, 32>;
 }
@@ -73,6 +73,15 @@ def ZRC16 : RegisterClass<"C65", [i16], 8, (add ZR0W, ZR2W, ZR4W, ZR6W, ZR8W,
 def ZRC32 : RegisterClass<"C65", [i32], 8, (add ZR0D, ZR4D, ZR8D, ZR12D,
                                                 ZR16D, ZR20D, ZR24D, ZR28D)>;
 def ZRC64 : RegisterClass<"C65", [i64], 8, (add ZR0Q, ZR8Q, ZR16Q, ZR24Q)>;
+// def ZRC : RegisterClass<"C65", [i8, i16, i32, i64], 8,
+//                         (add (sequence "ZR%u", 0, 31),
+//                              ZR0W, ZR2W, ZR4W, ZR6W, ZR8W,
+//                              ZR10W, ZR12W, ZR14W, ZR16W,
+//                              ZR18W, ZR20W, ZR22W, ZR24W,
+//                              ZR26W, ZR28W, ZR30W,
+//                              ZR0D, ZR4D, ZR8D, ZR12D,
+//                              ZR16D, ZR20D, ZR24D, ZR28D,
+//                              ZR0Q, ZR8Q, ZR16Q, ZR24Q)>;
 
 
 // 8-bit registers

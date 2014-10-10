@@ -146,12 +146,15 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
 
 unsigned C65InstrInfo::isStoreToStackSlot(const MachineInstr *MI,
                                           int &FrameIndex) const {
-  // if (MI->getOpcode() == C65::STAis) {
-  //   if (MI->getOperand(0).isFI()) {
-  //     FrameIndex = MI->getOperand(0).getIndex();
-  //     return C65::A;
-  //   }
-  // }
+  if (MI->getOpcode() == C65::ZST8s ||
+      MI->getOpcode() == C65::ZST16s ||
+      MI->getOpcode() == C65::ZST32s ||
+      MI->getOpcode() == C65::ZST64s) {
+    if (MI->getOperand(1).isFI()) {
+      FrameIndex = MI->getOperand(1).getIndex();
+      return MI->getOperand(0).getReg();
+    }
+  }
   return 0;
 }
 
@@ -161,24 +164,38 @@ storeRegToStackSlot(MachineBasicBlock &MBB,
                     unsigned SrcReg, bool isKill, int FI,
                     const TargetRegisterClass *RC,
                     const TargetRegisterInfo *TRI) const {
-  // DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
-  // if (SrcReg == C65::A) {
-  //   BuildMI(MBB, MBBI, DL, get(C65::STAis)).addFrameIndex(FI);
-  // } else {
-  //   DEBUG(dbgs() << "Cannot store " << RI.getName(SrcReg)
-  //                << " to stack frame\n");
-  //   llvm_unreachable("Unable to store reg from stack slot.");
-  // }
+  DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
+  unsigned Opcode;
+  if (C65::ZRC8RegClass.contains(SrcReg))
+    Opcode = C65::ZST8s;
+  else if (C65::ZRC16RegClass.contains(SrcReg))
+    Opcode = C65::ZST16s;
+  else if (C65::ZRC32RegClass.contains(SrcReg))
+    Opcode = C65::ZST32s;
+  else if (C65::ZRC64RegClass.contains(SrcReg))
+    Opcode = C65::ZST64s;
+  else {
+    DEBUG(dbgs() << "Cannot store " << RI.getName(SrcReg)
+                 << " to stack frame\n");
+    llvm_unreachable("Unable to store reg from stack slot.");
+  }
+  BuildMI(MBB, MBBI, DL, get(Opcode))
+    .addReg(SrcReg)
+    .addFrameIndex(FI)
+    .addImm(0);
 }
 
 unsigned C65InstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
                                            int &FrameIndex) const {
-  // if (MI->getOpcode() == C65::LDAis) {
-  //   if (MI->getOperand(0).isFI()) {
-  //     FrameIndex = MI->getOperand(0).getIndex();
-  //     return C65::A;
-  //   }
-  // }
+  if (MI->getOpcode() == C65::ZLD8s ||
+      MI->getOpcode() == C65::ZLD16s ||
+      MI->getOpcode() == C65::ZLD32s ||
+      MI->getOpcode() == C65::ZLD64s) {
+    if (MI->getOperand(1).isFI()) {
+      FrameIndex = MI->getOperand(1).getIndex();
+      return MI->getOperand(0).getReg();
+    }
+  }
   return 0;
 }
 
@@ -188,14 +205,25 @@ loadRegFromStackSlot(MachineBasicBlock &MBB,
                      unsigned DestReg, int FI,
                      const TargetRegisterClass *RC,
                      const TargetRegisterInfo *TRI) const {
-  // DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
-  // if (DestReg == C65::A) {
-  //   BuildMI(MBB, MBBI, DL, get(C65::LDAis)).addFrameIndex(FI);
-  // } else {
-  //   DEBUG(dbgs() << "Cannot load " << RI.getName(DestReg)
-  //                << " from stack frame\n");
-  //   llvm_unreachable("Unable to load reg from stack slot.");
-  // }
+  DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
+  unsigned Opcode;
+  if (C65::ZRC8RegClass.contains(DestReg))
+    Opcode = C65::ZLD8s;
+  else if (C65::ZRC16RegClass.contains(DestReg))
+    Opcode = C65::ZLD16s;
+  else if (C65::ZRC32RegClass.contains(DestReg))
+    Opcode = C65::ZLD32s;
+  else if (C65::ZRC64RegClass.contains(DestReg))
+    Opcode = C65::ZLD64s;
+  else {
+    DEBUG(dbgs() << "Cannot load " << RI.getName(DestReg)
+                 << " from stack frame\n");
+    llvm_unreachable("Unable to load reg from stack slot.");
+  }
+  BuildMI(MBB, MBBI, DL, get(Opcode))
+    .addReg(DestReg)
+    .addFrameIndex(FI)
+    .addImm(0);
 }
 
 bool C65InstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MBBI) const {

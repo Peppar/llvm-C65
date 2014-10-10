@@ -32,55 +32,87 @@ C65FrameLowering::C65FrameLowering(const C65Subtarget &ST)
     ST(ST) {}
 
 void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
-  // const MachineFrameInfo *MFI = MF.getFrameInfo();
-  // const C65InstrInfo &TII =
-  //     *static_cast<const C65InstrInfo *>(MF.getSubtarget().getInstrInfo());
-  // MachineBasicBlock &MBB = MF.front();
-  // MachineBasicBlock::iterator MBBI = MBB.begin();
-  // //  MachineModuleInfo &MMI = MF.getMMI();
-  // //  const MCRegisterInfo *MRI = MMI.getContext().getRegisterInfo();
-  // //  const std::vector<CalleeSavedInfo> &CSI = MFFrame->getCalleeSavedInfo();
-  // //  bool HasFP = hasFP(MF);
-  // DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  MachineBasicBlock &MBB = MF.front();
+  MachineBasicBlock::iterator MBBI = MBB.begin();
+  int Size = (int)MFI->getStackSize();
+  if (Size)
+    emitSAdjustment(MF, MBB, MBBI, -Size);
+}
 
-  // int NumBytes = (int)MFI->getStackSize();
+void C65FrameLowering::emitSAdjustment(MachineFunction &MF,
+                                       MachineBasicBlock &MBB,
+                                       MachineBasicBlock::iterator MBBI,
+                                       int NumBytes) const {
+  DebugLoc DL = (MBBI != MBB.end()) ? MBBI->getDebugLoc() : DebugLoc();
+  const C65InstrInfo &TII = *ST.getInstrInfo();
+  const int PushPullThreshold = 10;
 
-  // while (NumBytes > 0) {
-  //   // Push 2 bytes
-  //   BuildMI(MBB, MBBI, DL, TII.get(C65::PHA));
-  //   NumBytes -= 2;
-  // }
+  if (NumBytes >= PushPullThreshold) {
+    BuildMI(MBB, MBBI, DL, TII.get(C65::TSC));
+    BuildMI(MBB, MBBI, DL, TII.get(C65::CLC));
+    BuildMI(MBB, MBBI, DL, TII.get(C65::ADC16imm))
+      .addImm(NumBytes);
+    BuildMI(MBB, MBBI, DL, TII.get(C65::TCS));
+  } else if (NumBytes <= -PushPullThreshold) {
+    BuildMI(MBB, MBBI, DL, TII.get(C65::TSC));
+    BuildMI(MBB, MBBI, DL, TII.get(C65::SEC));
+    BuildMI(MBB, MBBI, DL, TII.get(C65::SBC16imm))
+      .addImm(-NumBytes);
+    BuildMI(MBB, MBBI, DL, TII.get(C65::TCS));
+  } else {
+    while (NumBytes != 0) {
+      if (NumBytes >= 2) {
+        BuildMI(MBB, MBBI, DL, TII.get(C65::PLA16));
+        NumBytes -= 2;
+      } else if (NumBytes >= 1) {
+        BuildMI(MBB, MBBI, DL, TII.get(C65::PLA8));
+        NumBytes -= 1;
+      } else if (NumBytes <= -2) {
+        BuildMI(MBB, MBBI, DL, TII.get(C65::PHA16));
+        NumBytes += 2;
+      } else if (NumBytes <= -1) {
+        BuildMI(MBB, MBBI, DL, TII.get(C65::PHP));
+        NumBytes += 1;
+      }
+    }
+  }
 }
 
 void C65FrameLowering::
 eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator I) const {
+  MachineInstr &MI = *I;
+  int Size = MI.getOperand(0).getImm();
+  if (Size) {
+    if (MI.getOpcode() == C65::ADJCALLSTACKDOWN)
+      emitSAdjustment(MF, MBB, I, -Size);
+    else
+      emitSAdjustment(MF, MBB, I, Size);
+  }
+  MBB.erase(I);
 }
 
 void C65FrameLowering::emitEpilogue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
-  // const MachineFrameInfo *MFI = MF.getFrameInfo();
-  // const C65InstrInfo &TII =
-  //     *static_cast<const C65InstrInfo *>(MF.getSubtarget().getInstrInfo());
-  // MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
-  // assert(MBBI != MBB.end() && "Returning block has no instructions");
-  // DebugLoc DL = MBBI->getDebugLoc();
-
-  // int NumBytes = (int)MFI->getStackSize();
-
-  // while (NumBytes > 0) {
-  //   // Pull 2 bytes
-  //   BuildMI(MBB, MBBI, DL, TII.get(C65::PLA));
-  //   NumBytes -= 2;
-  // }
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
+  assert(MBBI->getOpcode() == C65::RTS &&
+         "Can only put epilog before 'rts' instruction!");
+  int Size = (int)MFI->getStackSize();
+  if (Size)
+    emitSAdjustment(MF, MBB, MBBI, Size);
 }
 
-// hasFP - Return true if the specified function should have a dedicated frame
-// pointer register.  This is true if the function has variable sized allocas or
-// if frame pointer elimination is disabled.
+// hasFP - Return true if the specified function should have a
+// dedicated frame pointer register.  This is true if the function has
+// variable sized allocas or if frame pointer elimination is disabled.
+// In addition, for C65 as well when we do not have 65802 capabilities (TSC,
+// TCS) or when the frame is too large for stack relative indexing (255 bytes)
 bool C65FrameLowering::hasFP(const MachineFunction &MF) const {
-  // const MachineFrameInfo *MFI = MF.getFrameInfo();
-  // return MF.getTarget().Options.DisableFramePointerElim(MF) ||
-  //   MFI->hasVarSizedObjects() || MFI->isFrameAddressTaken();
-  return false;
+  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  return MF.getTarget().Options.DisableFramePointerElim(MF) ||
+    MFI->hasVarSizedObjects() || MFI->isFrameAddressTaken() ||
+    MFI->getStackSize() > 0xFF ||
+    !ST.has65802();
 }

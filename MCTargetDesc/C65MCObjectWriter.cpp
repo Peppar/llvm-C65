@@ -287,23 +287,21 @@ void WLAKObjectWriter::RecordRelocation(const MCAssembler &Asm,
   const MCSymbolRefExpr *RefB = Target.getSymB();
   const MCSymbol &SymA = RefA->getSymbol();
 
-  const MCSection &Section = SymA.getSection();
-
-  assert(SymA.isInSection());
+  const MCSection &Section = FixupSection->getSection();
+  //  assert(SymA.isInSection());
 
   if (RefB || C) {
     // WLAK supports arbitrary calculations for relocations using a
     // stack-based language.
-    WLAKComplexRelocationEntry Rel(Section, Type, FileID, LineNumber,
-                                   Offset);
+    WLAKComplexRelocationEntry Rel(Section, Type, FileID, LineNumber, Offset);
     Rel.addSymb(SymA);
     if (RefB) {
       assert(RefB->getKind() == MCSymbolRefExpr::VK_None &&
              "Should not have constructed this");
 
       const MCSymbol &SymB = RefB->getSymbol();
-      const MCSection &SecB = SymB.getSection();
-      assert(&SecB == &FixupSection->getSection());
+      //      const MCSection &SecB = SymB.getSection();
+      //      assert(&SecB == &FixupSection->getSection());
       assert(!SymB.isAbsolute() && "Should have been folded");
 
       Rel.addSymb(RefB->getSymbol());

@@ -32,7 +32,9 @@ struct C65RegisterInfo : public C65GenRegisterInfo {
 
   /// Code Generation virtual methods...
   const MCPhysReg *
-  getCalleeSavedRegs(const MachineFunction *MF =nullptr) const override;
+  getCalleeSavedRegs(const MachineFunction *MF = nullptr) const override;
+
+  const uint32_t *getCallPreservedMask(CallingConv::ID CC) const override;
 
   BitVector getReservedRegs(const MachineFunction &MF) const override;
 

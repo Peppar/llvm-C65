@@ -25,7 +25,7 @@ void C65Subtarget::anchor() {}
 
 static std::string computeDataLayout(const C65Subtarget &ST) {
   // Stub 2 simulates handling all 8, 16, 32, 64-bit integers natively
-  return "e-p:16:8-n8:16:32:64-S8";
+  return "e-p:16:8-i16:8-i32:8-i64:8-a:0:8-n8:16:32:64-a:0:8-S8";
 }
 
 C65Subtarget &
@@ -36,12 +36,6 @@ C65Subtarget::initializeSubtargetDependencies(StringRef CPU, StringRef FS) {
   }
   // Parse features string.
   ParseSubtargetFeatures(CPUName, FS);
-
-  // Default to 8-bit accumulator and index registers
-  if (!InAcc8Mode && !InAcc16Mode)
-    InAcc8Mode = true;
-  if (!InIx8Mode && !InIx16Mode)
-    InIx8Mode = true;
 
   // It's important to keep the MCSubtargetInfo feature bits in sync with
   // target data structure which is shared with MC code emitter, etc.

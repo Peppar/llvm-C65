@@ -39,10 +39,13 @@ C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
 
 const MCPhysReg*
 C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
-  static const MCPhysReg CSR_SaveList[] = { 0 };
-  return CSR_SaveList;
+  return CSR_C65_SaveList;
 }
 
+const uint32_t*
+C65RegisterInfo::getCallPreservedMask(CallingConv::ID CC) const {
+  return CSR_C65_RegMask;
+}
 
 BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   BitVector Reserved(getNumRegs());
@@ -125,28 +128,23 @@ C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 
   MachineInstr &MI = *II;
   MachineFunction &MF = *MI.getParent()->getParent();
-  //  const TargetFrameLowering *TFI = MF.getTarget().getFrameLowering();
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
-  unsigned BasePtr = C65::S;
 
   unsigned Opc = MI.getOpcode();
 
-  MI.getOperand(FIOperandNum).ChangeToRegister(C65::S, false);
-
-  //  int FIOffset = TFI->getFrameIndexOffset(MF, FrameIndex);
-  int64_t FIOffset = MF.getFrameInfo()->getObjectOffset(FrameIndex);
+  int64_t FIOffset = MF.getFrameInfo()->getObjectOffset(FrameIndex) +
+    MF.getFrameInfo()->getStackSize() + 1;
 
   if (MI.getOperand(FIOperandNum + 1).isImm()) {
-    // Offset is a 16-bit integer.
+    // Offset is an 8-bit integer.
     int Offset = FIOffset +
       (int)(MI.getOperand(FIOperandNum + 1).getImm());
-    MI.getOperand(FIOperandNum + 1).ChangeToImmediate(Offset);
+    MI.getOperand(FIOperandNum).ChangeToImmediate(Offset);
   } else {
-    // Offset is symbolic. This is extremely rare.
-    uint64_t Offset = FIOffset +
-      (uint64_t)MI.getOperand(FIOperandNum + 1).getOffset();
-    MI.getOperand(FIOperandNum + 1).setOffset(Offset);
+    // Offset is symbolic. This is not supported.
+    llvm_unreachable("Unable to eliminate symbolic frame index.");
   }
+  MI.RemoveOperand(FIOperandNum + 1);
 }
 
 unsigned C65RegisterInfo::getFrameRegister(const MachineFunction &MF) const {

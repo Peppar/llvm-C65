@@ -13,8 +13,10 @@
 
 #include "C65.h"
 #include "C65InstPrinter.h"
+#include "MCTargetDesc/C65BaseInfo.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
+#include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/raw_ostream.h"
@@ -31,12 +33,57 @@ void C65InstPrinter::printRegName(raw_ostream &OS, unsigned RegNo) const {
   OS << StringRef(getRegisterName(RegNo));
 }
 
+void C65InstPrinter::printComments(const MCInst *MI, raw_ostream &OS) {
+  if (MI->getNumOperands() == 2) {
+    // MVN, MVP instructions are the only ones with more than one operand
+    OS << '$';
+    OS.write_hex(MI->getOperand(0).getImm());
+    OS << ",$";
+    OS.write_hex(MI->getOperand(1).getImm());
+    OS << '\n';
+  } else if (MI->getNumOperands() == 1) {
+    bool HasComment = false;
+    unsigned Opcode = MI->getOpcode();
+    const MCInstrDesc &Desc = MII.get(Opcode);
+    unsigned AccSize = C65II::getAccSize(Desc.TSFlags);
+    unsigned IxSize = C65II::getIxSize(Desc.TSFlags);
+    if (MI->getOperand(0).isImm()) {
+      OS << "$";
+      OS.write_hex(MI->getOperand(0).getImm());
+      HasComment = true;
+    }
+    if (AccSize || IxSize) {
+      OS << '(';
+      if (AccSize == C65II::Acc8Bit)
+        OS << "Acc:8";
+      else if (AccSize == C65II::Acc16Bit)
+        OS << "Acc:16";
+      if (AccSize && IxSize)
+        OS << ',';
+      if (IxSize == C65II::Ix8Bit)
+        OS << "Ix:8";
+      else if (IxSize == C65II::Ix16Bit)
+        OS << "Ix:16";
+      OS << ')';
+      HasComment = true;
+    }
+    if (HasComment)
+      OS << '\n';
+  } else
+    assert(MI->getNumOperands() == 0);
+}
+
 void C65InstPrinter::printInst(const MCInst *MI, raw_ostream &OS,
                                StringRef Annot) {
-  if (!printAliasInstr(MI, OS)) {
+  if (!printAliasInstr(MI, OS))
     printInstruction(MI, OS);
-  }
+
+  // Next always print the annotation.
   printAnnotation(OS, Annot);
+
+  // If verbose assembly is enabled, we can print some informative comments.
+  if (CommentStream)
+    printComments(MI, *CommentStream);
 }
 
 void C65InstPrinter::printOperand(const MCInst *MI, int OpNum,
@@ -78,13 +125,13 @@ C65InstPrinter::printAddress(const MCInst *MI, int OpNum, unsigned Indirection,
     MO.getExpr()->print(OS);
   }
   if (PreIndexReg)
-    OS << PreIndexReg;
+    OS << ',' << PreIndexReg;
   if (Indirection == 1)
     OS << ')';
   else if (Indirection == 2)
     OS << ']';
   if (PostIndexReg)
-    OS << PostIndexReg;
+    OS << ',' << PostIndexReg;
 }
 void C65InstPrinter::printPCRel8Operand(const MCInst *MI, int OpNum,
                                         raw_ostream &OS) {

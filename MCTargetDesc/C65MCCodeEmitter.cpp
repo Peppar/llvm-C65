@@ -78,7 +78,7 @@ EncodeInstruction(const MCInst &MI, raw_ostream &OS,
   //  assert (MCII.get(MI.getOpcode()).getSize() == 1);
   OS << uint8_t(C65Opcode);
 
-  unsigned NumOps = Desc.getNumOperands();
+  unsigned NumOps = MI.getNumOperands();
   for (unsigned I = 0; I < NumOps; ++I) {
     const MCOperand &MO = MI.getOperand(I);
     unsigned Value;
