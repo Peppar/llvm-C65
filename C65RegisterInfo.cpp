@@ -116,6 +116,36 @@ C65RegisterInfo::getZRAddress(unsigned RegNo) const {
   case C65::ZR14W:
   case C65::ZR14: return 14;
   case C65::ZR15: return 15;
+  case C65::ZR16Q:
+  case C65::ZR16D:
+  case C65::ZR16W:
+  case C65::ZR16: return 16;
+  case C65::ZR17: return 17;
+  case C65::ZR18W:
+  case C65::ZR18: return 18;
+  case C65::ZR19: return 19;
+  case C65::ZR20D:
+  case C65::ZR20W:
+  case C65::ZR20: return 20;
+  case C65::ZR21: return 21;
+  case C65::ZR22W:
+  case C65::ZR22: return 22;
+  case C65::ZR23: return 23;
+  case C65::ZR24Q:
+  case C65::ZR24D:
+  case C65::ZR24W:
+  case C65::ZR24: return 24;
+  case C65::ZR25: return 25;
+  case C65::ZR26W:
+  case C65::ZR26: return 26;
+  case C65::ZR27: return 27;
+  case C65::ZR28D:
+  case C65::ZR28W:
+  case C65::ZR28: return 28;
+  case C65::ZR29: return 29;
+  case C65::ZR30W:
+  case C65::ZR30: return 30;
+  case C65::ZR31: return 31;
   }
 }
 

@@ -60,6 +60,10 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   // Compute derived properties from the register classes
   computeRegisterProperties();
 
+  // Copied from SystemZ
+  setSchedulingPreference(Sched::RegPressure);
+
+
   // Handle operations that are handled in a similar way for all types.
   for (unsigned I = MVT::FIRST_INTEGER_VALUETYPE;
        I <= MVT::LAST_INTEGER_VALUETYPE;
@@ -77,52 +81,54 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
 
       // BR_CC is custom inserted.
       setOperationAction(ISD::BR_CC, VT, Custom);
+
+      // Custom libcalls for these
+      setOperationAction(ISD::SHL, VT, Custom);
+      setOperationAction(ISD::SRA, VT, Custom);
+      setOperationAction(ISD::SRL, VT, Custom);
+      setOperationAction(ISD::ROTL, VT, Custom);
+      setOperationAction(ISD::ROTR, VT, Custom);
+
+      setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Expand);
+
+      setOperationAction(ISD::SIGN_EXTEND, VT, Expand);
+      setOperationAction(ISD::ZERO_EXTEND, VT, Expand);
+      setOperationAction(ISD::ANY_EXTEND, VT, Expand);
+      setOperationAction(ISD::TRUNCATE, VT, Expand);
+
+      // These are operations that the 6502 compatibles cannot perform
+      // natively; extend to libcalls.
+      setOperationAction(ISD::MUL, VT, Expand);
+      setOperationAction(ISD::SDIV, VT, Expand);
+      setOperationAction(ISD::UDIV, VT, Expand);
+      setOperationAction(ISD::SREM, VT, Expand);
+      setOperationAction(ISD::UREM, VT, Expand);
+      setOperationAction(ISD::SMUL_LOHI, VT, Expand);
+      setOperationAction(ISD::UMUL_LOHI, VT, Expand);
+      setOperationAction(ISD::SDIVREM, VT, Expand);
+      setOperationAction(ISD::UDIVREM, VT, Expand);
+      setOperationAction(ISD::CARRY_FALSE, VT, Expand);
+      setOperationAction(ISD::ADDC, VT, Expand);
+      setOperationAction(ISD::SUBC, VT, Expand);
+      setOperationAction(ISD::ADDE, VT, Expand);
+      setOperationAction(ISD::SUBE, VT, Expand);
+      setOperationAction(ISD::SADDO, VT, Expand);
+      setOperationAction(ISD::UADDO, VT, Expand);
+      setOperationAction(ISD::SSUBO, VT, Expand);
+      setOperationAction(ISD::USUBO, VT, Expand);
+      setOperationAction(ISD::SMULO, VT, Expand);
+      setOperationAction(ISD::UMULO, VT, Expand);
+      setOperationAction(ISD::MULHU, VT, Expand);
+      setOperationAction(ISD::MULHS, VT, Expand);
+      setOperationAction(ISD::BSWAP, VT, Expand);
+      setOperationAction(ISD::CTTZ, VT, Expand);
+      setOperationAction(ISD::CTLZ, VT, Expand);
+      setOperationAction(ISD::CTPOP, VT, Expand);
+      setOperationAction(ISD::CTTZ_ZERO_UNDEF, VT, Expand);
+      setOperationAction(ISD::CTLZ_ZERO_UNDEF, VT, Expand);
+      setOperationAction(ISD::SHL_PARTS, VT, Expand);
+      setOperationAction(ISD::SRA_PARTS, VT, Expand);
     }
-
-    // Custom libcalls for these
-    setOperationAction(ISD::SHL, VT, Custom);
-    setOperationAction(ISD::SRA, VT, Custom);
-    setOperationAction(ISD::SRL, VT, Custom);
-    setOperationAction(ISD::ROTL, VT, Custom);
-    setOperationAction(ISD::ROTR, VT, Custom);
-    //    setOperationAction(ISD::SIGN_EXTEND, VT, Custom);
-    //    setOperationAction(ISD::ZERO_EXTEND, VT, Custom);
-    //    setOperationAction(ISD::ANY_EXTEND, VT, Custom);
-    //    setOperationAction(ISD::TRUNCATE, VT, Custom);
-
-    // These are operations that the 6502 compatibles cannot perform
-    // natively; extend to libcalls.
-    setOperationAction(ISD::MUL, VT, Expand);
-    setOperationAction(ISD::SDIV, VT, Expand);
-    setOperationAction(ISD::UDIV, VT, Expand);
-    setOperationAction(ISD::SREM, VT, Expand);
-    setOperationAction(ISD::UREM, VT, Expand);
-    setOperationAction(ISD::SMUL_LOHI, VT, Expand);
-    setOperationAction(ISD::UMUL_LOHI, VT, Expand);
-    setOperationAction(ISD::SDIVREM, VT, Expand);
-    setOperationAction(ISD::UDIVREM, VT, Expand);
-    setOperationAction(ISD::CARRY_FALSE, VT, Expand);
-    setOperationAction(ISD::ADDC, VT, Expand);
-    setOperationAction(ISD::SUBC, VT, Expand);
-    setOperationAction(ISD::ADDE, VT, Expand);
-    setOperationAction(ISD::SUBE, VT, Expand);
-    setOperationAction(ISD::SADDO, VT, Expand);
-    setOperationAction(ISD::UADDO, VT, Expand);
-    setOperationAction(ISD::SSUBO, VT, Expand);
-    setOperationAction(ISD::USUBO, VT, Expand);
-    setOperationAction(ISD::SMULO, VT, Expand);
-    setOperationAction(ISD::UMULO, VT, Expand);
-    setOperationAction(ISD::MULHU, VT, Expand);
-    setOperationAction(ISD::MULHS, VT, Expand);
-    setOperationAction(ISD::BSWAP, VT, Expand);
-    setOperationAction(ISD::CTTZ, VT, Expand);
-    setOperationAction(ISD::CTLZ, VT, Expand);
-    setOperationAction(ISD::CTPOP, VT, Expand);
-    setOperationAction(ISD::CTTZ_ZERO_UNDEF, VT, Expand);
-    setOperationAction(ISD::CTLZ_ZERO_UNDEF, VT, Expand);
-    setOperationAction(ISD::SHL_PARTS, VT, Expand);
-    setOperationAction(ISD::SRA_PARTS, VT, Expand);
-    //    setOperationAction(ISD::SIGN_EXTEND_INREG, VT, Expand);
   }
 
   // setOperationAction(ISD::ZERO_EXTEND_INREG, MVT::i32, Expand);
@@ -223,13 +229,13 @@ SDValue C65TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
   if (Op.getOpcode() == ISD::SHL) {
     isSigned = false; /*sign irrelevant*/
     if (VT == MVT::i8)
-      LCName = "c65_ashl8";
+      LCName = "c65_shl8";
     else if (VT == MVT::i16)
-      LCName = "c65_ashl16";
+      LCName = "c65_shl16";
     else if (VT == MVT::i32)
-      LCName = "c65_ashl32";
+      LCName = "c65_shl32";
     else if (VT == MVT::i64)
-      LCName = "c65_ashl64";
+      LCName = "c65_shl64";
   } else if (Op.getOpcode() == ISD::SRL) {
     isSigned = false;
     if (VT == MVT::i8)
@@ -329,10 +335,10 @@ static struct Comparison getComparison(const MachineInstr *MI) {
   switch (CC) { //           Op0  Op1  Equality Signed Bitvalue
   case ISD::SETEQ:  return { Op0, Op1, true,    false, true };
   case ISD::SETNE:  return { Op0, Op1, true,    false, false };
-  case ISD::SETLT:  return { Op1, Op0, false,   true,  false };
-  case ISD::SETLE:  return { Op0, Op1, false,   true,  true };
-  case ISD::SETGT:  return { Op0, Op1, false,   true,  false };
-  case ISD::SETGE:  return { Op1, Op0, false,   true,  true };
+  case ISD::SETLT:  return { Op0, Op1, false,   true,  true };
+  case ISD::SETLE:  return { Op1, Op0, false,   true,  false };
+  case ISD::SETGT:  return { Op1, Op0, false,   true,  true };
+  case ISD::SETGE:  return { Op0, Op1, false,   true,  false };
   case ISD::SETULT: return { Op0, Op1, false,   false, true };
   case ISD::SETULE: return { Op1, Op0, false,   false, false };
   case ISD::SETUGT: return { Op1, Op0, false,   false, true };
@@ -366,9 +372,11 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
 
   if (C.Equality) {
     // thisMBB:
+    // cmpMBB0:
     //   LDA %ZRA
     //   CMP %ZRB
     //   BNE sinkMBB/Dest
+    // cmpMBB1:
     //   LDA %ZRA+2
     //   CMP %ZRB+2
     //   BNE sinkMBB/Dest
@@ -383,34 +391,44 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
 
     MachineBasicBlock *thisMBB = MBB;
     MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
-    MF->insert(MFI, sinkMBB);
+    MachineBasicBlock *predMBB = thisMBB;
+    MachineBasicBlock *cmpMBB;
 
     // Transfer the remainder of the MBB and its successor edges to sinkMBB.
     sinkMBB->splice(sinkMBB->begin(), MBB,
                     std::next(MachineBasicBlock::iterator(MI)), MBB->end());
     sinkMBB->transferSuccessorsAndUpdatePHIs(MBB);
-    thisMBB->addSuccessor(sinkMBB);
-    thisMBB->addSuccessor(Dest);
 
     for (unsigned I = 0; I < NumBytes; I += AccSize) {
-      BuildMI(thisMBB, DL, TII->get(LDAInstr))
+      cmpMBB = MF->CreateMachineBasicBlock(BB);
+      MF->insert(MFI, cmpMBB);
+      predMBB->addSuccessor(cmpMBB);
+
+      BuildMI(cmpMBB, DL, TII->get(LDAInstr))
         .addImm(RI->getZRAddress(C.Op0.getReg()) + I);
-      BuildMI(thisMBB, DL, TII->get(CMPInstr))
+      BuildMI(cmpMBB, DL, TII->get(CMPInstr))
         .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
       if (I == NumBytes - AccSize) {
         if (C.Bitvalue) {
-          BuildMI(thisMBB, DL, TII->get(C65::BEQ)).addMBB(Dest);
+          BuildMI(cmpMBB, DL, TII->get(C65::BEQ)).addMBB(Dest);
+          cmpMBB->addSuccessor(Dest);
         } else {
-          BuildMI(thisMBB, DL, TII->get(C65::BNE)).addMBB(Dest);
+          BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(Dest);
+          cmpMBB->addSuccessor(Dest);
         }
       } else {
         if (C.Bitvalue) {
-          BuildMI(thisMBB, DL, TII->get(C65::BNE)).addMBB(sinkMBB);
+          BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(sinkMBB);
+          cmpMBB->addSuccessor(sinkMBB);
         } else {
-          BuildMI(thisMBB, DL, TII->get(C65::BNE)).addMBB(Dest);
+          BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(Dest);
+          cmpMBB->addSuccessor(Dest);
         }
       }
+      predMBB = cmpMBB;
     }
+    MF->insert(MFI, sinkMBB);
+    predMBB->addSuccessor(sinkMBB);
 
     MI->eraseFromParent();
     return sinkMBB;
@@ -421,11 +439,74 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
     //   LDA %ZRA+2
     //   SBC %ZRB+2
     //   ...
-    //   BVC sinkMBB
+    //   BVC braMBB
+    // ovfMBB:
     //   EOR #$8000
-    // sinkMBB:
+    // braMBB:
     //   BPL/BMI %DEST
+    // sinkMBB:
 
+    const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
+    const unsigned CMPInstr = Use8Bit ? C65::CMP8zp : C65::CMP16zp;
+    const unsigned SBCInstr = Use8Bit ? C65::SBC8zp : C65::SBC16zp;
+
+    MachineBasicBlock *thisMBB = MBB;
+    MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
+    MachineBasicBlock *ovfMBB = MF->CreateMachineBasicBlock(BB);
+    MachineBasicBlock *braMBB = MF->CreateMachineBasicBlock(BB);
+    MF->insert(MFI, ovfMBB);
+    MF->insert(MFI, braMBB);
+    MF->insert(MFI, sinkMBB);
+
+    // Transfer the remainder of the MBB and its successor edges to sinkMBB.
+    sinkMBB->splice(sinkMBB->begin(), MBB,
+                    std::next(MachineBasicBlock::iterator(MI)), MBB->end());
+    sinkMBB->transferSuccessorsAndUpdatePHIs(MBB);
+    thisMBB->addSuccessor(braMBB);
+    thisMBB->addSuccessor(ovfMBB);
+    ovfMBB->addSuccessor(braMBB);
+    braMBB->addSuccessor(Dest);
+    braMBB->addSuccessor(sinkMBB);
+
+    BuildMI(thisMBB, DL, TII->get(LDAInstr))
+      .addImm(RI->getZRAddress(C.Op0.getReg()));
+    BuildMI(thisMBB, DL, TII->get(CMPInstr))
+      .addImm(RI->getZRAddress(C.Op1.getReg()));
+
+    for (unsigned I = AccSize; I < NumBytes; I += AccSize) {
+      BuildMI(thisMBB, DL, TII->get(LDAInstr))
+        .addImm(RI->getZRAddress(C.Op0.getReg()) + I);
+      BuildMI(thisMBB, DL, TII->get(SBCInstr))
+        .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
+    }
+
+    BuildMI(thisMBB, DL, TII->get(C65::BVC))
+      .addMBB(braMBB);
+    if (Use8Bit) {
+      BuildMI(*ovfMBB, ovfMBB->begin(), DL, TII->get(C65::EOR8imm))
+        .addImm(0x80);
+    } else {
+      BuildMI(*ovfMBB, ovfMBB->begin(), DL, TII->get(C65::EOR16imm))
+        .addImm(0x8000);
+    }
+
+    if (C.Bitvalue) {
+      BuildMI(*braMBB, braMBB->begin(), DL, TII->get(C65::BMI)).addMBB(Dest);
+    } else {
+      BuildMI(*braMBB, braMBB->begin(), DL, TII->get(C65::BPL)).addMBB(Dest);
+    }
+
+    MI->eraseFromParent();
+    return sinkMBB;
+  } else {
+    // thisMBB:
+    //   LDA %ZRA
+    //   CMP %ZRB
+    //   LDA %ZRA+2
+    //   SBC %ZRB+2
+    //   ...
+    //   BCS/BCC Dest
+    // sinkMBB:
     const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
     const unsigned CMPInstr = Use8Bit ? C65::CMP8zp : C65::CMP16zp;
     const unsigned SBCInstr = Use8Bit ? C65::SBC8zp : C65::SBC16zp;
@@ -441,12 +522,6 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
     thisMBB->addSuccessor(sinkMBB);
     thisMBB->addSuccessor(Dest);
 
-    if (C.Bitvalue) {
-      BuildMI(*sinkMBB, sinkMBB->begin(), DL, TII->get(C65::BMI)).addMBB(Dest);
-    } else {
-      BuildMI(*sinkMBB, sinkMBB->begin(), DL, TII->get(C65::BPL)).addMBB(Dest);
-    }
-
     BuildMI(thisMBB, DL, TII->get(LDAInstr))
       .addImm(RI->getZRAddress(C.Op0.getReg()));
     BuildMI(thisMBB, DL, TII->get(CMPInstr))
@@ -458,53 +533,15 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
       BuildMI(thisMBB, DL, TII->get(SBCInstr))
         .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
     }
-
-    BuildMI(thisMBB, DL, TII->get(C65::BVC))
-      .addMBB(sinkMBB);
-    if (Use8Bit) {
-      BuildMI(thisMBB, DL, TII->get(C65::EOR8imm))
-        .addImm(0x80);
+    if (C.Bitvalue) {
+      BuildMI(thisMBB, DL, TII->get(C65::BCS)).addMBB(Dest);
     } else {
-      BuildMI(thisMBB, DL, TII->get(C65::EOR16imm))
-        .addImm(0x8000);
+      BuildMI(thisMBB, DL, TII->get(C65::BCC)).addMBB(Dest);
     }
 
     MI->eraseFromParent();
 
     return sinkMBB;
-  } else {
-    //   LDA %ZRA
-    //   CMP %ZRB
-    //   LDA %ZRA+2
-    //   SBC %ZRB+2
-    //   ...
-    //   BCS/BCC Dest
-    const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
-    const unsigned CMPInstr = Use8Bit ? C65::CMP8zp : C65::CMP16zp;
-    const unsigned SBCInstr = Use8Bit ? C65::SBC8zp : C65::SBC16zp;
-
-    MachineBasicBlock::iterator MBBI = MI;
-
-    BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
-      .addImm(RI->getZRAddress(C.Op0.getReg()));
-    BuildMI(*MBB, MBBI, DL, TII->get(CMPInstr))
-      .addImm(RI->getZRAddress(C.Op1.getReg()));
-
-    for (unsigned I = AccSize; I < NumBytes; I += AccSize) {
-      BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
-        .addImm(RI->getZRAddress(C.Op0.getReg()) + I);
-      BuildMI(*MBB, MBBI, DL, TII->get(SBCInstr))
-        .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
-    }
-    if (C.Bitvalue) {
-      BuildMI(*MBB, MBBI, DL, TII->get(C65::BCS)).addMBB(Dest);
-    } else {
-      BuildMI(*MBB, MBBI, DL, TII->get(C65::BCC)).addMBB(Dest);
-    }
-
-    MI->eraseFromParent();
-
-    return MBB;
   }
 }
 
@@ -1329,11 +1366,11 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
   // TODO: THIS
   // Add a register mask operand representing the call-preserved registers.
-  //  const TargetRegisterInfo *TRI =
-  //    getTargetMachine().getSubtargetImpl()->getRegisterInfo();
-  //  const uint32_t *Mask = TRI->getCallPreservedMask(CallConv);
-  //  assert(Mask && "Missing call preserved mask for calling convention");
-  //  Ops.push_back(DAG.getRegisterMask(Mask));
+  const TargetRegisterInfo *TRI =
+    getTargetMachine().getSubtargetImpl()->getRegisterInfo();
+  const uint32_t *Mask = TRI->getCallPreservedMask(CallConv);
+  assert(Mask && "Missing call preserved mask for calling convention");
+  Ops.push_back(DAG.getRegisterMask(Mask));
 
   // Glue the call to the argument copies, if any.
   if (Glue.getNode()) {

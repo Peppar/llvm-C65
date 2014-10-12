@@ -1113,11 +1113,11 @@ def SEP   : FF<0xe2, (outs), (ins i8imm:$imm), "sep $imm", []>,
               OpSize8, Requires<[Has65802]>;
 
 def CLC    : FF<0x18, (outs), (ins), "clc", []>;
-def SEC    : FF<0x38, (outs), (ins), "stc", []>;
+def SEC    : FF<0x38, (outs), (ins), "sec", []>;
 def CLD    : FF<0xd8, (outs), (ins), "cld", []>;
-def SED    : FF<0xf8, (outs), (ins), "std", []>;
+def SED    : FF<0xf8, (outs), (ins), "sed", []>;
 def CLI    : FF<0x58, (outs), (ins), "cli", []>;
-def SEI    : FF<0x78, (outs), (ins), "sti", []>;
+def SEI    : FF<0x78, (outs), (ins), "sei", []>;
 def CLV    : FF<0xb8, (outs), (ins), "clv", []>;
 
 let Predicates = [IsIx8Bit] in {
@@ -1369,3 +1369,37 @@ def : Pat<(C65call tglobaladdr:$dst),
           (JSRabs tglobaladdr:$dst)>;
 def : Pat<(C65call texternalsym:$dst),
           (JSRabs texternalsym:$dst)>;
+// trunc patterns
+def : Pat<(i8 (trunc ZRC16:$src)),
+          (EXTRACT_SUBREG ZRC16:$src, sub_8bit)>;
+
+def : Pat<(i8 (trunc ZRC32:$src)),
+          (EXTRACT_SUBREG ZRC32:$src, sub_8bit)>;
+def : Pat<(i16 (trunc ZRC32:$src)),
+          (EXTRACT_SUBREG ZRC32:$src, sub_16bit)>;
+
+def : Pat<(i8 (trunc ZRC64:$src)),
+          (EXTRACT_SUBREG ZRC64:$src, sub_8bit)>;
+def : Pat<(i16 (trunc ZRC64:$src)),
+          (EXTRACT_SUBREG ZRC64:$src, sub_16bit)>;
+def : Pat<(i32 (trunc ZRC64:$src)),
+          (EXTRACT_SUBREG ZRC64:$src, sub_32bit)>;
+
+// // h-register tricks
+// def : Pat<(i8 (trunc (srl_su ZRC16:$src, (i8 8)))),
+//           (EXTRACT_SUBREG ZRC16:$src, sub_8bit_hi)>;
+
+// def : Pat<(i8 (trunc (srl_su ZRC32:$src, (i8 8)))),
+//           (EXTRACT_SUBREG
+//             (EXTRACT_SUBREG ZRC32:$src, sub_16bit), sub_8bit_hi)>;
+// def : Pat<(i8 (trunc (srl_su ZRC32:$src, (i8 16)))),
+//           (EXTRACT_SUBREG
+//             (EXTRACT_SUBREG ZRC32:$src, sub_16bit_hi), sub_8bit)>;
+// def : Pat<(i8 (trunc (srl_su ZRC32:$src, (i8 24)))),
+//           (EXTRACT_SUBREG
+//             (EXTRACT_SUBREG ZRC32:$src, sub_16bit_hi), sub_8bit_hi)>;
+
+// def : Pat<(i8 (trunc (srl_su ZRC64:$src, (i8 8)))),
+//           (EXTRACT_SUBREG
+//             (EXTRACT_SUBREG
+//               (EXTRACT_SUBREG ZRC64:$src, sub_32bit), sub_16bit), sub_8bit_hi)>;

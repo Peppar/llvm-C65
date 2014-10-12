@@ -76,7 +76,7 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
 
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
     MachineBasicBlock *MBB = I;
-    unsigned CurAccSize = C65II::Acc16Bit;;
+    unsigned CurAccSize = C65II::Acc16Bit;
     unsigned CurIxSize = C65II::Ix16Bit;
     for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
          MBBI != MBBE; ++MBBI) {
@@ -117,8 +117,11 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
     }
     if (CurAccSize != C65II::Acc16Bit || CurIxSize != C65II::Ix16Bit) {
       DebugLoc DL;
+      unsigned ResetBits =
+        ((CurAccSize != C65II::Acc16Bit) ? 0x20 : 0) |
+        ((CurIxSize != C65II::Ix16Bit)  ? 0x10 : 0);
       BuildMI(MBB, DL, TII->get(C65::REP))
-        .addImm(0x30);
+        .addImm(ResetBits);
     }
     for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
          MBBI != MBBE; ) {
