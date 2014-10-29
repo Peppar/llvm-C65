@@ -73,6 +73,7 @@ namespace {
 MCOperand C65AsmPrinter::LowerSymbolOperand(const MachineOperand &MO) {
   const MCSymbol *Symbol = nullptr;
   bool HasOffset = true;
+  unsigned ShiftAmt = MO.getTargetFlags();
 
   switch(MO.getType()) {
   default:
@@ -80,7 +81,7 @@ MCOperand C65AsmPrinter::LowerSymbolOperand(const MachineOperand &MO) {
 
   case MachineOperand::MO_MachineBasicBlock:
     Symbol = MO.getMBB()->getSymbol();
-    HasOffset = 0;
+    HasOffset = false;
     break;
 
   case MachineOperand::MO_GlobalAddress:
@@ -111,6 +112,10 @@ MCOperand C65AsmPrinter::LowerSymbolOperand(const MachineOperand &MO) {
       const MCExpr *OffsetExpr = MCConstantExpr::Create(Offset, OutContext);
       Expr = MCBinaryExpr::CreateAdd(Expr, OffsetExpr, OutContext);
     }
+  }
+  if (ShiftAmt) {
+    const MCExpr *ShiftAmtExpr =  MCConstantExpr::Create(ShiftAmt, OutContext);
+    Expr = MCBinaryExpr::CreateShr(Expr, ShiftAmtExpr, OutContext);
   }
   return MCOperand::CreateExpr(Expr);
 }

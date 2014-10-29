@@ -30,7 +30,8 @@ namespace llvm {
       BR_CC,
       SELECT_CC,
       CALL,
-      RET
+      RET,
+      Wrapper
     };
   }
 
@@ -82,8 +83,11 @@ namespace llvm {
                                bool Signed = false) const;
     MachineBasicBlock *EmitZLDimm(MachineInstr *MI, MachineBasicBlock *MBB,
                                   unsigned NumBytes) const;
-    MachineBasicBlock *EmitZMOV(MachineInstr *MI, MachineBasicBlock *MBB,
-                                 unsigned NumBytes) const;
+    MachineBasicBlock *EmitZMOV(MachineInstr *MI,
+                                MachineBasicBlock *MBB,
+                                unsigned NumBytes,
+                                unsigned ExtendBegin,
+                                bool Signed = false) const;
     MachineBasicBlock *EmitZInstr(MachineInstr *MI,
                                   MachineBasicBlock *MBB) const;
     MachineBasicBlock *
@@ -99,9 +103,32 @@ namespace llvm {
     /// getSetCCResultType - Return the ISD::SETCC ValueType
     EVT getSetCCResultType(LLVMContext &Context, EVT VT) const override;
 
+    // ConstantPool, JumpTable, GlobalAddress, and ExternalSymbol are
+    // lowered as their target countpart wrapped in the
+    // C65ISD::Wrapper node. Suppose N is one of the above mentioned
+    // nodes. It has to be wrapped because otherwise Select(N) returns
+    // N. So the raw TargetGlobalAddress nodes, etc. can only be used
+    // to form addressing mode.
     SDValue
-    LowerGlobalAddress(GlobalAddressSDNode *Node, SelectionDAG &DAG) const;
+    LowerConstantPool(SDValue Op, SelectionDAG &DAG) const;
 
+    SDValue
+    LowerGlobalAddress(const GlobalValue *GV, SDLoc DL,
+                       int64_t Offset, SelectionDAG &DAG) const;
+
+    SDValue
+    LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;
+
+    SDValue
+    LowerExternalSymbol(SDValue Op, SelectionDAG &DAG) const;
+
+    SDValue
+    LowerBlockAddress(SDValue Op, SelectionDAG &DAG) const;
+
+    SDValue
+    LowerJumpTable(SDValue Op, SelectionDAG &DAG) const;
+
+    // Call lowering
     SDValue
     LowerFormalArguments(SDValue Chain,
                          CallingConv::ID CallConv,

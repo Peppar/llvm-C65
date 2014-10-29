@@ -98,7 +98,7 @@ void C65FrameLowering::emitEpilogue(MachineFunction &MF,
   const MachineFrameInfo *MFI = MF.getFrameInfo();
   MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
   assert(MBBI->getOpcode() == C65::RTS &&
-         "Can only put epilog before 'rts' instruction!");
+         "Can only put epilogue before 'rts' instruction!");
   int Size = (int)MFI->getStackSize();
   if (Size)
     emitSAdjustment(MF, MBB, MBBI, Size);

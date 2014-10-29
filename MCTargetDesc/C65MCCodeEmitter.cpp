@@ -102,16 +102,35 @@ C65MCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
   unsigned Opcode = MI.getOpcode();
   const MCInstrDesc &Desc = MCII.get(Opcode);
   unsigned TSFlags = Desc.TSFlags;
-
   unsigned OpSize = C65II::getOpSize(TSFlags);
+
+  const MCExpr *Expr = MO.getExpr();
+  unsigned ShiftAmt = 0;
+
+  // For 8-bit and 16-bit values, the outermost bit shift right is
+  // converted to a corresponding fixup handled by the object writer.
+  if (OpSize == 1 || OpSize == 2) {
+    if (const MCBinaryExpr *BE = dyn_cast<MCBinaryExpr>(Expr)) {
+      if (BE->getOpcode() == MCBinaryExpr::Shr) {
+        if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(BE->getRHS())) {
+          ShiftAmt = CE->getValue();
+          Expr = BE->getLHS();
+        }
+      }
+    }
+  }
+
   MCFixupKind FixupKind;
-  if (OpSize == 1)
-    FixupKind = FK_Data_1;
-  else if (OpSize == 2)
-    FixupKind = FK_Data_2;
-  else if (OpSize == 3)
-    FixupKind = FK_Data_4;
-  else
+  if (OpSize == 1) {
+    assert(ShiftAmt < 64);
+    FixupKind = (MCFixupKind)(C65::FK_C65_8 + (ShiftAmt >> 3));
+  } else if (OpSize == 2) {
+    assert(ShiftAmt < 64);
+    FixupKind = (MCFixupKind)(C65::FK_C65_16 + (ShiftAmt >> 4));
+  } else if (OpSize == 3) {
+    assert(ShiftAmt == 0);
+    FixupKind = (MCFixupKind)(C65::FK_C65_24);
+  } else
     llvm_unreachable("Instruction expected to be without operands.");
 
   Fixups.push_back(MCFixup::Create(1, MO.getExpr(), FixupKind));

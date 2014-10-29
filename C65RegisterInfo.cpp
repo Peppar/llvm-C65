@@ -19,6 +19,7 @@
 #include "llvm/CodeGen/MachineFrameInfo.h"
 #include "llvm/CodeGen/MachineFunction.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
+#include "llvm/IR/Function.h"
 #include "llvm/IR/Type.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -39,11 +40,19 @@ C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
 
 const MCPhysReg*
 C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+  switch (MF->getFunction()->getCallingConv()) {
+  case CallingConv::PreserveAll:
+    return CSR_C65_AllRegs_SaveList;
+  }
   return CSR_C65_SaveList;
 }
 
 const uint32_t*
 C65RegisterInfo::getCallPreservedMask(CallingConv::ID CC) const {
+  switch (CC) {
+  case CallingConv::PreserveAll:
+    return CSR_C65_AllRegs_RegMask;
+  }
   return CSR_C65_RegMask;
 }
 
@@ -61,7 +70,8 @@ BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
   return Reserved;
 }
 
-const TargetRegisterClass*
+const
+TargetRegisterClass*
 C65RegisterInfo::getPointerRegClass(const MachineFunction &MF,
                                     unsigned Kind) const {
   // if (Kind == 0)

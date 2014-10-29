@@ -261,6 +261,35 @@ public:
                                bool MatchingInlineAsm) override;
 
   // Used by the TableGen code to parse particular operand types.
+  OperandMatchResultTy parseImmOperand(OperandVector &Operands) {
+    SMLoc StartLoc = Parser.getTok().getLoc();
+    const MCExpr *Imm;
+    // Hash required for immediate operands
+    if (!getLexer().is(AsmToken::Hash))
+      return MatchOperand_NoMatch;
+    Parser.Lex();
+    if (getLexer().is(AsmToken::Less)) {
+      // Get lower byte of operand (no-op)
+      Parser.Lex();
+    } else if (getLexer().is(AsmToken::Greater)) {
+      // Get higher byte of operand (shift right 8 bits)
+      Parser.Lex();
+      const MCExpr *ShiftAmt = MCConstantExpr::Create(8, Parser.getContext());
+      Imm = MCBinaryExpr::CreateShr(Imm, ShiftAmt, Parser.getContext());
+    } else if (getLexer().is(AsmToken::Colon)) {
+      // Get bank byte of operand (shift right 16 bits)
+      Parser.Lex();
+      const MCExpr *ShiftAmt = MCConstantExpr::Create(16, Parser.getContext());
+      Imm = MCBinaryExpr::CreateShr(Imm, ShiftAmt, Parser.getContext());
+    }
+    if (getParser().parseExpression(Imm))
+      return MatchOperand_ParseFail;
+    SMLoc EndLoc =
+      SMLoc::getFromPointer(Parser.getTok().getLoc().getPointer() - 1);
+
+    Operands.push_back(C65Operand::createImm(Imm, StartLoc, EndLoc));
+    return MatchOperand_Success;
+  }
   OperandMatchResultTy parsePCRel8Operand(OperandVector &Operands) {
     return parseAddress(Operands, MemPCRel8, 8, true, 0, 0, 0);
   }

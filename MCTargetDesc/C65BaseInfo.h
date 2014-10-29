@@ -30,34 +30,34 @@ namespace C65II {
   enum {
     // This needs to be kept in sync with C65InstrInfo.td TSFlags
 
-    // AccSize
+    // Accumulator register size.
     AccSize = (3 << 0),
     AccSizeShift = 0,
     Acc8Bit = 2,
     Acc16Bit = 3,
 
-    // IxSize
+    // Index register size.
     IxSize = (3 << 2),
     IxSizeShift = 2,
     Ix8Bit = 2,
     Ix16Bit = 3,
 
-    // Is a ZR instruction
+    // Is a ZR instruction.
     ZRInstr = (1 << 4),
 
-    // ZR operand size
+    // ZR operand size.
     ZROpSize = (3 << 5),
     ZROpSizeShift = 5,
 
-    // Machine code operand byte size
+    // Machine code operand byte size.
     OpSize = (3 << 7),
     OpSizeShift = 7,
 
-    // Machine Opcode
+    // Machine opcode.
     Opcode = (255 << 9),
     OpcodeShift = 9,
 
-    // Machine operand is PC relative
+    // Machine operand is PC relative.
     OpPCRel = (1 << 17)
   };
 

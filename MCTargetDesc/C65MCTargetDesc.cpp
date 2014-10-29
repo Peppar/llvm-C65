@@ -43,14 +43,13 @@ namespace llvm {
       CalleeSaveStackSlotSize = 1;
       IsLittleEndian = true;
 
-      Data8bitsDirective = "\t.db\t";
-      Data16bitsDirective = "\t.dw\t";
-      Data32bitsDirective = "\t.dd\t";
-      Data64bitsDirective = "\t.dq\t";
-
-      AsciiDirective = "\t.db\t";
-      AscizDirective = nullptr;
-      ZeroDirective = nullptr;
+      // Data8bitsDirective = "\t.db\t";
+      // Data16bitsDirective = "\t.dw\t";
+      // Data32bitsDirective = "\t.dd\t";
+      // Data64bitsDirective = "\t.dq\t";
+      // AsciiDirective = "\t.db\t";
+      // AscizDirective = nullptr;
+      // ZeroDirective = nullptr;
       CommentString = ";";
 
       InlineAsmStart = ";APP\n";

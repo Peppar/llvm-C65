@@ -23,15 +23,10 @@ using namespace llvm;
 static uint64_t extractBitsForFixup(MCFixupKind Kind, uint64_t Value) {
   if (Kind < FirstTargetFixupKind)
     return Value;
-
-  switch (unsigned(Kind)) {
-  case C65::FK_390_PC16DBL:
-  case C65::FK_390_PC32DBL:
-  case C65::FK_390_PLT16DBL:
-  case C65::FK_390_PLT32DBL:
-    return (int64_t)Value / 2;
-  }
-
+  if (C65::isFixup8Bit(Kind))
+    return Value >> C65::get8BitFixupShiftAmt(Kind) & 0xFF;
+  if (C65::isFixup16Bit(Kind))
+    return Value >> C65::get16BitFixupShiftAmt(Kind) & 0xFFFF;
   llvm_unreachable("Unknown fixup kind!");
 }
 
@@ -70,10 +65,19 @@ public:
 const MCFixupKindInfo &
 C65MCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
   const static MCFixupKindInfo Infos[C65::NumTargetFixupKinds] = {
-    { "FK_390_PC16DBL",  0, 16, MCFixupKindInfo::FKF_IsPCRel },
-    { "FK_390_PC32DBL",  0, 32, MCFixupKindInfo::FKF_IsPCRel },
-    { "FK_390_PLT16DBL", 0, 16, MCFixupKindInfo::FKF_IsPCRel },
-    { "FK_390_PLT32DBL", 0, 32, MCFixupKindInfo::FKF_IsPCRel }
+    { "FK_C65_8",     0, 8,  0 },
+    { "FK_C65_8s8",   0, 8,  0 },
+    { "FK_C65_8s16",  0, 8,  0 },
+    { "FK_C65_8s24",  0, 8,  0 },
+    { "FK_C65_8s32",  0, 8,  0 },
+    { "FK_C65_8s40",  0, 8,  0 },
+    { "FK_C65_8s48",  0, 8,  0 },
+    { "FK_C65_8s56",  0, 8,  0 },
+    { "FK_C65_16",    0, 16, 0 },
+    { "FK_C65_16s16", 0, 16, 0 },
+    { "FK_C65_16s32", 0, 16, 0 },
+    { "FK_C65_16s48", 0, 16, 0 },
+    { "FK_C65_24",    0, 24, 0 }
   };
 
   if (Kind < FirstTargetFixupKind)
@@ -85,8 +89,8 @@ C65MCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
 }
 
 void C65MCAsmBackend::applyFixup(const MCFixup &Fixup, char *Data,
-                                     unsigned DataSize, uint64_t Value,
-                                     bool IsPCRel) const {
+                                 unsigned DataSize, uint64_t Value,
+                                 bool IsPCRel) const {
   MCFixupKind Kind = Fixup.getKind();
   unsigned Offset = Fixup.getOffset();
   unsigned Size = (getFixupKindInfo(Kind).TargetSize + 7) / 8;

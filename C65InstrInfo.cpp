@@ -116,7 +116,6 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   DEBUG(dbgs() << "CopyPhysReg from "
                << RI.getName(DestReg)
                << " to " << RI.getName(SrcReg) << '\n');
-  MBB.dump();
   // if (SrcReg == C65::A && DestReg == C65::X) {
   //   BuildMI(MBB, MI, DL, get(C65::TAX));
   // } else if (SrcReg == C65::A && DestReg == C65::Y) {
@@ -166,21 +165,18 @@ storeRegToStackSlot(MachineBasicBlock &MBB,
                     const TargetRegisterInfo *TRI) const {
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
   unsigned Opcode;
-  if (C65::ZRC8RegClass.contains(SrcReg))
+  if (RC == &C65::ZRC8RegClass)
     Opcode = C65::ZST8s;
-  else if (C65::ZRC16RegClass.contains(SrcReg))
+  else if (RC == &C65::ZRC16RegClass)
     Opcode = C65::ZST16s;
-  else if (C65::ZRC32RegClass.contains(SrcReg))
+  else if (RC == &C65::ZRC32RegClass)
     Opcode = C65::ZST32s;
-  else if (C65::ZRC64RegClass.contains(SrcReg))
+  else if (RC == &C65::ZRC64RegClass)
     Opcode = C65::ZST64s;
-  else {
-    DEBUG(dbgs() << "Cannot store " << RI.getName(SrcReg)
-                 << " to stack frame\n");
+  else
     llvm_unreachable("Unable to store reg from stack slot.");
-  }
   BuildMI(MBB, MBBI, DL, get(Opcode))
-    .addReg(SrcReg)
+    .addReg(SrcReg, getKillRegState(isKill))
     .addFrameIndex(FI)
     .addImm(0);
 }
@@ -207,21 +203,17 @@ loadRegFromStackSlot(MachineBasicBlock &MBB,
                      const TargetRegisterInfo *TRI) const {
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
   unsigned Opcode;
-  if (C65::ZRC8RegClass.contains(DestReg))
+  if (RC == &C65::ZRC8RegClass)
     Opcode = C65::ZLD8s;
-  else if (C65::ZRC16RegClass.contains(DestReg))
+  else if (RC == &C65::ZRC16RegClass)
     Opcode = C65::ZLD16s;
-  else if (C65::ZRC32RegClass.contains(DestReg))
+  else if (RC == &C65::ZRC32RegClass)
     Opcode = C65::ZLD32s;
-  else if (C65::ZRC64RegClass.contains(DestReg))
+  else if (RC == &C65::ZRC64RegClass)
     Opcode = C65::ZLD64s;
-  else {
-    DEBUG(dbgs() << "Cannot load " << RI.getName(DestReg)
-                 << " from stack frame\n");
+  else
     llvm_unreachable("Unable to load reg from stack slot.");
-  }
-  BuildMI(MBB, MBBI, DL, get(Opcode))
-    .addReg(DestReg)
+  BuildMI(MBB, MBBI, DL, get(Opcode), DestReg)
     .addFrameIndex(FI)
     .addImm(0);
 }
@@ -258,7 +250,7 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
     if (I->isDebugValue())
       continue;
 
-    // When we see a non-terminator, we are done.
+    // Working from the bottom, we see a non-terminator, we are done.
     if (!isUnpredicatedTerminator(I))
       break;
 
@@ -278,12 +270,16 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
         continue;
       }
 
+      // Delete all instructions after an unconditional branch.
       while (std::next(I) != MBB.end())
         std::next(I)->eraseFromParent();
 
+      // Any previously encountered conditional branches are
+      // irrelevant now.
       Cond.clear();
       FBB = nullptr;
 
+      // Delete the branch if it's equivalent to a fall-through.
       if (MBB.isLayoutSuccessor(I->getOperand(0).getMBB())) {
         TBB = nullptr;
         I->eraseFromParent();
@@ -296,6 +292,8 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
       continue;
     }
 
+    // If we're here, that means that the current instruction should
+    // be a conditional branch.
     unsigned Opcode = I->getOpcode();
     if (Opcode != C65::ZBRCC8 &&
         Opcode != C65::ZBRCC16 &&
@@ -303,8 +301,10 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
         Opcode != C65::ZBRCC64)
       return true; // Unknown Opcode.
 
+    // Working from the bottom, handle the first conditional branch.
     if (Cond.empty()) {
       FBB = TBB;
+      Cond.push_back(MachineOperand::CreateImm(Opcode));
       Cond.push_back(I->getOperand(0));
       Cond.push_back(I->getOperand(1));
       Cond.push_back(I->getOperand(2));
@@ -346,32 +346,33 @@ C65InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                            const SmallVectorImpl<MachineOperand> &Cond,
                            DebugLoc DL) const {
   assert(TBB && "InsertBranch must not be told to insert a fallthrough");
-  assert((Cond.size() == 3 || Cond.size() == 0) &&
-         "C65 branch conditions have three components!");
+  assert((Cond.size() == 4 || Cond.size() == 0) &&
+         "C65 branch conditions have four components!");
 
+  // Unconditional branch.
   if(Cond.empty()) {
     assert(!FBB && "Unconditional branch with multiple successors!");
     BuildMI(&MBB, DL, get(C65::JMPabs)).addMBB(TBB);
     return 1;
   }
 
-  unsigned Instr;
+  unsigned Instr = Cond[0].getImm();
 
-  if (C65::ZRC8RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::ZBRCC8;
-  else if (C65::ZRC16RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::ZBRCC16;
-  else if (C65::ZRC32RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::ZBRCC32;
-  else if (C65::ZRC64RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
-    Instr = C65::ZBRCC64;
-  else
-    llvm_unreachable("Unexpected BRCC operands.");
+  // if (C65::ZRC8RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
+  //   Instr = C65::ZBRCC8;
+  // else if (C65::ZRC16RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
+  //   Instr = C65::ZBRCC16;
+  // else if (C65::ZRC32RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
+  //   Instr = C65::ZBRCC32;
+  // else if (C65::ZRC64RegClass.contains(Cond[1].getReg(), Cond[2].getReg()))
+  //   Instr = C65::ZBRCC64;
+  // else
+  //   llvm_unreachable("Unexpected BRCC operands.");
 
   BuildMI(&MBB, DL, get(Instr))
-    .addOperand(Cond[0])
     .addOperand(Cond[1])
     .addOperand(Cond[2])
+    .addOperand(Cond[3])
     .addMBB(TBB);
 
   if (!FBB)

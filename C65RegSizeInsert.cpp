@@ -84,7 +84,8 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
       unsigned AccSize = 0;
       unsigned IxSize = 0;
 
-      if (MI->getDesc().isBranch() || MI->getDesc().isBarrier()) {
+      if (MI->getDesc().isBranch() || MI->getDesc().isBarrier() ||
+          MI->getDesc().isCall()) {
         AccSize = C65II::Acc16Bit;
         IxSize = C65II::Ix16Bit;
       } else {

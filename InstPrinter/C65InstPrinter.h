@@ -36,6 +36,7 @@ public:
   void printOperand(const MCInst *MI, int OpNum, raw_ostream &OS,
                     bool Imm = false);
 
+  void printImmOperand(const MCInst *MI, int OpNum, raw_ostream &OS);
   void printAddress(const MCInst *MI, int OpNum, unsigned Indirection,
                     char PreIndexReg, char PostIndexReg,
                     unsigned LengthConstraint, raw_ostream &OS);

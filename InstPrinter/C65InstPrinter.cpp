@@ -102,6 +102,17 @@ void C65InstPrinter::printOperand(const MCInst *MI, int OpNum,
   }
 }
 
+void C65InstPrinter::printImmOperand(const MCInst *MI, int OpNum,
+                                     raw_ostream &OS) {
+  const MCOperand &MO = MI->getOperand(OpNum);
+  OS << '#';
+  if (MO.isImm())
+    OS << (int)MO.getImm();
+  else {
+    assert(MO.isExpr() && "Unknown operand kind in printImmOperand");
+    MO.getExpr()->print(OS);
+  }
+}
 void
 C65InstPrinter::printAddress(const MCInst *MI, int OpNum, unsigned Indirection,
                              char PreIndexReg, char PostIndexReg,

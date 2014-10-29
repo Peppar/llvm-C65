@@ -56,7 +56,7 @@ class WLAKCalcStackEntry {
     : Type(STRING), Sign(Sign), Symbol(&Symbol) {};
 
 public:
-  static WLAKCalcStackEntry createImm(unsigned Imm) {
+  static WLAKCalcStackEntry createImm(int Imm) {
     return WLAKCalcStackEntry((double)Imm);
   }
   static WLAKCalcStackEntry createOp(unsigned Op) {
@@ -71,7 +71,7 @@ public:
     OP_SUB         =  1,
     OP_MUL         =  2,
     OP_OR          =  5,
-    OP_AND         =  5,
+    OP_AND         =  6,
     OP_DIVIDE      =  7,
     OP_POWER       =  8,
     OP_SHIFT_LEFT  =  9,
@@ -255,18 +255,44 @@ public:
 
 // WLAKObjectWriter Impl
 
-static unsigned GetRelocType(const MCValue &Target,
-                             const MCFixup &Fixup,
-                             bool IsPCRel) {
+static unsigned GetRelocType(const MCFixup &Fixup) {
   switch((unsigned)Fixup.getKind()) {
   default:
     llvm_unreachable("Unimplemented fixup -> relocation");
-  case FK_PCRel_1: return WLAKRelocationEntry::RELATIVE_8BIT;
-  case FK_PCRel_2: return WLAKRelocationEntry::RELATIVE_16BIT;
-  case FK_Data_1: return WLAKRelocationEntry::DIRECT_8BIT;
-  case FK_Data_2: return WLAKRelocationEntry::DIRECT_16BIT;
-  case FK_Data_4: return WLAKRelocationEntry::DIRECT_24BIT;
+  case FK_PCRel_1:
+    return WLAKRelocationEntry::RELATIVE_8BIT;
+  case FK_PCRel_2:
+    return WLAKRelocationEntry::RELATIVE_16BIT;
+  case FK_Data_1:
+  case C65::FK_C65_8:
+  case C65::FK_C65_8s8:
+  case C65::FK_C65_8s16:
+  case C65::FK_C65_8s24:
+  case C65::FK_C65_8s32:
+  case C65::FK_C65_8s40:
+  case C65::FK_C65_8s48:
+  case C65::FK_C65_8s56:
+    return WLAKRelocationEntry::DIRECT_8BIT;
+  case FK_Data_2:
+  case C65::FK_C65_16:
+  case C65::FK_C65_16s16:
+  case C65::FK_C65_16s32:
+  case C65::FK_C65_16s48:
+    return WLAKRelocationEntry::DIRECT_16BIT;
+  case FK_Data_4:
+  case C65::FK_C65_24:
+    return WLAKRelocationEntry::DIRECT_24BIT;
   }
+}
+
+static unsigned GetFixupShiftAmt(const MCFixup &Fixup) {
+  int Kind = Fixup.getKind();
+  if (C65::isFixup8Bit(Kind))
+    return C65::get8BitFixupShiftAmt(Kind);
+  else if (C65::isFixup16Bit(Kind))
+    return C65::get16BitFixupShiftAmt(Kind);
+  else
+    return 0;
 }
 
 void WLAKObjectWriter::RecordRelocation(const MCAssembler &Asm,
@@ -279,7 +305,8 @@ void WLAKObjectWriter::RecordRelocation(const MCAssembler &Asm,
   const MCSectionData *FixupSection = Fragment->getParent();
   unsigned C = Target.getConstant();
   unsigned Offset = Layout.getFragmentOffset(Fragment) + Fixup.getOffset();
-  unsigned Type = GetRelocType(Target, Fixup, IsPCRel);
+  unsigned Type = GetRelocType(Fixup);
+  unsigned ShiftAmt = GetFixupShiftAmt(Fixup);
   unsigned FileID = 1;
   unsigned LineNumber = 0;
 
@@ -290,7 +317,7 @@ void WLAKObjectWriter::RecordRelocation(const MCAssembler &Asm,
   const MCSection &Section = FixupSection->getSection();
   //  assert(SymA.isInSection());
 
-  if (RefB || C) {
+  if (ShiftAmt || RefB || C) {
     // WLAK supports arbitrary calculations for relocations using a
     // stack-based language.
     WLAKComplexRelocationEntry Rel(Section, Type, FileID, LineNumber, Offset);
@@ -310,6 +337,10 @@ void WLAKObjectWriter::RecordRelocation(const MCAssembler &Asm,
     if (C) {
       Rel.addImm(C);
       Rel.addOp(WLAKCalcStackEntry::OP_ADD);
+    }
+    if (ShiftAmt) {
+      Rel.addImm(ShiftAmt);
+      Rel.addOp(WLAKCalcStackEntry::OP_SHIFT_RIGHT);
     }
     ComplexRelocations.push_back(Rel);
   } else {
@@ -357,7 +388,7 @@ void WLAKObjectWriter::WriteSymbol(MCAssembler &Asm,
   const MCSymbol &Symbol = SymbolData.getSymbol();
   getStream() << Symbol.getName();
   // String terminator decides type
-  Write8(0); // 0 - is label, 1 - symbol, 2 - breakpoint
+  Write8(0); // 0 - label, 1 - symbol, 2 - breakpoint
   Write8(getSectionID(Symbol.getSection())); // Section ID
   Write8(1); // File ID
   WriteBE32(0); // Line number
