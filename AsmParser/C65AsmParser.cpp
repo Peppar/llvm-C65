@@ -1,4 +1,4 @@
-//===-- C65AsmParser.cpp - Parse C65 assembly instructions --------===//
+//===-- C65AsmParser.cpp - Parse C65 assembly instructions ----------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -19,15 +19,6 @@
 #include "llvm/Support/TargetRegistry.h"
 
 using namespace llvm;
-
-// Return true if Expr is in the range [MinValue, MaxValue].
-// static bool inRange(const MCExpr *Expr, int64_t MinValue, int64_t MaxValue) {
-//   if (auto *CE = dyn_cast<MCConstantExpr>(Expr)) {
-//     int64_t Value = CE->getValue();
-//     return Value >= MinValue && Value <= MaxValue;
-//   }
-//   return false;
-// }
 
 namespace {
 
@@ -142,9 +133,6 @@ public:
   bool isImm() const override {
     return Kind == KindImm;
   }
-  //  bool isImm(int64_t MinValue, int64_t MaxValue) const {
-  //    return Kind == KindImm && inRange(Imm, MinValue, MaxValue);
-  //  }
   const MCExpr *getImm() const {
     assert(Kind == KindImm && "Not an immediate");
     return Imm.Val;
@@ -182,26 +170,27 @@ public:
   }
 
   // Used by the TableGen code to check for particular operand types.
-  bool isasmop_pcrel8() { return isMem(MemPCRel8); }
-  bool isasmop_pcrel16() { return isMem(MemPCRel16); }
-  bool isasmop_abs() { return isMem(MemAbs); }
-  bool isasmop_absx() { return isMem(MemAbsX); }
-  bool isasmop_absy() { return isMem(MemAbsY); }
-  bool isasmop_abspreix() { return isMem(MemAbsPreIX); }
-  bool isasmop_absind() { return isMem(MemAbsInd); }
-  bool isasmop_absindl() { return isMem(MemAbsIndL); }
-  bool isasmop_absl() { return isMem(MemAbsL); }
-  bool isasmop_absxl() { return isMem(MemAbsXL); }
-  bool isasmop_zp() { return isMem(MemZP); }
-  bool isasmop_zpx() { return isMem(MemZPX); }
-  bool isasmop_zpy() { return isMem(MemZPY); }
-  bool isasmop_zppreix() { return isMem(MemZPPreIX); }
-  bool isasmop_zpind() { return isMem(MemZPInd); }
-  bool isasmop_dpindl() { return isMem(MemDPIndL); }
-  bool isasmop_zppostiy() { return isMem(MemZPPostIY); }
+  bool isasmop_imm()       { return isImm(); }
+  bool isasmop_pcrel8()    { return isMem(MemPCRel8   ); }
+  bool isasmop_pcrel16()   { return isMem(MemPCRel16  ); }
+  bool isasmop_abs()       { return isMem(MemAbs      ); }
+  bool isasmop_absx()      { return isMem(MemAbsX     ); }
+  bool isasmop_absy()      { return isMem(MemAbsY     ); }
+  bool isasmop_abspreix()  { return isMem(MemAbsPreIX ); }
+  bool isasmop_absind()    { return isMem(MemAbsInd   ); }
+  bool isasmop_absindl()   { return isMem(MemAbsIndL  ); }
+  bool isasmop_absl()      { return isMem(MemAbsL     ); }
+  bool isasmop_absxl()     { return isMem(MemAbsXL    ); }
+  bool isasmop_zp()        { return isMem(MemZP       ); }
+  bool isasmop_zpx()       { return isMem(MemZPX      ); }
+  bool isasmop_zpy()       { return isMem(MemZPY      ); }
+  bool isasmop_zppreix()   { return isMem(MemZPPreIX  ); }
+  bool isasmop_zpind()     { return isMem(MemZPInd    ); }
+  bool isasmop_dpindl()    { return isMem(MemDPIndL   ); }
+  bool isasmop_zppostiy()  { return isMem(MemZPPostIY ); }
   bool isasmop_dppostiyl() { return isMem(MemDPPostIYL); }
-  bool isasmop_srel() { return isMem(MemSRel); }
-  bool isasmop_spostiy() { return isMem(MemSPostIY); }
+  bool isasmop_srel()      { return isMem(MemSRel     ); }
+  bool isasmop_spostiy()   { return isMem(MemSPostIY  ); }
 };
 
 class C65AsmParser : public MCTargetAsmParser {
@@ -242,8 +231,8 @@ private:
 
 public:
   C65AsmParser(MCSubtargetInfo &sti, MCAsmParser &parser,
-                   const MCInstrInfo &MII,
-                   const MCTargetOptions &Options)
+               const MCInstrInfo &MII,
+               const MCTargetOptions &Options)
       : MCTargetAsmParser(), STI(sti), Parser(parser) {
     MCAsmParserExtension::Initialize(Parser);
 
@@ -396,28 +385,28 @@ public:
 void C65Operand::print(raw_ostream &OS) const {
   if (isMem()) {
     switch(Mem.Kind) {
-    case MemPCRel8: OS << "PCRel8"; break;
-    case MemPCRel16: OS << "PCRel16"; break;
-    case MemAbs: OS << "Abs"; break;
-    case MemAbsX: OS << "AbsX"; break;
-    case MemAbsY: OS << "AbsY"; break;
-    case MemAbsPreIX: OS << "AbsPreIX"; break;
-    case MemAbsInd: OS << "AbsInd"; break;
-    case MemAbsIndL: OS << "AbsIndL"; break;
-    case MemAbsL: OS << "AbsL"; break;
-    case MemAbsXL: OS << "AbsXL"; break;
-    case MemZP: OS << "ZP"; break;
-    case MemZPX: OS << "ZPX"; break;
-    case MemZPY: OS << "ZPY"; break;
-    case MemZPPreIX: OS << "ZPPreIX"; break;
-    case MemZPInd: OS << "ZPInd"; break;
-    case MemDPIndL: OS << "DPIndL"; break;
-    case MemZPPostIY: OS << "ZPPostIY"; break;
+    case MemPCRel8:    OS << "PCRel8";    break;
+    case MemPCRel16:   OS << "PCRel16";   break;
+    case MemAbs:       OS << "Abs";       break;
+    case MemAbsX:      OS << "AbsX";      break;
+    case MemAbsY:      OS << "AbsY";      break;
+    case MemAbsPreIX:  OS << "AbsPreIX";  break;
+    case MemAbsInd:    OS << "AbsInd";    break;
+    case MemAbsIndL:   OS << "AbsIndL";   break;
+    case MemAbsL:      OS << "AbsL";      break;
+    case MemAbsXL:     OS << "AbsXL";     break;
+    case MemZP:        OS << "ZP";        break;
+    case MemZPX:       OS << "ZPX";       break;
+    case MemZPY:       OS << "ZPY";       break;
+    case MemZPPreIX:   OS << "ZPPreIX";   break;
+    case MemZPInd:     OS << "ZPInd";     break;
+    case MemDPIndL:    OS << "DPIndL";    break;
+    case MemZPPostIY:  OS << "ZPPostIY";  break;
     case MemDPPostIYL: OS << "DPPostIYL"; break;
-    case MemSRel: OS << "SRel"; break;
-    case MemSPostIY: OS << "SPostIY"; break;
-    case MemIZ: OS << "IZ"; break;
-    case MemZZ: OS << "ZZ"; break;
+    case MemSRel:      OS << "SRel";      break;
+    case MemSPostIY:   OS << "SPostIY";   break;
+    case MemIZ:        OS << "IZ";        break;
+    case MemZZ:        OS << "ZZ";        break;
     default: llvm_unreachable("Unexpected memory kind.");
     }
     OS << "(";
@@ -433,20 +422,9 @@ void C65Operand::print(raw_ostream &OS) const {
   }
 }
 
-// bool C65AsmParser::matchRegister(char Reg) {
-//   // Expect a register name.
-//   if (Parser.getTok().isNot(AsmToken::Identifier))
-//     return true;
-
-//   // Check that there's a prefix.
-//   StringRef Name = Parser.getTok().getString();
-//   if (Name.size() != 1 || Name[0] != Reg)
-//     return true;
-
-//   Parser.Lex();
-//   return false;
-// }
-
+// Match a specific register for an adressing mode. Only X, Y and S
+// are supported.
+//
 bool C65AsmParser::parseRegister(char &Reg) {
   if (Parser.getTok().isNot(AsmToken::Identifier)) {
     return Error(Parser.getTok().getLoc(), "expected identifier");
@@ -548,6 +526,7 @@ C65AsmParser::parseAddress() {
 }
 
 // Parse a memory operand and add it to Operands.
+//
 C65AsmParser::OperandMatchResultTy
 C65AsmParser::parseAddress(OperandVector &Operands, MemoryKind MemKind,
                            unsigned Length, bool AllowZExt,
@@ -582,6 +561,8 @@ C65AsmParser::parseAddress(OperandVector &Operands, MemoryKind MemKind,
   return MatchOperand_Success;
 }
 
+// Parse target-specific directives.
+//
 bool C65AsmParser::ParseDirective(AsmToken DirectiveID) {
   StringRef IDVal = DirectiveID.getIdentifier();
   if (IDVal == ".accu") {
@@ -618,6 +599,9 @@ bool C65AsmParser::ParseDirective(AsmToken DirectiveID) {
   return true;
 }
 
+// Registers are always implicit or distinguish an adressing
+// mode. This function never matches.
+//
 bool C65AsmParser::ParseRegister(unsigned &RegNo, SMLoc &StartLoc,
                                  SMLoc &EndLoc) {
   return true;
@@ -675,24 +659,10 @@ bool C65AsmParser::parseOperand(OperandVector &Operands,
 
   // If we consumed tokens to parse an address, and none of the custom
   // parser matched it, then we need to flag this as a match
-  // fail. Otherwise, try parsing an immediate operand below.
+  // fail.
   if (AddressMatch.Valid && AddressMatch.Lexed) {
     return Error(AddressMatch.StartLoc,
                  "instruction does not support this addressing mode");
-  }
-
-  // The only remaining possibility is an immediate operand, starting
-  // with a hash.
-  if (Parser.getTok().is(AsmToken::Hash)) {
-    Parser.Lex();
-    SMLoc StartLoc = Parser.getTok().getLoc();
-    const MCExpr *Expr;
-    if (getParser().parseExpression(Expr))
-      return true;
-    SMLoc EndLoc =
-      SMLoc::getFromPointer(Parser.getTok().getLoc().getPointer() - 1);
-    Operands.push_back(C65Operand::createImm(Expr, StartLoc, EndLoc));
-    return false;
   }
   return true;
 }
@@ -760,37 +730,6 @@ bool C65AsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
 
   llvm_unreachable("Unexpected match type");
 }
-
-// C65AsmParser::OperandMatchResultTy
-// C65AsmParser::parsePCRel(OperandVector &Operands, int64_t MinVal,
-//                              int64_t MaxVal) {
-//   MCContext &Ctx = getContext();
-//   MCStreamer &Out = getStreamer();
-//   const MCExpr *Expr;
-//   SMLoc StartLoc = Parser.getTok().getLoc();
-//   if (getParser().parseExpression(Expr))
-//     return MatchOperand_NoMatch;
-
-//   // For consistency with the GNU assembler, treat immediates as offsets
-//   // from ".".
-//   if (auto *CE = dyn_cast<MCConstantExpr>(Expr)) {
-//     int64_t Value = CE->getValue();
-//     if ((Value & 1) || Value < MinVal || Value > MaxVal) {
-//       Error(StartLoc, "offset out of range");
-//       return MatchOperand_ParseFail;
-//     }
-//     MCSymbol *Sym = Ctx.CreateTempSymbol();
-//     Out.EmitLabel(Sym);
-//     const MCExpr *Base = MCSymbolRefExpr::Create(Sym, MCSymbolRefExpr::VK_None,
-//                                                  Ctx);
-//     Expr = Value == 0 ? Base : MCBinaryExpr::CreateAdd(Base, Expr, Ctx);
-//   }
-
-//   SMLoc EndLoc =
-//     SMLoc::getFromPointer(Parser.getTok().getLoc().getPointer() - 1);
-//   Operands.push_back(C65Operand::createImm(Expr, StartLoc, EndLoc));
-//   return MatchOperand_Success;
-// }
 
 // Force static initialization.
 extern "C" void LLVMInitializeC65AsmParser() {

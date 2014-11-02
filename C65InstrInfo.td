@@ -58,17 +58,17 @@ class InstC65<dag outs, dag ins, string asmstr, list<dag> pattern>
   let TSFlags{17}   = OpPCRel;
 }
 
-class ZROpSize8 { bits<2> ZRSize = 0; }
+class ZROpSize8  { bits<2> ZRSize = 0; }
 class ZROpSize16 { bits<2> ZRSize = 1; }
 class ZROpSize32 { bits<2> ZRSize = 2; }
 class ZROpSize64 { bits<2> ZRSize = 3; }
 
 class Acc8Bit  { bits<2> AccSize = 0b10; }
 class Acc16Bit { bits<2> AccSize = 0b11; }
-class Ix8Bit   { bits<2> IxSize = 0b10; }
-class Ix16Bit  { bits<2> IxSize = 0b11; }
+class Ix8Bit   { bits<2> IxSize  = 0b10; }
+class Ix16Bit  { bits<2> IxSize  = 0b11; }
 
-class OpSize8 { bits<2> OpSize = 1; }
+class OpSize8  { bits<2> OpSize = 1; }
 class OpSize16 { bits<2> OpSize = 2; }
 class OpSize24 { bits<2> OpSize = 3; }
 
@@ -98,17 +98,14 @@ def SDTC65CMP         : SDTypeProfile<0, 2,  [SDTCisInt<0>,
 def SDTC65BR_CC       : SDTypeProfile<0, 4,  [SDTCisVT<0, i32>,
                                               SDTCisSameAs<1, 2>,
                                               SDTCisVT<3, OtherVT>]>;
-def SDTC65SELECT_CC   : SDTypeProfile<1, 4,  [SDTCisSameAs<0, 1>,
+def SDTC65SELECT_CC   : SDTypeProfile<1, 5,  [SDTCisSameAs<0, 3>,
+                                              SDTCisSameAs<0, 4>,
                                               SDTCisSameAs<1, 2>,
-                                              SDTCisVT<3, i32>,
-                                              SDTCisVT<4, i32>]>;
+                                              SDTCisVT<5, i32>]>;
 def SDTC65CALL        : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
-//def SDTC65ret         : SDTypeProfile<0, -1, [SDTCisVT<0, i16>]>;
-//def SDTC65LOAD        : SDTypeProfile<0, 3,  [SDTCisVT<2, i32>]>;
 def SDTC65Wrapper     : SDTypeProfile<1, 1,  [SDTCisSameAs<0, 1>,
                                               SDTCisPtrTy<0>]>;
 
-//def C65LOAD            : SDNode<"C65ISD::LOAD", SDTC65load>;
 def C65CMP             : SDNode<"C65ISD::CMP", SDTC65CMP,
                                 [SDNPOutGlue]>;
 def C65BR_CC           : SDNode<"C65ISD::BR_CC", SDTC65BR_CC,
@@ -135,17 +132,11 @@ def C65CALLSEQ_END   : SDNode<"ISD::CALLSEQ_END",   SDTC65CALLSEQ_END,
 // C65 assembler operand definitions
 //===----------------------------------------------------------------------===//
 
-// 8-bit immediate operand (6502, 65C02, 65802, 65816)
-//   LDA #123
-def asmop_imm8 : AsmOperandClass {
-  let Name = "asmop_imm8";
-  let RenderMethod = "addImmOperands";
-  let ParserMethod = "parseImmOperand";
-}
-// 16-bit immediate operand (65802, 65816)
-//   LDA #12345
-def asmop_imm16 : AsmOperandClass {
-  let Name = "asmop_imm16";
+// Immediate operand
+//   LDA #123   ; 8-bit (6502, 65C02, 65802, 65816)
+//   LDA #12345 ; 16-bit (65802, 65816)
+def asmop_imm : AsmOperandClass {
+  let Name = "asmop_imm";
   let RenderMethod = "addImmOperands";
   let ParserMethod = "parseImmOperand";
 }
@@ -327,13 +318,13 @@ def imm8 : Operand<i8> {
   let MIOperandInfo = (ops i8imm);
   let DecoderMethod = "decodeImm8Operand";
   let PrintMethod = "printImmOperand";
-  let ParserMatchClass = asmop_imm8;
+  let ParserMatchClass = asmop_imm;
 }
 def imm16 : Operand<i16> {
   let MIOperandInfo = (ops i16imm);
   let DecoderMethod = "decodeImm16Operand";
   let PrintMethod = "printImmOperand";
-  let ParserMatchClass = asmop_imm16;
+  let ParserMatchClass = asmop_imm;
 }
 
 // Branch target operands
@@ -1398,6 +1389,25 @@ def ZBRCC8  : ZBRCC<ZRC8,  i8>,  ZROpSize8;
 def ZBRCC16 : ZBRCC<ZRC16, i16>, ZROpSize16;
 def ZBRCC32 : ZBRCC<ZRC32, i32>, ZROpSize32;
 def ZBRCC64 : ZBRCC<ZRC64, i64>, ZROpSize64;
+
+class ZSELECTCC<RegisterClass RC1, RegisterClass RC2>
+  : ZRInstr<(outs RC1:$out), (ins RC2:$lhs, RC2:$rhs,
+                                  RC1:$true, RC1:$false, i32imm:$cc),
+            "zselectcc $out,$lhs,$rhs,$true,$false,$cc",
+            [(set RC1:$out, (C65SELECT_CC RC2:$lhs, RC2:$rhs,
+                                          RC1:$true, RC1:$false, imm:$cc))]>;
+
+multiclass ZSELECTCC_A<RegisterClass RC1> {
+  def _8  : ZSELECTCC<RC1, ZRC8>,  ZROpSize8;
+  def _16 : ZSELECTCC<RC1, ZRC16>, ZROpSize16;
+  def _32 : ZSELECTCC<RC1, ZRC32>, ZROpSize32;
+  def _64 : ZSELECTCC<RC1, ZRC64>, ZROpSize64;
+}
+
+defm ZSELECTCC8  : ZSELECTCC_A<ZRC8>;
+defm ZSELECTCC16 : ZSELECTCC_A<ZRC16>;
+defm ZSELECTCC32 : ZSELECTCC_A<ZRC32>;
+defm ZSELECTCC64 : ZSELECTCC_A<ZRC64>;
 
 class ZLD_imm<RegisterClass RC, ValueType Ty, Operand immOp>
   : ZRInstr<(outs RC:$dst), (ins immOp:$imm), "zld $dst,$imm",

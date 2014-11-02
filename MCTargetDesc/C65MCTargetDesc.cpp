@@ -42,6 +42,7 @@ namespace llvm {
       PointerSize = 2;
       CalleeSaveStackSlotSize = 1;
       IsLittleEndian = true;
+      PrivateGlobalPrefix = ".L";
 
       // Data8bitsDirective = "\t.db\t";
       // Data16bitsDirective = "\t.dw\t";

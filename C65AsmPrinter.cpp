@@ -152,8 +152,8 @@ void C65AsmPrinter::LowerC65MachineInstrToMCInst(const MachineInstr *MI,
 
   OutMI.setOpcode(MI->getOpcode());
 
-  for (unsigned i = 0, e = MI->getNumOperands(); i != e; ++i) {
-    const MachineOperand &MO = MI->getOperand(i);
+  for (unsigned I = 0, E = MI->getNumOperands(); I != E; ++I) {
+    const MachineOperand &MO = MI->getOperand(I);
     MCOperand MCOp = LowerOperand(MO);
 
     if (MCOp.isValid())

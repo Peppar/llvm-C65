@@ -51,6 +51,7 @@ namespace llvm {
     C65TargetLowering(TargetMachine &TM);
 
     SDValue LowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
+    SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
     SDValue LowerShift(SDValue Op, SelectionDAG &DAG) const;
 
     SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
@@ -71,8 +72,10 @@ namespace llvm {
       EmitBinaryZI(MachineInstr *MI, MachineBasicBlock *MBB,
                    unsigned NumBytes, unsigned Instr8, unsigned Instr16,
                    bool clc = false, bool stc = false) const;
-    MachineBasicBlock *EmitZBRCC(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZBR_CC(MachineInstr *MI, MachineBasicBlock *MBB,
                                  unsigned NumBytes) const;
+    MachineBasicBlock *EmitZSELECT_CC(MachineInstr *MI, MachineBasicBlock *MBB,
+                                      unsigned NumBytes) const;
     MachineBasicBlock *EmitZST(MachineInstr *MI, MachineBasicBlock *MBB,
                                bool Stack,
                                unsigned NumBytes) const;

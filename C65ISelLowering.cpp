@@ -76,8 +76,8 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
       // Expand SELECT(C, A, B) into SELECT_CC(X, 0, A, B, NE).
       setOperationAction(ISD::SELECT, VT, Expand);
 
-      // Lower SELECT_CC and BR_CC into separate comparisons and branches.
-      setOperationAction(ISD::SELECT_CC, VT, Expand);
+      // SELECT_CC is custom inserted.
+      setOperationAction(ISD::SELECT_CC, VT, Custom);
 
       // BR_CC is custom inserted.
       setOperationAction(ISD::BR_CC, VT, Custom);
@@ -194,6 +194,8 @@ LowerOperation(SDValue Op, SelectionDAG &DAG) const {
     return LowerShift(Op, DAG);
   case ISD::BR_CC:
     return LowerBR_CC(Op, DAG);
+  case ISD::SELECT_CC:
+    return LowerSELECT_CC(Op, DAG);
   case ISD::ConstantPool:   return LowerConstantPool(Op, DAG);
   case ISD::GlobalAddress:  return LowerGlobalAddress(Op, DAG);
   case ISD::ExternalSymbol: return LowerExternalSymbol(Op, DAG);
@@ -206,13 +208,26 @@ SDValue C65TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
   SDLoc DL(Op);
   SDValue Chain    = Op.getOperand(0);
   ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(1))->get();
-  SDValue CmpOp0   = Op.getOperand(2);
-  SDValue CmpOp1   = Op.getOperand(3);
+  SDValue CmpLHS   = Op.getOperand(2);
+  SDValue CmpRHS   = Op.getOperand(3);
   SDValue Dest     = Op.getOperand(4);
 
   return DAG.getNode(C65ISD::BR_CC, DL, Op.getValueType(),
                      Chain, DAG.getConstant(CC, MVT::i32),
-                     CmpOp0, CmpOp1, Dest);
+                     CmpLHS, CmpRHS, Dest);
+}
+
+SDValue C65TargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
+  SDLoc DL(Op);
+  SDValue CmpLHS   = Op.getOperand(0);
+  SDValue CmpRHS   = Op.getOperand(1);
+  ISD::CondCode CC = cast<CondCodeSDNode>(Op.getOperand(4))->get();
+  SDValue TrueVal  = Op.getOperand(2);
+  SDValue FalseVal = Op.getOperand(3);
+
+  return DAG.getNode(C65ISD::SELECT_CC, DL, Op.getValueType(),
+                     CmpLHS, CmpRHS, TrueVal, FalseVal,
+                     DAG.getConstant(CC, MVT::i32));
 }
 
 SDValue C65TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
@@ -368,10 +383,9 @@ struct Comparison {
 
 /// Decompose the comparison to one more easily solved by our arch
 ///
-static struct Comparison getComparison(const MachineInstr *MI) {
-  ISD::CondCode CC = (ISD::CondCode)MI->getOperand(0).getImm();
-  const MachineOperand Op0 = MI->getOperand(1);
-  const MachineOperand Op1 = MI->getOperand(2);
+static struct Comparison getComparison(ISD::CondCode CC,
+                                       const MachineOperand Op0,
+                                       const MachineOperand Op1) {
 
   switch (CC) { //           Op0  Op1  Equality Signed Bitvalue
   case ISD::SETEQ:  return { Op0, Op1, true,    false, true };
@@ -380,19 +394,19 @@ static struct Comparison getComparison(const MachineInstr *MI) {
   case ISD::SETLE:  return { Op1, Op0, false,   true,  false };
   case ISD::SETGT:  return { Op1, Op0, false,   true,  true };
   case ISD::SETGE:  return { Op0, Op1, false,   true,  false };
-  case ISD::SETULT: return { Op0, Op1, false,   false, true };
-  case ISD::SETULE: return { Op1, Op0, false,   false, false };
-  case ISD::SETUGT: return { Op1, Op0, false,   false, true };
-  case ISD::SETUGE: return { Op0, Op1, false,   false, false };
+  case ISD::SETULT: return { Op0, Op1, false,   false, false };
+  case ISD::SETULE: return { Op1, Op0, false,   false, true };
+  case ISD::SETUGT: return { Op1, Op0, false,   false, false };
+  case ISD::SETUGE: return { Op0, Op1, false,   false, true };
   default:
     llvm_unreachable("Cannot emit this type of comparison!");
   }
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZBRCC(MachineInstr *MI,
-                             MachineBasicBlock *MBB,
-                             unsigned NumBytes) const {
+C65TargetLowering::EmitZBR_CC(MachineInstr *MI,
+                              MachineBasicBlock *MBB,
+                              unsigned NumBytes) const {
 
   bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
   unsigned AccSize = Use8Bit ? 1 : 2;
@@ -408,23 +422,27 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
   const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
 
-  struct Comparison C = getComparison(MI);
+  struct Comparison C = getComparison((ISD::CondCode)MI->getOperand(0).getImm(),
+                                      MI->getOperand(1),
+                                      MI->getOperand(2));
   MachineBasicBlock *Dest = MI->getOperand(3).getMBB();
 
   if (C.Equality) {
     // thisMBB:
     // cmpMBB0:
-    //   LDA %ZRA
-    //   CMP %ZRB
-    //   BNE sinkMBB/Dest
+    //   lda %zra
+    //   cmp %zrb
+    //   bne sinkMBB/jumpMBB
     // cmpMBB1:
-    //   LDA %ZRA+2
-    //   CMP %ZRB+2
-    //   BNE sinkMBB/Dest
+    //   lda %zra+2
+    //   cmp %zrb+2
+    //   bne sinkMBB/jumpMBB
     //   ...
-    //   LDA %ZRA+N
-    //   CMP %ZRB+N
-    //   BEQ/BNE Dest
+    //   lda %zra+N
+    //   cmp %zrb+N
+    //   bne/beq sinkMBB
+    // jumpMBB:
+    //   jmp Dest
     // sinkMBB:
 
     const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
@@ -432,6 +450,7 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
 
     MachineBasicBlock *thisMBB = MBB;
     MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
+    MachineBasicBlock *jumpMBB = MF->CreateMachineBasicBlock(BB);
     MachineBasicBlock *predMBB = thisMBB;
     MachineBasicBlock *cmpMBB;
 
@@ -451,51 +470,59 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
         .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
       if (I == NumBytes - AccSize) {
         if (C.Bitvalue) {
-          BuildMI(cmpMBB, DL, TII->get(C65::BEQ)).addMBB(Dest);
-          cmpMBB->addSuccessor(Dest);
+          BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(sinkMBB);
+          cmpMBB->addSuccessor(sinkMBB);
         } else {
-          BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(Dest);
-          cmpMBB->addSuccessor(Dest);
+          BuildMI(cmpMBB, DL, TII->get(C65::BEQ)).addMBB(sinkMBB);
+          cmpMBB->addSuccessor(sinkMBB);
         }
       } else {
         if (C.Bitvalue) {
           BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(sinkMBB);
           cmpMBB->addSuccessor(sinkMBB);
         } else {
-          BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(Dest);
-          cmpMBB->addSuccessor(Dest);
+          BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(jumpMBB);
+          cmpMBB->addSuccessor(jumpMBB);
         }
       }
       predMBB = cmpMBB;
     }
+    MF->insert(MFI, jumpMBB);
+    predMBB->addSuccessor(jumpMBB);
+    BuildMI(jumpMBB, DL, TII->get(C65::JMPabs)).addMBB(Dest);
+    jumpMBB->addSuccessor(Dest);
+
     MF->insert(MFI, sinkMBB);
-    predMBB->addSuccessor(sinkMBB);
 
     MI->eraseFromParent();
     return sinkMBB;
   } else if (C.Signed) {
     // thisMBB:
-    //   LDA %ZRA
-    //   CMP %ZRB
-    //   LDA %ZRA+2
-    //   SBC %ZRB+2
+    //   lda %zra
+    //   cmp %zrb
+    //   lda %zra+2
+    //   sbc %zrb+2
     //   ...
-    //   BVC braMBB
+    //   bvc braMBB
     // ovfMBB:
-    //   EOR #$8000
+    //   eor #$8000
     // braMBB:
-    //   BPL/BMI %DEST
+    //   bmi/bpl sinkMBB
+    // jumpMBB:
+    //   jmp Dest
     // sinkMBB:
 
     const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
     const unsigned SBCInstr = Use8Bit ? C65::SBC8zp : C65::SBC16zp;
 
     MachineBasicBlock *thisMBB = MBB;
-    MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
     MachineBasicBlock *ovfMBB = MF->CreateMachineBasicBlock(BB);
     MachineBasicBlock *braMBB = MF->CreateMachineBasicBlock(BB);
+    MachineBasicBlock *jumpMBB = MF->CreateMachineBasicBlock(BB);
+    MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
     MF->insert(MFI, ovfMBB);
     MF->insert(MFI, braMBB);
+    MF->insert(MFI, jumpMBB);
     MF->insert(MFI, sinkMBB);
 
     // Transfer the remainder of the MBB and its successor edges to sinkMBB.
@@ -505,8 +532,9 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
     thisMBB->addSuccessor(braMBB);
     thisMBB->addSuccessor(ovfMBB);
     ovfMBB->addSuccessor(braMBB);
-    braMBB->addSuccessor(Dest);
     braMBB->addSuccessor(sinkMBB);
+    braMBB->addSuccessor(jumpMBB);
+    jumpMBB->addSuccessor(Dest);
 
     BuildMI(thisMBB, DL, TII->get(C65::SEC));
 
@@ -519,37 +547,42 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
 
     BuildMI(thisMBB, DL, TII->get(C65::BVC))
       .addMBB(braMBB);
+
     if (Use8Bit) {
-      BuildMI(*ovfMBB, ovfMBB->begin(), DL, TII->get(C65::EOR8imm))
-        .addImm(0x80);
+      BuildMI(ovfMBB, DL, TII->get(C65::EOR8imm)).addImm(0x80);
     } else {
-      BuildMI(*ovfMBB, ovfMBB->begin(), DL, TII->get(C65::EOR16imm))
-        .addImm(0x8000);
+      BuildMI(ovfMBB, DL, TII->get(C65::EOR16imm)).addImm(0x8000);
     }
 
     if (C.Bitvalue) {
-      BuildMI(*braMBB, braMBB->begin(), DL, TII->get(C65::BMI)).addMBB(Dest);
+      BuildMI(braMBB, DL, TII->get(C65::BPL)).addMBB(sinkMBB);
     } else {
-      BuildMI(*braMBB, braMBB->begin(), DL, TII->get(C65::BPL)).addMBB(Dest);
+      BuildMI(braMBB, DL, TII->get(C65::BMI)).addMBB(sinkMBB);
     }
+
+    BuildMI(jumpMBB, DL, TII->get(C65::JMPabs)).addMBB(Dest);
 
     MI->eraseFromParent();
     return sinkMBB;
   } else {
     // thisMBB:
-    //   LDA %ZRA
-    //   CMP %ZRB
-    //   LDA %ZRA+2
-    //   SBC %ZRB+2
+    //   lda %zra
+    //   cmp %zrb
+    //   lda %zra+2
+    //   sbc %zrb+2
     //   ...
-    //   BCS/BCC Dest
+    //   bcc/bcs sinkMBB
+    // jumpMBB:
+    //   jmp Dest
     // sinkMBB:
     const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
     const unsigned CMPInstr = Use8Bit ? C65::CMP8zp : C65::CMP16zp;
     const unsigned SBCInstr = Use8Bit ? C65::SBC8zp : C65::SBC16zp;
 
     MachineBasicBlock *thisMBB = MBB;
+    MachineBasicBlock *jumpMBB = MF->CreateMachineBasicBlock(BB);
     MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
+    MF->insert(MFI, jumpMBB);
     MF->insert(MFI, sinkMBB);
 
     // Transfer the remainder of the MBB and its successor edges to sinkMBB.
@@ -557,7 +590,8 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
                     std::next(MachineBasicBlock::iterator(MI)), MBB->end());
     sinkMBB->transferSuccessorsAndUpdatePHIs(MBB);
     thisMBB->addSuccessor(sinkMBB);
-    thisMBB->addSuccessor(Dest);
+    thisMBB->addSuccessor(jumpMBB);
+    jumpMBB->addSuccessor(Dest);
 
     BuildMI(thisMBB, DL, TII->get(LDAInstr))
       .addImm(RI->getZRAddress(C.Op0.getReg()));
@@ -571,15 +605,240 @@ C65TargetLowering::EmitZBRCC(MachineInstr *MI,
         .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
     }
     if (C.Bitvalue) {
-      BuildMI(thisMBB, DL, TII->get(C65::BCS)).addMBB(Dest);
+      BuildMI(thisMBB, DL, TII->get(C65::BCC)).addMBB(sinkMBB);
     } else {
-      BuildMI(thisMBB, DL, TII->get(C65::BCC)).addMBB(Dest);
+      BuildMI(thisMBB, DL, TII->get(C65::BCS)).addMBB(sinkMBB);
     }
+    BuildMI(jumpMBB, DL, TII->get(C65::JMPabs)).addMBB(Dest);
 
     MI->eraseFromParent();
 
     return sinkMBB;
   }
+}
+
+MachineBasicBlock *
+C65TargetLowering::EmitZSELECT_CC(MachineInstr *MI,
+                                  MachineBasicBlock *MBB,
+                                  unsigned NumBytes) const {
+
+  bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
+  unsigned AccSize = Use8Bit ? 1 : 2;
+
+  DebugLoc DL = MI->getDebugLoc();
+  MachineFunction *MF = MBB->getParent();
+
+  const BasicBlock *BB = MBB->getBasicBlock();
+  MachineFunction::iterator MFI = MBB;
+  ++MFI;
+
+  const C65InstrInfo *TII = Subtarget->getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+
+  struct Comparison C = getComparison((ISD::CondCode)MI->getOperand(5).getImm(),
+                                      MI->getOperand(1),
+                                      MI->getOperand(2));
+  unsigned RetReg = MI->getOperand(0).getReg();
+  unsigned TrueReg = MI->getOperand(3).getReg();
+  unsigned FalseReg = MI->getOperand(4).getReg();
+
+  unsigned ZMOVInstr;
+  unsigned NumMovBytes;
+  if (C65::ZRC8RegClass.contains(RetReg)) {
+    ZMOVInstr = C65::ZMOV8;
+    NumMovBytes = 1;
+  } else if (C65::ZRC16RegClass.contains(RetReg)) {
+    ZMOVInstr = C65::ZMOV16;
+    NumMovBytes = 2;
+  } else if (C65::ZRC32RegClass.contains(RetReg)) {
+    ZMOVInstr = C65::ZMOV32;
+    NumMovBytes = 4;
+  } else if (C65::ZRC64RegClass.contains(RetReg)) {
+    ZMOVInstr = C65::ZMOV64;
+    NumMovBytes = 8;
+  } else
+    llvm_unreachable("Unrecognized register class.");
+
+  // SELECT_CC is lowered in three parts: a comparison part depending
+  // on the type of comparison (equality, signed or unsigned
+  // comparison), a true MBB and a false MBB. The comparison part
+  // branches to the false MBB or falls through or branches to the
+  // true MBB depending on outcome.
+  //
+  // The true and false MBB loads the output register with the true
+  // and false value of the machine instruction.
+
+  MachineBasicBlock *thisMBB = MBB;
+  MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
+  MachineBasicBlock *trueMBB = MF->CreateMachineBasicBlock(BB);
+  MachineBasicBlock *falseMBB = MF->CreateMachineBasicBlock(BB);
+  MF->insert(MFI, trueMBB);
+  MF->insert(MFI, falseMBB);
+  MF->insert(MFI, sinkMBB);
+  MFI = trueMBB;
+
+  // Transfer the remainder of the MBB and its successor edges to sinkMBB.
+  sinkMBB->splice(sinkMBB->begin(), MBB,
+                  std::next(MachineBasicBlock::iterator(MI)), MBB->end());
+  sinkMBB->transferSuccessorsAndUpdatePHIs(MBB);
+
+  if (C.Equality) {
+    // thisMBB:
+    // cmpMBB0:
+    //   lda %zra
+    //   cmp %zrb
+    //   bne falseMBB/trueMBB
+    // cmpMBB1:
+    //   lda %zra+2
+    //   cmp %zrb+2
+    //   bne falseMBB/trueMBB
+    //   ...
+    //   lda %zra+N
+    //   cmp %zrb+N
+    //   bne/beq falseMBB
+
+    const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
+    const unsigned CMPInstr = Use8Bit ? C65::CMP8zp : C65::CMP16zp;
+
+    MachineBasicBlock *cmpMBB;
+    MachineBasicBlock *predMBB = thisMBB;
+
+    // cmpMBB(N):
+    for (unsigned I = 0; I < NumBytes; I += AccSize) {
+      cmpMBB = MF->CreateMachineBasicBlock(BB);
+      MF->insert(MFI, cmpMBB);
+      predMBB->addSuccessor(cmpMBB);
+
+      BuildMI(cmpMBB, DL, TII->get(LDAInstr))
+        .addImm(RI->getZRAddress(C.Op0.getReg()) + I);
+      BuildMI(cmpMBB, DL, TII->get(CMPInstr))
+        .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
+      if (I == NumBytes - AccSize) {
+        if (C.Bitvalue) {
+          BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(falseMBB);
+          cmpMBB->addSuccessor(falseMBB);
+        } else {
+          BuildMI(cmpMBB, DL, TII->get(C65::BEQ)).addMBB(falseMBB);
+          cmpMBB->addSuccessor(falseMBB);
+        }
+      } else {
+        if (C.Bitvalue) {
+          BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(falseMBB);
+          cmpMBB->addSuccessor(falseMBB);
+        } else {
+          BuildMI(cmpMBB, DL, TII->get(C65::BNE)).addMBB(trueMBB);
+          cmpMBB->addSuccessor(trueMBB);
+        }
+      }
+      predMBB = cmpMBB;
+    }
+    predMBB->addSuccessor(trueMBB);
+  } else if (C.Signed) {
+    // thisMBB:
+    //   sec
+    //   lda %zra
+    //   sbc %zrb
+    //   lda %zra+2
+    //   sbc %zrb+2
+    //   ...
+    //   bvc braMBB
+    // ovfMBB:
+    //   eor #$8000
+    // braMBB:
+    //   bmi/bpl falseMBB
+
+    const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
+    const unsigned SBCInstr = Use8Bit ? C65::SBC8zp : C65::SBC16zp;
+
+    MachineBasicBlock *ovfMBB = MF->CreateMachineBasicBlock(BB);
+    MachineBasicBlock *braMBB = MF->CreateMachineBasicBlock(BB);
+
+    // thisMBB:
+    BuildMI(thisMBB, DL, TII->get(C65::SEC));
+
+    for (unsigned I = 0; I < NumBytes; I += AccSize) {
+      BuildMI(thisMBB, DL, TII->get(LDAInstr))
+        .addImm(RI->getZRAddress(C.Op0.getReg()) + I);
+      BuildMI(thisMBB, DL, TII->get(SBCInstr))
+        .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
+    }
+    BuildMI(thisMBB, DL, TII->get(C65::BVC))
+      .addMBB(braMBB);
+    thisMBB->addSuccessor(braMBB);
+    thisMBB->addSuccessor(ovfMBB);
+
+    // ovfMBB:
+    MF->insert(MFI, ovfMBB);
+    if (Use8Bit) {
+      BuildMI(ovfMBB, DL, TII->get(C65::EOR8imm)).addImm(0x80);
+    } else {
+      BuildMI(ovfMBB, DL, TII->get(C65::EOR16imm)).addImm(0x8000);
+    }
+    ovfMBB->addSuccessor(braMBB);
+
+    // braMBB:
+    MF->insert(MFI, braMBB);
+    if (C.Bitvalue) {
+      BuildMI(braMBB, DL, TII->get(C65::BPL)).addMBB(falseMBB);
+    } else {
+      BuildMI(braMBB, DL, TII->get(C65::BMI)).addMBB(falseMBB);
+    }
+    braMBB->addSuccessor(falseMBB);
+    braMBB->addSuccessor(trueMBB);
+  } else {
+    // thisMBB:
+    //   lda %zra
+    //   cmp %zrb
+    //   lda %zra+2
+    //   sbc %zrb+2
+    //   ...
+    //   bcc/bcs falseMBB
+    const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
+    const unsigned CMPInstr = Use8Bit ? C65::CMP8zp : C65::CMP16zp;
+    const unsigned SBCInstr = Use8Bit ? C65::SBC8zp : C65::SBC16zp;
+
+    BuildMI(thisMBB, DL, TII->get(LDAInstr))
+      .addImm(RI->getZRAddress(C.Op0.getReg()));
+    BuildMI(thisMBB, DL, TII->get(CMPInstr))
+      .addImm(RI->getZRAddress(C.Op1.getReg()));
+
+    for (unsigned I = AccSize; I < NumBytes; I += AccSize) {
+      BuildMI(thisMBB, DL, TII->get(LDAInstr))
+        .addImm(RI->getZRAddress(C.Op0.getReg()) + I);
+      BuildMI(thisMBB, DL, TII->get(SBCInstr))
+        .addImm(RI->getZRAddress(C.Op1.getReg()) + I);
+    }
+    if (C.Bitvalue) {
+      BuildMI(thisMBB, DL, TII->get(C65::BCC)).addMBB(falseMBB);
+    } else {
+      BuildMI(thisMBB, DL, TII->get(C65::BCS)).addMBB(falseMBB);
+    }
+    thisMBB->addSuccessor(falseMBB);
+    thisMBB->addSuccessor(trueMBB);
+  }
+
+  // trueMBB:
+  MachineInstr *TrueMI =
+    BuildMI(trueMBB, DL, TII->get(ZMOVInstr))
+    .addReg(RetReg)
+    .addReg(TrueReg);
+  EmitZMOV(TrueMI, trueMBB, NumMovBytes, NumMovBytes, false);
+  BuildMI(trueMBB, DL, TII->get(C65::JMPabs)).addMBB(sinkMBB);
+  trueMBB->addSuccessor(sinkMBB);
+
+  // falseMBB:
+  MachineInstr *FalseMI =
+    BuildMI(falseMBB, DL, TII->get(ZMOVInstr))
+    .addReg(RetReg)
+    .addReg(FalseReg);
+  EmitZMOV(FalseMI, falseMBB, NumMovBytes, NumMovBytes, false);
+  falseMBB->addSuccessor(sinkMBB);
+
+  // sinkMBB:
+
+  MI->eraseFromParent();
+
+  return sinkMBB;
 }
 
 MachineBasicBlock *
@@ -590,7 +849,6 @@ C65TargetLowering::EmitZST(MachineInstr *MI,
   bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
-  unsigned NumOperands = MI->getNumOperands();
   const MachineOperand *Src = &MI->getOperand(0);
   const MachineOperand *Op1 = &MI->getOperand(1);
   const MachineOperand *Op2;
@@ -599,19 +857,20 @@ C65TargetLowering::EmitZST(MachineInstr *MI,
   const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
   unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
   unsigned STAInstr;
+  unsigned NumOperands = TII->get(MI->getOpcode()).getNumOperands();
 
   DebugLoc DL = MI->getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
   bool YIndirect;
 
-  if (NumOperands == 2) {
+  if (Stack) {
     assert(!Op1->isReg());
-
-    if (Stack)
-      STAInstr = Use8Bit ? C65::STA8srel  : C65::STA16srel;
-    else
-      STAInstr = Use8Bit ? C65::STA8abs  : C65::STA16abs;
+    STAInstr = Use8Bit ? C65::STA8srel  : C65::STA16srel;
+    YIndirect = false;
+  } else if (NumOperands == 2) {
+    assert(!Op1->isReg());
+    STAInstr = Use8Bit ? C65::STA8abs  : C65::STA16abs;
     YIndirect = false;
   } else /* NumOperands == 3 */ {
     assert(Op1->isReg());
@@ -660,7 +919,6 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
   bool Use8Bit = ExtendBegin == 1 || !Subtarget->has65802();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
-  unsigned NumOperands = MI->getNumOperands();
   const MachineOperand *Dest = &MI->getOperand(0);
   const MachineOperand *Op1 = &MI->getOperand(1);
   const MachineOperand *Op2;
@@ -670,18 +928,20 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
   unsigned STAInstr = Use8Bit ? C65::STA8zp : C65::STA16zp;
   unsigned STZInstr = Use8Bit ? C65::STZ8zp  : C65::STZ16zp;
   unsigned LDAInstr;
+  unsigned NumOperands = TII->get(MI->getOpcode()).getNumOperands();
 
   DebugLoc DL = MI->getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
   bool YIndirect;
 
-  if (NumOperands == 2) {
+  if (Stack) {
     assert(!Op1->isReg());
-    if (Stack)
-      LDAInstr = Use8Bit ? C65::LDA8srel : C65::LDA16srel;
-    else
-      LDAInstr = Use8Bit ? C65::LDA8abs  : C65::LDA16abs;
+    LDAInstr = Use8Bit ? C65::LDA8srel : C65::LDA16srel;
+    YIndirect = false;
+  } else if (NumOperands == 2) {
+    assert(!Op1->isReg());
+    LDAInstr = Use8Bit ? C65::LDA8abs  : C65::LDA16abs;
     YIndirect = false;
   } else /* NumOperands == 3 */ {
     assert(Op1->isReg());
@@ -772,33 +1032,6 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
     return MBB;
   }
 }
-
-// SDValue C65TargetLowering::WithShift(SDValue Op, unsigned ShiftAmt) {
-//   if (const GlobalAddressSDNode *GA = dyn_cast<GlobalAddressSDNode>(Op))
-//     return DAG.getTargetGlobalAddress(GA->getGlobal(),
-//                                       SDLoc(GA),
-//                                       GA->getValueType(0),
-//                                       GA->getOffset(), TF);
-
-//   if (const ConstantPoolSDNode *CP = dyn_cast<ConstantPoolSDNode>(Op))
-//     return DAG.getTargetConstantPool(CP->getConstVal(),
-//                                      CP->getValueType(0),
-//                                      CP->getAlignment(),
-//                                      CP->getOffset(), TF);
-
-//   if (const BlockAddressSDNode *BA = dyn_cast<BlockAddressSDNode>(Op))
-//     return DAG.getTargetBlockAddress(BA->getBlockAddress(),
-//                                      Op.getValueType(),
-//                                      0,
-//                                      TF);
-
-//   if (const ExternalSymbolSDNode *ES = dyn_cast<ExternalSymbolSDNode>(Op))
-//     return DAG.getTargetExternalSymbol(ES->getSymbol(),
-//                                        ES->getValueType(0), TF);
-
-//   llvm_unreachable("Unhandled address SDNode");
-
-// }
 
 MachineBasicBlock *
 C65TargetLowering::EmitZLDimm(MachineInstr *MI,
@@ -899,7 +1132,6 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
   bool Use8Bit = ExtendBegin == 1 || !Subtarget->has65802();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
-  unsigned NumOperands = MI->getNumOperands();
   const MachineOperand *Dest = &MI->getOperand(0);
   const MachineOperand *Src = &MI->getOperand(1);
 
@@ -908,18 +1140,20 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
   unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
   unsigned STAInstr = Use8Bit ? C65::STA8zp : C65::STA16zp;
   unsigned STZInstr = Use8Bit ? C65::STZ8zp : C65::STZ16zp;
+  unsigned NumOperands = TII->get(MI->getOpcode()).getNumOperands();
 
   DebugLoc DL = MI->getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
   if (Src->getReg() == Dest->getReg()) {
-    assert(ExtendBegin != NumBytes && "Useless reg-to-reg move!");
-    // If the source and destination register are the same, this must
-    // be an extend operation.  Load the most significant byte to set
-    // the negative status bit when performing a sign-extend.
-    if (Signed) {
-      BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
-        .addImm(RI->getZRAddress(Src->getReg()) + ExtendBegin - AccSize);
+    if (ExtendBegin != NumBytes) {
+      // This is an in-reg extend operation.  Load the most
+      // significant byte to set the negative status bit when
+      // performing a sign-extend.
+      if (Signed) {
+        BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
+          .addImm(RI->getZRAddress(Src->getReg()) + ExtendBegin - AccSize);
+      }
     }
   } else {
     // The last LDA instruction will set the negative status bit for
@@ -990,32 +1224,6 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
   }
 }
 
-// MachineBasicBlock *
-// C65TargetLowering::EmitZMOV(MachineInstr *MI,
-//                             MachineBasicBlock *MBB,
-//                             unsigned NumBytes) const {
-//   const bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
-//   const unsigned AccSize = Use8Bit ? 1 : 2;
-
-//   const C65InstrInfo *TII = Subtarget->getInstrInfo();
-//   const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
-//   const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
-//   const unsigned STAInstr = Use8Bit ? C65::STA8zp : C65::STA16zp;
-//   DebugLoc DL = MI->getDebugLoc();
-//   MachineBasicBlock::iterator MBBI = MI;
-
-//   for (unsigned I = 0; I < NumBytes; I += AccSize) {
-//     BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
-//       .addImm(RI->getZRAddress(MI->getOperand(1).getReg()) + I);
-//     BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
-//       .addImm(RI->getZRAddress(MI->getOperand(0).getReg()) + I);
-//   }
-
-//   MI->eraseFromParent();
-
-//   return MBB;
-// }
-
 MachineBasicBlock *
 C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
   unsigned OpSize = 1 << C65II::getZROpSize(MI->getDesc().TSFlags);
@@ -1026,7 +1234,25 @@ C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
   case C65::ZBRCC16:
   case C65::ZBRCC32:
   case C65::ZBRCC64:
-    return EmitZBRCC(MI, MBB, OpSize);
+    return EmitZBR_CC(MI, MBB, OpSize);
+
+  case C65::ZSELECTCC8_8:
+  case C65::ZSELECTCC8_16:
+  case C65::ZSELECTCC8_32:
+  case C65::ZSELECTCC8_64:
+  case C65::ZSELECTCC16_8:
+  case C65::ZSELECTCC16_16:
+  case C65::ZSELECTCC16_32:
+  case C65::ZSELECTCC16_64:
+  case C65::ZSELECTCC32_8:
+  case C65::ZSELECTCC32_16:
+  case C65::ZSELECTCC32_32:
+  case C65::ZSELECTCC32_64:
+  case C65::ZSELECTCC64_8:
+  case C65::ZSELECTCC64_16:
+  case C65::ZSELECTCC64_32:
+  case C65::ZSELECTCC64_64:
+    return EmitZSELECT_CC(MI, MBB, OpSize);
 
     // ZST
   case C65::ZST8s:

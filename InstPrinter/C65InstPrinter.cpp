@@ -36,6 +36,7 @@ void C65InstPrinter::printRegName(raw_ostream &OS, unsigned RegNo) const {
 void C65InstPrinter::printComments(const MCInst *MI, raw_ostream &OS) {
   if (MI->getNumOperands() == 2) {
     // MVN, MVP instructions are the only ones with more than one operand
+    // FIXME: $ is not actually recognized as a hex prefix..!
     OS << '$';
     OS.write_hex(MI->getOperand(0).getImm());
     OS << ",$";
