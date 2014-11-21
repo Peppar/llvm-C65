@@ -12,6 +12,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "C65InstrInfo.h"
+#include "C65Subtarget.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/ISDOpcodes.h"
@@ -81,36 +82,74 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                DebugLoc DL,
                                unsigned DestReg, unsigned SrcReg,
                                bool KillSrc) const {
-  const unsigned ByteCapacity = 2;
-  unsigned NumBytes;
-  unsigned LDAInstr;
-  unsigned STAInstr;
+  const unsigned ByteCapacity = STI.has65802() ? 2 : 1;
+  bool ZRegSrc = RI.isZReg(SrcReg);
+  bool ZRegDest = RI.isZReg(DestReg);
 
-  if (C65::ZRC8RegClass.contains(DestReg, SrcReg)) {
-    NumBytes = 1;
-  } else if (C65::ZRC16RegClass.contains(DestReg, SrcReg)) {
-    NumBytes = 2;
-  } else if (C65::ZRC32RegClass.contains(DestReg, SrcReg)) {
-    NumBytes = 4;
-  } else if (C65::ZRC64RegClass.contains(DestReg, SrcReg)) {
-    NumBytes = 8;
+  if (ZRegSrc && ZRegDest) {
+    unsigned LDAInstr;
+    unsigned STAInstr;
+    unsigned NumBytes = RI.getZRSize(DestReg);
+    if (NumBytes == 1 || ByteCapacity == 1) {
+      LDAInstr = C65::LDA8zp;
+      STAInstr = C65::STA8zp;
+    } else {
+      LDAInstr = C65::LDA16zp;
+      STAInstr = C65::STA16zp;
+    }
+    for (unsigned I = 0; I < NumBytes; I += ByteCapacity) {
+      BuildMI(MBB, MBBI, DL, get(LDAInstr))
+        .addImm(RI.getZRAddress(SrcReg) + I);
+      BuildMI(MBB, MBBI, DL, get(STAInstr))
+        .addImm(RI.getZRAddress(DestReg) + I);
+    }
+  } else if (ZRegSrc) {
+    unsigned SimpleOp =
+      DestReg == C65::C ? C65::LDA16zp :
+      DestReg == C65::X ? C65::LDX16zp :
+      DestReg == C65::Y ? C65::LDY16zp :
+      DestReg == C65::A ? C65::LDA8zp :
+      DestReg == C65::XL ? C65::LDX8zp :
+      DestReg == C65::YL ? C65::LDY8zp : 0;
+    if (SimpleOp) {
+      BuildMI(MBB, MBBI, DL, get(SimpleOp))
+        .addImm(RI.getZRAddress(SrcReg));
+    } else {
+      unsigned TransOp16 =
+        DestReg == C65::D ? C65::TCD : 0;
+      if (TransOp16) {
+        BuildMI(MBB, MBBI, DL, get(C65::LDA16zp))
+          .addImm(RI.getZRAddress(SrcReg));
+        BuildMI(MBB, MBBI, DL, get(TransOp16));
+      } else {
+        llvm_unreachable("Cannot copy Z register to this register.");
+      }
+    }
+  } else if (ZRegDest) {
+    unsigned SimpleOp =
+      SrcReg == C65::C ? C65::STA16zp :
+      SrcReg == C65::X ? C65::STX16zp :
+      SrcReg == C65::Y ? C65::STY16zp :
+      SrcReg == C65::A ? C65::STA8zp :
+      SrcReg == C65::XL ? C65::STX8zp :
+      SrcReg == C65::YL ? C65::STY8zp : 0;
+    if (SimpleOp) {
+      BuildMI(MBB, MBBI, DL, get(SimpleOp))
+        .addImm(RI.getZRAddress(SrcReg));
+    } else {
+      unsigned TransOp16 =
+        SrcReg == C65::D ? C65::TDC :
+        SrcReg == C65::S ? C65::TSC : 0;
+      if (TransOp16) {
+        BuildMI(MBB, MBBI, DL, get(TransOp16));
+        BuildMI(MBB, MBBI, DL, get(C65::STA16zp))
+          .addImm(RI.getZRAddress(DestReg));
+      } else {
+        llvm_unreachable("Cannot copy Z register from this register.");
+      }
+    }
   } else {
-    llvm_unreachable("Impossible reg-to-reg copy");
-  }
-
-  if (NumBytes == 1 || ByteCapacity == 1) {
-    LDAInstr = C65::LDA8zp;
-    STAInstr = C65::STA8zp;
-  } else {
-    LDAInstr = C65::LDA16zp;
-    STAInstr = C65::STA16zp;
-  }
-
-  for (unsigned I = 0; I < NumBytes; I += ByteCapacity) {
-    BuildMI(MBB, MBBI, DL, get(LDAInstr))
-      .addImm(RI.getZRAddress(SrcReg) + I);
-    BuildMI(MBB, MBBI, DL, get(STAInstr))
-      .addImm(RI.getZRAddress(DestReg) + I);
+    llvm_unreachable("Normal reg-to-reg copy not implemented.");
   }
 
   DEBUG(dbgs() << "CopyPhysReg from "

@@ -41,6 +41,10 @@ struct C65RegisterInfo : public C65GenRegisterInfo {
   const TargetRegisterClass *getPointerRegClass(const MachineFunction &MF,
                                                 unsigned Kind) const override;
 
+  bool isZReg(unsigned RegNo) const;
+
+  unsigned getZRSize(unsigned RegNo) const;
+
   unsigned getZRAddress(unsigned RegNo) const;
 
   void eliminateFrameIndex(MachineBasicBlock::iterator II,

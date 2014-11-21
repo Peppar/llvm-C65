@@ -140,12 +140,19 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   setOperationAction(ISD::STACKSAVE,      MVT::Other, Expand);
   setOperationAction(ISD::STACKRESTORE,   MVT::Other, Expand);
 
-  // Custom legalize these nodes
-  setOperationAction(ISD::ConstantPool,   getPointerTy(), Custom);
-  setOperationAction(ISD::GlobalAddress,  getPointerTy(), Custom);
-  setOperationAction(ISD::ExternalSymbol, getPointerTy(), Custom);
-  setOperationAction(ISD::BlockAddress,   getPointerTy(), Custom);
-  setOperationAction(ISD::JumpTable,      getPointerTy(), Custom);
+  // Custom legalize (near pointer).
+  setOperationAction(ISD::ConstantPool,   MVT::i16, Custom);
+  setOperationAction(ISD::GlobalAddress,  MVT::i16, Custom);
+  setOperationAction(ISD::ExternalSymbol, MVT::i16, Custom);
+  setOperationAction(ISD::BlockAddress,   MVT::i16, Custom);
+  setOperationAction(ISD::JumpTable,      MVT::i16, Custom);
+
+  // Custom legalize (far pointer).
+  setOperationAction(ISD::ConstantPool,   MVT::i32, Custom);
+  setOperationAction(ISD::GlobalAddress,  MVT::i32, Custom);
+  setOperationAction(ISD::ExternalSymbol, MVT::i32, Custom);
+  setOperationAction(ISD::BlockAddress,   MVT::i32, Custom);
+  setOperationAction(ISD::JumpTable,      MVT::i32, Custom);
 
   setStackPointerRegisterToSaveRestore(C65::S);
 }
@@ -156,12 +163,13 @@ const char *C65TargetLowering::getTargetNodeName(unsigned Opcode) const {
   switch (Opcode) {
   default:
     return TargetLowering::getTargetNodeName(Opcode);
-  case C65ISD::CMP:       return "C65ISD::CMP";
-  case C65ISD::BR_CC:     return "C65ISD::BR_CC";
-  case C65ISD::SELECT_CC: return "C65ISD::SELECT_CC";
-  case C65ISD::CALL:      return "C65ISD::CALL";
-  case C65ISD::RET:       return "C65ISD::RET";
-  case C65ISD::Wrapper:   return "C65ISD::Wrapper";
+  case C65ISD::CMP:        return "C65ISD::CMP";
+  case C65ISD::BR_CC:      return "C65ISD::BR_CC";
+  case C65ISD::SELECT_CC:  return "C65ISD::SELECT_CC";
+  case C65ISD::CALL:       return "C65ISD::CALL";
+  case C65ISD::RET:        return "C65ISD::RET";
+  case C65ISD::Wrapper:    return "C65ISD::Wrapper";
+  case C65ISD::FarWrapper: return "C65ISD::FarWrapper";
   }
 }
 
@@ -190,12 +198,10 @@ LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::SRA:
   case ISD::SRL:
   case ISD::ROTL:
-  case ISD::ROTR:
-    return LowerShift(Op, DAG);
-  case ISD::BR_CC:
-    return LowerBR_CC(Op, DAG);
-  case ISD::SELECT_CC:
-    return LowerSELECT_CC(Op, DAG);
+  case ISD::ROTR:           return LowerShift(Op, DAG);
+  case ISD::BR_CC:          return LowerBR_CC(Op, DAG);
+  case ISD::SELECT_CC:      return LowerSELECT_CC(Op, DAG);
+  case ISD::FRAMEADDR:      return LowerFRAMEADDR(Op, DAG);
   case ISD::ConstantPool:   return LowerConstantPool(Op, DAG);
   case ISD::GlobalAddress:  return LowerGlobalAddress(Op, DAG);
   case ISD::ExternalSymbol: return LowerExternalSymbol(Op, DAG);
@@ -304,6 +310,17 @@ SDValue C65TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
   }
 }
 
+SDValue
+C65TargetLowering::LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const {
+  MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
+  MFI->setFrameAddressIsTaken(true);
+
+  EVT VT = Op.getValueType();
+  SDLoc DL(Op);
+
+  return DAG.getCopyFromReg(DAG.getEntryNode(), DL, C65::S, VT);
+}
+
 // ConstantPool, JumpTable, GlobalAddress, and ExternalSymbol are
 // lowered as their target countpart wrapped in the C65ISD::Wrapper
 // node. Suppose N is one of the above mentioned nodes. It has to be
@@ -321,19 +338,33 @@ C65TargetLowering::LowerConstantPool(SDValue Op, SelectionDAG &DAG) const {
   return Result;
 }
 
-SDValue
-C65TargetLowering::LowerGlobalAddress(const GlobalValue *GV, SDLoc DL,
-                                      int64_t Offset, SelectionDAG &DAG) const {
-  SDValue Result = DAG.getTargetGlobalAddress(GV, DL, getPointerTy(), Offset);
-  Result = DAG.getNode(C65ISD::Wrapper, DL, getPointerTy(), Result);
-  return Result;
-}
+// SDValue
+// C65TargetLowering::LowerGlobalAddress(const GlobalValue *GV, SDLoc DL,
+//                                       int64_t Offset, SelectionDAG &DAG) const {
+//   GlobalAddressSDNode *G = cast<GlobalAddressSDNode
+//   SDValue Result = DAG.getTargetGlobalAddress(GV, DL, getPointerTy(), Offset);
+//   if (
+//   Result = DAG.getNode(C65ISD::Wrapper, DL, getPointerTy(), Result);
+//   return Result;
+// }
 
 SDValue
 C65TargetLowering::LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const {
-  const GlobalValue *GV = cast<GlobalAddressSDNode>(Op)->getGlobal();
-  int64_t Offset = cast<GlobalAddressSDNode>(Op)->getOffset();
-  return LowerGlobalAddress(GV, SDLoc(Op), Offset, DAG);
+  GlobalAddressSDNode *G = cast<GlobalAddressSDNode>(Op);
+  const GlobalValue *GV = G->getGlobal();
+  int64_t Offset = G->getOffset();
+  SDLoc DL(Op);
+
+  SDValue Result = DAG.getTargetGlobalAddress(GV, DL, getPointerTy(), Offset);
+  if (G->getAddressSpace() == C65AS::NEAR_ADDRESS) {
+    assert(Op.getValueType() == MVT::i16);
+    Result = DAG.getNode(C65ISD::Wrapper, DL, MVT::i16, Result);
+  } else if (G->getAddressSpace() == C65AS::FAR_ADDRESS) {
+    assert(Op.getValueType() == MVT::i32);
+    Result = DAG.getNode(C65ISD::FarWrapper, DL, MVT::i32, Result);
+  } else
+    llvm_unreachable("Unknown address space in GlobalAddress lowering.");
+  return Result;
 }
 
 SDValue
@@ -341,7 +372,12 @@ C65TargetLowering::LowerExternalSymbol(SDValue Op, SelectionDAG &DAG) const {
   const char *Sym = cast<ExternalSymbolSDNode>(Op)->getSymbol();
   SDValue Result = DAG.getTargetExternalSymbol(Sym, getPointerTy());
   SDLoc DL(Op);
-  Result = DAG.getNode(C65ISD::Wrapper, DL, getPointerTy(), Result);
+  if (Op.getValueType() == MVT::i16)
+    Result = DAG.getNode(C65ISD::Wrapper, DL, MVT::i16, Result);
+  else if (Op.getValueType() == MVT::i32)
+    Result = DAG.getNode(C65ISD::FarWrapper, DL, MVT::i32, Result);
+  else
+    llvm_unreachable("Unexpeted return value for external symbol.");
   return Result;
 }
 
@@ -351,7 +387,12 @@ C65TargetLowering::LowerBlockAddress(SDValue Op, SelectionDAG &DAG) const {
   int64_t Offset = cast<BlockAddressSDNode>(Op)->getOffset();
   SDLoc DL(Op);
   SDValue Result = DAG.getTargetBlockAddress(BA, getPointerTy(), Offset);
-  Result = DAG.getNode(C65ISD::Wrapper, DL, getPointerTy(), Result);
+  if (Op.getValueType() == MVT::i16)
+    Result = DAG.getNode(C65ISD::Wrapper, DL, MVT::i16, Result);
+  else if (Op.getValueType() == MVT::i32)
+    Result = DAG.getNode(C65ISD::FarWrapper, DL, MVT::i32, Result);
+  else
+    llvm_unreachable("Unexpeted return value for block address.");
   return Result;
 }
 
@@ -360,7 +401,12 @@ C65TargetLowering::LowerJumpTable(SDValue Op, SelectionDAG &DAG) const {
   JumpTableSDNode *JT = cast<JumpTableSDNode>(Op);
   SDValue Result = DAG.getTargetJumpTable(JT->getIndex(), getPointerTy());
   SDLoc DL(JT);
-  Result = DAG.getNode(C65ISD::Wrapper, DL, getPointerTy(), Result);
+  if (Op.getValueType() == MVT::i16)
+    Result = DAG.getNode(C65ISD::Wrapper, DL, MVT::i16, Result);
+  else if (Op.getValueType() == MVT::i32)
+    Result = DAG.getNode(C65ISD::FarWrapper, DL, MVT::i32, Result);
+  else
+    llvm_unreachable("Unexpeted return value for jump table.");
   return Result;
 }
 
@@ -845,7 +891,8 @@ MachineBasicBlock *
 C65TargetLowering::EmitZST(MachineInstr *MI,
                            MachineBasicBlock *MBB,
                            bool Stack,
-                           unsigned NumBytes) const {
+                           unsigned NumBytes,
+                           bool Far) const {
   bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
@@ -870,13 +917,18 @@ C65TargetLowering::EmitZST(MachineInstr *MI,
     YIndirect = false;
   } else if (NumOperands == 2) {
     assert(!Op1->isReg());
-    STAInstr = Use8Bit ? C65::STA8abs  : C65::STA16abs;
+    if (Far)
+      STAInstr = Use8Bit ? C65::STA8absl  : C65::STA16absl;
+    else
+      STAInstr = Use8Bit ? C65::STA8abs  : C65::STA16abs;
     YIndirect = false;
   } else /* NumOperands == 3 */ {
     assert(Op1->isReg());
     Op2 = &MI->getOperand(2);
-
-    STAInstr = Use8Bit ? C65::STA8zppostiy16 : C65::STA16zppostiy16;
+    if (Far)
+      STAInstr = Use8Bit ? C65::STA8dppostiyl16 : C65::STA16dppostiyl16;
+    else
+      STAInstr = Use8Bit ? C65::STA8zppostiy16 : C65::STA16zppostiy16;
     if (Op2->isReg()) {
       BuildMI(*MBB, MBBI, DL, TII->get(C65::LDY16zp))
         .addImm(RI->getZRAddress(Op2->getReg()));
@@ -914,6 +966,7 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
                            MachineBasicBlock *MBB,
                            bool Stack,
                            unsigned NumBytes,
+                           bool Far,
                            unsigned ExtendBegin,
                            bool Signed) const {
   bool Use8Bit = ExtendBegin == 1 || !Subtarget->has65802();
@@ -941,13 +994,18 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
     YIndirect = false;
   } else if (NumOperands == 2) {
     assert(!Op1->isReg());
-    LDAInstr = Use8Bit ? C65::LDA8abs  : C65::LDA16abs;
+    if (Far)
+      LDAInstr = Use8Bit ? C65::LDA8absl  : C65::LDA16absl;
+    else
+      LDAInstr = Use8Bit ? C65::LDA8abs  : C65::LDA16abs;
     YIndirect = false;
   } else /* NumOperands == 3 */ {
     assert(Op1->isReg());
     Op2 = &MI->getOperand(2);
-
-    LDAInstr = Use8Bit ? C65::LDA8zppostiy16 : C65::LDA16zppostiy16;
+    if (Far)
+      LDAInstr = Use8Bit ? C65::LDA8dppostiyl16 : C65::LDA16dppostiyl16;
+    else
+      LDAInstr = Use8Bit ? C65::LDA8zppostiy16 : C65::LDA16zppostiy16;
     if (Op2->isReg()) {
       BuildMI(*MBB, MBBI, DL, TII->get(C65::LDY16zp))
         .addImm(RI->getZRAddress(Op2->getReg()));
@@ -1052,7 +1110,7 @@ C65TargetLowering::EmitZLDimm(MachineInstr *MI,
   MachineBasicBlock::iterator MBBI = MI;
 
   for (unsigned I = 0; I < NumBytes; I += AccSize) {
-    unsigned ShiftAmt = I << 3;
+    unsigned ShiftAmt = (NumBytes - AccSize - I) << 3;
     if (Op1->isImm()) {
       unsigned Value;
       if (Use8Bit) {
@@ -1225,6 +1283,24 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
 }
 
 MachineBasicBlock *
+C65TargetLowering::EmitZLEA(MachineInstr *MI,
+                            MachineBasicBlock *MBB) const {
+  const C65InstrInfo *TII = Subtarget->getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  DebugLoc DL = MI->getDebugLoc();
+  MachineBasicBlock::iterator MBBI = MI;
+
+  BuildMI(*MBB, MBBI, DL, TII->get(C65::CLC));
+  BuildMI(*MBB, MBBI, DL, TII->get(C65::TSC));
+  BuildMI(*MBB, MBBI, DL, TII->get(C65::ADC16imm))
+    .addImm(MI->getOperand(1).getImm());
+  BuildMI(*MBB, MBBI, DL, TII->get(C65::STA16zp))
+    .addImm(RI->getZRAddress(MI->getOperand(0).getReg()));
+  MI->eraseFromParent();
+  return MBB;
+}
+
+MachineBasicBlock *
 C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
   unsigned OpSize = 1 << C65II::getZROpSize(MI->getDesc().TSFlags);
   switch (MI->getOpcode()) {
@@ -1259,200 +1335,308 @@ C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
   case C65::ZST16s:
   case C65::ZST32s:
   case C65::ZST64s:
-    return EmitZST(MI, MBB, true, OpSize);
+    return EmitZST(MI, MBB, true, OpSize, false);
   case C65::ZST8zp:
   case C65::ZST16zp:
   case C65::ZST32zp:
   case C65::ZST64zp:
-  case C65::ZST8i16:
-  case C65::ZST16i16:
-  case C65::ZST32i16:
-  case C65::ZST64i16:
-  case C65::ZST8zi16:
-  case C65::ZST16zi16:
-  case C65::ZST32zi16:
-  case C65::ZST64zi16:
-  case C65::ZST8zz16:
-  case C65::ZST16zz16:
-  case C65::ZST32zz16:
-  case C65::ZST64zz16:
-    return EmitZST(MI, MBB, false, OpSize);
+  case C65::ZST8abs:
+  case C65::ZST16abs:
+  case C65::ZST32abs:
+  case C65::ZST64abs:
+  case C65::ZST8ri:
+  case C65::ZST16ri:
+  case C65::ZST32ri:
+  case C65::ZST64ri:
+  case C65::ZST8rr:
+  case C65::ZST16rr:
+  case C65::ZST32rr:
+  case C65::ZST64rr:
+    return EmitZST(MI, MBB, false, OpSize, false);
+  case C65::ZST8absl:
+  case C65::ZST16absl:
+  case C65::ZST32absl:
+  case C65::ZST64absl:
+  case C65::ZST8rif:
+  case C65::ZST16rif:
+  case C65::ZST32rif:
+  case C65::ZST64rif:
+  case C65::ZST8rrf:
+  case C65::ZST16rrf:
+  case C65::ZST32rrf:
+  case C65::ZST64rrf:
+    return EmitZST(MI, MBB, false, OpSize, true);
 
     // ZST truncating
   case C65::ZST16trunc8s:
   case C65::ZST32trunc8s:
   case C65::ZST64trunc8s:
-    return EmitZST(MI, MBB, true, 1);
+    return EmitZST(MI, MBB, true, 1, false);
   case C65::ZST16trunc8zp:
-  case C65::ZST16trunc8i16:
-  case C65::ZST16trunc8zi16:
-  case C65::ZST16trunc8zz16:
+  case C65::ZST16trunc8abs:
+  case C65::ZST16trunc8ri:
+  case C65::ZST16trunc8rr:
   case C65::ZST32trunc8zp:
-  case C65::ZST32trunc8i16:
-  case C65::ZST32trunc8zi16:
-  case C65::ZST32trunc8zz16:
+  case C65::ZST32trunc8abs:
+  case C65::ZST32trunc8ri:
+  case C65::ZST32trunc8rr:
   case C65::ZST64trunc8zp:
-  case C65::ZST64trunc8i16:
-  case C65::ZST64trunc8zi16:
-  case C65::ZST64trunc8zz16:
-    return EmitZST(MI, MBB, false, 1);
+  case C65::ZST64trunc8abs:
+  case C65::ZST64trunc8ri:
+  case C65::ZST64trunc8rr:
+    return EmitZST(MI, MBB, false, 1, false);
+  case C65::ZST16trunc8absl:
+  case C65::ZST16trunc8rif:
+  case C65::ZST16trunc8rrf:
+  case C65::ZST32trunc8absl:
+  case C65::ZST32trunc8rif:
+  case C65::ZST32trunc8rrf:
+  case C65::ZST64trunc8absl:
+  case C65::ZST64trunc8rif:
+  case C65::ZST64trunc8rrf:
+    return EmitZST(MI, MBB, false, 1, false);
   case C65::ZST32trunc16s:
   case C65::ZST64trunc16s:
-    return EmitZST(MI, MBB, true, 2);
+    return EmitZST(MI, MBB, true, 2, false);
   case C65::ZST32trunc16zp:
-  case C65::ZST32trunc16i16:
-  case C65::ZST32trunc16zi16:
-  case C65::ZST32trunc16zz16:
+  case C65::ZST32trunc16abs:
+  case C65::ZST32trunc16ri:
+  case C65::ZST32trunc16rr:
   case C65::ZST64trunc16zp:
-  case C65::ZST64trunc16i16:
-  case C65::ZST64trunc16zi16:
-  case C65::ZST64trunc16zz16:
-    return EmitZST(MI, MBB, false, 2);
+  case C65::ZST64trunc16abs:
+  case C65::ZST64trunc16ri:
+  case C65::ZST64trunc16rr:
+    return EmitZST(MI, MBB, false, 2, false);
+  case C65::ZST32trunc16absl:
+  case C65::ZST32trunc16rif:
+  case C65::ZST32trunc16rrf:
+  case C65::ZST64trunc16absl:
+  case C65::ZST64trunc16rif:
+  case C65::ZST64trunc16rrf:
+    return EmitZST(MI, MBB, false, 2, true);
   case C65::ZST64trunc32s:
-    return EmitZST(MI, MBB, true, 4);
+    return EmitZST(MI, MBB, true, 4, false);
   case C65::ZST64trunc32zp:
-  case C65::ZST64trunc32i16:
-  case C65::ZST64trunc32zi16:
-  case C65::ZST64trunc32zz16:
-    return EmitZST(MI, MBB, false, 4);
+  case C65::ZST64trunc32abs:
+  case C65::ZST64trunc32ri:
+  case C65::ZST64trunc32rr:
+    return EmitZST(MI, MBB, false, 4, false);
+  case C65::ZST64trunc32absl:
+  case C65::ZST64trunc32rif:
+  case C65::ZST64trunc32rrf:
+    return EmitZST(MI, MBB, false, 4, true);
 
     // ZLD
   case C65::ZLD8s:
   case C65::ZLD16s:
   case C65::ZLD32s:
   case C65::ZLD64s:
-    return EmitZLD(MI, MBB, true, OpSize, OpSize);
+    return EmitZLD(MI, MBB, true, OpSize, false, OpSize);
   case C65::ZLD8zp:
   case C65::ZLD16zp:
   case C65::ZLD32zp:
   case C65::ZLD64zp:
-  case C65::ZLD8i16:
-  case C65::ZLD16i16:
-  case C65::ZLD32i16:
-  case C65::ZLD64i16:
-  case C65::ZLD8zi16:
-  case C65::ZLD16zi16:
-  case C65::ZLD32zi16:
-  case C65::ZLD64zi16:
-  case C65::ZLD8zz16:
-  case C65::ZLD16zz16:
-  case C65::ZLD32zz16:
-  case C65::ZLD64zz16:
-    return EmitZLD(MI, MBB, false, OpSize, OpSize);
+  case C65::ZLD8abs:
+  case C65::ZLD16abs:
+  case C65::ZLD32abs:
+  case C65::ZLD64abs:
+  case C65::ZLD8ri:
+  case C65::ZLD16ri:
+  case C65::ZLD32ri:
+  case C65::ZLD64ri:
+  case C65::ZLD8rr:
+  case C65::ZLD16rr:
+  case C65::ZLD32rr:
+  case C65::ZLD64rr:
+    return EmitZLD(MI, MBB, false, OpSize, false, OpSize);
+  case C65::ZLD8absl:
+  case C65::ZLD16absl:
+  case C65::ZLD32absl:
+  case C65::ZLD64absl:
+  case C65::ZLD8rif:
+  case C65::ZLD16rif:
+  case C65::ZLD32rif:
+  case C65::ZLD64rif:
+  case C65::ZLD8rrf:
+  case C65::ZLD16rrf:
+  case C65::ZLD32rrf:
+  case C65::ZLD64rrf:
+    return EmitZLD(MI, MBB, false, OpSize, true, OpSize);
 
     // ZLD any extend
   case C65::ZLD16ext8s:
   case C65::ZLD32ext8s:
   case C65::ZLD64ext8s:
-    return EmitZLD(MI, MBB, true, 1, 1);
+    return EmitZLD(MI, MBB, true, 1, false, 1);
   case C65::ZLD16ext8zp:
-  case C65::ZLD16ext8i16:
-  case C65::ZLD16ext8zi16:
-  case C65::ZLD16ext8zz16:
+  case C65::ZLD16ext8abs:
+  case C65::ZLD16ext8ri:
+  case C65::ZLD16ext8rr:
   case C65::ZLD32ext8zp:
-  case C65::ZLD32ext8i16:
-  case C65::ZLD32ext8zi16:
-  case C65::ZLD32ext8zz16:
+  case C65::ZLD32ext8abs:
+  case C65::ZLD32ext8ri:
+  case C65::ZLD32ext8rr:
   case C65::ZLD64ext8zp:
-  case C65::ZLD64ext8i16:
-  case C65::ZLD64ext8zi16:
-  case C65::ZLD64ext8zz16:
-    return EmitZLD(MI, MBB, false, 1, 1);
+  case C65::ZLD64ext8abs:
+  case C65::ZLD64ext8ri:
+  case C65::ZLD64ext8rr:
+    return EmitZLD(MI, MBB, false, 1, false, 1);
+  case C65::ZLD16ext8absl:
+  case C65::ZLD32ext8absl:
+  case C65::ZLD32ext8rif:
+  case C65::ZLD32ext8rrf:
+  case C65::ZLD64ext8absl:
+  case C65::ZLD64ext8rif:
+  case C65::ZLD64ext8rrf:
+    return EmitZLD(MI, MBB, false, 1, true, 1);
   case C65::ZLD32ext16s:
   case C65::ZLD64ext16s:
-    return EmitZLD(MI, MBB, true, 2, 2);
+    return EmitZLD(MI, MBB, true, 2, false, 2);
   case C65::ZLD32ext16zp:
-  case C65::ZLD32ext16i16:
-  case C65::ZLD32ext16zi16:
-  case C65::ZLD32ext16zz16:
+  case C65::ZLD32ext16abs:
+  case C65::ZLD32ext16ri:
+  case C65::ZLD32ext16rr:
   case C65::ZLD64ext16zp:
-  case C65::ZLD64ext16i16:
-  case C65::ZLD64ext16zi16:
-  case C65::ZLD64ext16zz16:
-    return EmitZLD(MI, MBB, false, 2, 2);
+  case C65::ZLD64ext16abs:
+  case C65::ZLD64ext16ri:
+  case C65::ZLD64ext16rr:
+    return EmitZLD(MI, MBB, false, 2, false, 2);
+  case C65::ZLD32ext16absl:
+  case C65::ZLD32ext16rif:
+  case C65::ZLD32ext16rrf:
+  case C65::ZLD64ext16absl:
+  case C65::ZLD64ext16rif:
+  case C65::ZLD64ext16rrf:
+    return EmitZLD(MI, MBB, false, 2, true, 2);
   case C65::ZLD64ext32s:
-    return EmitZLD(MI, MBB, true, 4, 4);
+    return EmitZLD(MI, MBB, true, 4, false, 4);
   case C65::ZLD64ext32zp:
-  case C65::ZLD64ext32i16:
-  case C65::ZLD64ext32zi16:
-  case C65::ZLD64ext32zz16:
-    return EmitZLD(MI, MBB, false, 4, 4);
+  case C65::ZLD64ext32abs:
+  case C65::ZLD64ext32ri:
+  case C65::ZLD64ext32rr:
+    return EmitZLD(MI, MBB, false, 4, false, 4);
+  case C65::ZLD64ext32absl:
+  case C65::ZLD64ext32rif:
+  case C65::ZLD64ext32rrf:
+    return EmitZLD(MI, MBB, false, 4, true, 4);
 
     // ZLD sign extend
   case C65::ZLD16sext8s:
   case C65::ZLD32sext8s:
   case C65::ZLD64sext8s:
-    return EmitZLD(MI, MBB, true, OpSize, 1, true);
+    return EmitZLD(MI, MBB, true, OpSize, false, 1, true);
   case C65::ZLD16sext8zp:
-  case C65::ZLD16sext8i16:
-  case C65::ZLD16sext8zi16:
-  case C65::ZLD16sext8zz16:
+  case C65::ZLD16sext8abs:
+  case C65::ZLD16sext8ri:
+  case C65::ZLD16sext8rr:
   case C65::ZLD32sext8zp:
-  case C65::ZLD32sext8i16:
-  case C65::ZLD32sext8zi16:
-  case C65::ZLD32sext8zz16:
+  case C65::ZLD32sext8abs:
+  case C65::ZLD32sext8ri:
+  case C65::ZLD32sext8rr:
   case C65::ZLD64sext8zp:
-  case C65::ZLD64sext8i16:
-  case C65::ZLD64sext8zi16:
-  case C65::ZLD64sext8zz16:
-    return EmitZLD(MI, MBB, false, OpSize, 1, true);
+  case C65::ZLD64sext8abs:
+  case C65::ZLD64sext8ri:
+  case C65::ZLD64sext8rr:
+    return EmitZLD(MI, MBB, false, OpSize, false, 1, true);
+  case C65::ZLD16sext8absl:
+  case C65::ZLD16sext8rif:
+  case C65::ZLD16sext8rrf:
+  case C65::ZLD32sext8absl:
+  case C65::ZLD32sext8rif:
+  case C65::ZLD32sext8rrf:
+  case C65::ZLD64sext8absl:
+  case C65::ZLD64sext8rif:
+  case C65::ZLD64sext8rrf:
+    return EmitZLD(MI, MBB, false, OpSize, true, 1, true);
   case C65::ZLD32sext16s:
   case C65::ZLD64sext16s:
-    return EmitZLD(MI, MBB, true, OpSize, 2, true);
+    return EmitZLD(MI, MBB, true, OpSize, false, 2, true);
   case C65::ZLD32sext16zp:
-  case C65::ZLD32sext16i16:
-  case C65::ZLD32sext16zi16:
-  case C65::ZLD32sext16zz16:
+  case C65::ZLD32sext16abs:
+  case C65::ZLD32sext16ri:
+  case C65::ZLD32sext16rr:
   case C65::ZLD64sext16zp:
-  case C65::ZLD64sext16i16:
-  case C65::ZLD64sext16zi16:
-  case C65::ZLD64sext16zz16:
-    return EmitZLD(MI, MBB, false, OpSize, 2, true);
+  case C65::ZLD64sext16abs:
+  case C65::ZLD64sext16ri:
+  case C65::ZLD64sext16rr:
+    return EmitZLD(MI, MBB, false, OpSize, false, 2, true);
+  case C65::ZLD32sext16absl:
+  case C65::ZLD32sext16rif:
+  case C65::ZLD32sext16rrf:
+  case C65::ZLD64sext16absl:
+  case C65::ZLD64sext16rif:
+  case C65::ZLD64sext16rrf:
+    return EmitZLD(MI, MBB, false, OpSize, true, 2, true);
   case C65::ZLD64sext32s:
-    return EmitZLD(MI, MBB, true, OpSize, 4, true);
+    return EmitZLD(MI, MBB, true, OpSize, false, 4, true);
   case C65::ZLD64sext32zp:
-  case C65::ZLD64sext32i16:
-  case C65::ZLD64sext32zi16:
-  case C65::ZLD64sext32zz16:
-    return EmitZLD(MI, MBB, false, OpSize, 4, true);
+  case C65::ZLD64sext32abs:
+  case C65::ZLD64sext32ri:
+  case C65::ZLD64sext32rr:
+    return EmitZLD(MI, MBB, false, OpSize, false, 4, true);
+  case C65::ZLD64sext32absl:
+  case C65::ZLD64sext32rif:
+  case C65::ZLD64sext32rrf:
+    return EmitZLD(MI, MBB, false, OpSize, true, 4, true);
 
     // ZLD zero extend
   case C65::ZLD16zext8s:
   case C65::ZLD32zext8s:
   case C65::ZLD64zext8s:
-    return EmitZLD(MI, MBB, true, OpSize, 1, false);
+    return EmitZLD(MI, MBB, true, OpSize, false, 1, false);
   case C65::ZLD16zext8zp:
-  case C65::ZLD16zext8i16:
-  case C65::ZLD16zext8zi16:
-  case C65::ZLD16zext8zz16:
+  case C65::ZLD16zext8abs:
+  case C65::ZLD16zext8ri:
+  case C65::ZLD16zext8rr:
   case C65::ZLD32zext8zp:
-  case C65::ZLD32zext8i16:
-  case C65::ZLD32zext8zi16:
-  case C65::ZLD32zext8zz16:
+  case C65::ZLD32zext8abs:
+  case C65::ZLD32zext8ri:
+  case C65::ZLD32zext8rr:
   case C65::ZLD64zext8zp:
-  case C65::ZLD64zext8i16:
-  case C65::ZLD64zext8zi16:
-  case C65::ZLD64zext8zz16:
-    return EmitZLD(MI, MBB, false, OpSize, 1, false);
+  case C65::ZLD64zext8abs:
+  case C65::ZLD64zext8ri:
+  case C65::ZLD64zext8rr:
+    return EmitZLD(MI, MBB, false, OpSize, false, 1, false);
+  case C65::ZLD16zext8absl:
+  case C65::ZLD16zext8rif:
+  case C65::ZLD16zext8rrf:
+  case C65::ZLD32zext8absl:
+  case C65::ZLD32zext8rif:
+  case C65::ZLD32zext8rrf:
+  case C65::ZLD64zext8absl:
+  case C65::ZLD64zext8rif:
+  case C65::ZLD64zext8rrf:
+    return EmitZLD(MI, MBB, false, OpSize, true, 1, false);
   case C65::ZLD32zext16s:
   case C65::ZLD64zext16s:
-    return EmitZLD(MI, MBB, true, OpSize, 2, false);
+    return EmitZLD(MI, MBB, true, OpSize, false, 2, false);
   case C65::ZLD32zext16zp:
-  case C65::ZLD32zext16i16:
-  case C65::ZLD32zext16zi16:
-  case C65::ZLD32zext16zz16:
+  case C65::ZLD32zext16abs:
+  case C65::ZLD32zext16ri:
+  case C65::ZLD32zext16rr:
+  case C65::ZLD64zext16ri:
+  case C65::ZLD64zext16rr:
   case C65::ZLD64zext16zp:
-  case C65::ZLD64zext16i16:
-  case C65::ZLD64zext16zi16:
-  case C65::ZLD64zext16zz16:
-    return EmitZLD(MI, MBB, false, OpSize, 2, false);
+  case C65::ZLD64zext16abs:
+    return EmitZLD(MI, MBB, false, OpSize, false, 2, false);
+  case C65::ZLD32zext16absl:
+  case C65::ZLD32zext16rif:
+  case C65::ZLD32zext16rrf:
+  case C65::ZLD64zext16absl:
+  case C65::ZLD64zext16rif:
+  case C65::ZLD64zext16rrf:
+    return EmitZLD(MI, MBB, false, OpSize, true, 2, false);
   case C65::ZLD64zext32s:
-    return EmitZLD(MI, MBB, true, OpSize, 4, false);
+    return EmitZLD(MI, MBB, true, OpSize, false, 4, false);
   case C65::ZLD64zext32zp:
-  case C65::ZLD64zext32i16:
-  case C65::ZLD64zext32zi16:
-  case C65::ZLD64zext32zz16:
-    return EmitZLD(MI, MBB, false, OpSize, 4, false);
+  case C65::ZLD64zext32abs:
+  case C65::ZLD64zext32ri:
+  case C65::ZLD64zext32rr:
+    return EmitZLD(MI, MBB, false, OpSize, false, 4, false);
+  case C65::ZLD64zext32absl:
+  case C65::ZLD64zext32rif:
+  case C65::ZLD64zext32rrf:
+    return EmitZLD(MI, MBB, false, OpSize, true, 4, false);
 
     // ZLD immediate
   case C65::ZLD8imm:
@@ -1537,6 +1721,10 @@ C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
   case C65::ZSUB64:
     return EmitBinaryZI(MI, MBB, OpSize, C65::SBC8zp, C65::SBC16zp,
                         false, true);
+
+    // ZLEA
+  case C65::ZLEA16s:
+    return EmitZLEA(MI, MBB);
   }
 }
 

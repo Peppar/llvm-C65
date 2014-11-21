@@ -31,7 +31,8 @@ namespace llvm {
       SELECT_CC,
       CALL,
       RET,
-      Wrapper
+      Wrapper,
+      FarWrapper
     };
   }
 
@@ -49,12 +50,6 @@ namespace llvm {
     const C65Subtarget *Subtarget;
   public:
     C65TargetLowering(TargetMachine &TM);
-
-    SDValue LowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
-    SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
-    SDValue LowerShift(SDValue Op, SelectionDAG &DAG) const;
-
-    SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
 
     /// computeKnownBitsForTargetNode - Determine which of the bits specified
     /// in Mask are known to be either zero or one and return them in the
@@ -78,10 +73,12 @@ namespace llvm {
                                       unsigned NumBytes) const;
     MachineBasicBlock *EmitZST(MachineInstr *MI, MachineBasicBlock *MBB,
                                bool Stack,
-                               unsigned NumBytes) const;
+                               unsigned NumBytes,
+                               bool Far) const;
     MachineBasicBlock *EmitZLD(MachineInstr *MI, MachineBasicBlock *MBB,
                                bool Stack,
                                unsigned NumBytes,
+                               bool Far,
                                unsigned ExtendBegin,
                                bool Signed = false) const;
     MachineBasicBlock *EmitZLDimm(MachineInstr *MI, MachineBasicBlock *MBB,
@@ -91,6 +88,8 @@ namespace llvm {
                                 unsigned NumBytes,
                                 unsigned ExtendBegin,
                                 bool Signed = false) const;
+    MachineBasicBlock *EmitZLEA(MachineInstr *MI,
+                                MachineBasicBlock *MBB) const;
     MachineBasicBlock *EmitZInstr(MachineInstr *MI,
                                   MachineBasicBlock *MBB) const;
     MachineBasicBlock *
@@ -103,8 +102,18 @@ namespace llvm {
 
     MVT getScalarShiftAmountTy(EVT LHSTy) const override { return MVT::i8; }
 
-    /// getSetCCResultType - Return the ISD::SETCC ValueType
+    /// Return the ISD::SETCC ValueType
     EVT getSetCCResultType(LLVMContext &Context, EVT VT) const override;
+
+    SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
+
+    SDValue LowerBR_CC(SDValue Op, SelectionDAG &DAG) const;
+
+    SDValue LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const;
+
+    SDValue LowerShift(SDValue Op, SelectionDAG &DAG) const;
+
+    SDValue LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
 
     // ConstantPool, JumpTable, GlobalAddress, and ExternalSymbol are
     // lowered as their target countpart wrapped in the
@@ -115,9 +124,9 @@ namespace llvm {
     SDValue
     LowerConstantPool(SDValue Op, SelectionDAG &DAG) const;
 
-    SDValue
-    LowerGlobalAddress(const GlobalValue *GV, SDLoc DL,
-                       int64_t Offset, SelectionDAG &DAG) const;
+    // SDValue
+    // LowerGlobalAddress(const GlobalValue *GV, SDLoc DL,
+    //                    int64_t Offset, SelectionDAG &DAG) const;
 
     SDValue
     LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const;

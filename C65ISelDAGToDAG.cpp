@@ -50,10 +50,12 @@ public:
 
   // Complex pattern selectors
   bool SelectAddrZP(SDValue N, SDValue &Addr);
-  bool SelectAddrI(SDValue N, SDValue &Addr);
-  bool SelectAddrL(SDValue N, SDValue &Addr);
+  bool SelectAddrAbs(SDValue N, SDValue &Addr);
+  bool SelectAddrAbsL(SDValue N, SDValue &Addr);
   bool SelectAddrRR(SDValue N, SDValue &R1, SDValue &R2);
   bool SelectAddrRI(SDValue N, SDValue &Base, SDValue &Offset);
+  bool SelectAddrRRF(SDValue N, SDValue &R1, SDValue &R2);
+  bool SelectAddrRIF(SDValue N, SDValue &Base, SDValue &Offset);
   bool SelectAddrS(SDValue N, SDValue &Index, SDValue &Offset);
 
   /// SelectInlineAsmMemoryOperand - Implement addressing mode selection for
@@ -87,7 +89,7 @@ bool C65DAGToDAGISel::SelectAddrS(SDValue Addr, SDValue &Index,
     ConstantSDNode *CN = nullptr;
     if ((FIN = dyn_cast<FrameIndexSDNode>(Addr.getOperand(0))) &&
         (CN = dyn_cast<ConstantSDNode>(Addr.getOperand(1))) &&
-        (isInt<8>(CN->getSExtValue()))) {
+        (isUInt<8>(CN->getZExtValue()))) {
       // Constant positive word offset from frame index
       Index = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i16);
       Offset = CurDAG->getTargetConstant(CN->getZExtValue(), MVT::i8);
@@ -105,9 +107,9 @@ bool C65DAGToDAGISel::SelectAddrZP(SDValue Addr, SDValue &Offset) {
   } else if (Subtarget.has65802()) {
     // Avoid using direct page addressing for 65802.
   } else {
-    uint64_t Val = cast<ConstantSDNode>(Addr)->getSExtValue();
-    if (!isInt<8>(Val)) {
-      // Let 16-bit addressing capture this.
+    uint64_t Val = cast<ConstantSDNode>(Addr)->getZExtValue();
+    if (!isUInt<8>(Val)) {
+      // Let 16-bit or 24-bit addressing capture this.
     } else {
       Offset = CurDAG->getTargetConstant(Val, MVT::i16);
       return true;
@@ -118,12 +120,12 @@ bool C65DAGToDAGISel::SelectAddrZP(SDValue Addr, SDValue &Offset) {
 
 /// Select address for absolute, imm16
 ///
-bool C65DAGToDAGISel::SelectAddrI(SDValue Addr, SDValue &Offset) {
+bool C65DAGToDAGISel::SelectAddrAbs(SDValue Addr, SDValue &Offset) {
   if (Addr.getOpcode() == ISD::Constant) {
-    uint64_t Val = cast<ConstantSDNode>(Addr)->getSExtValue();
-    if (!Subtarget.has65802() && isInt<8>(Val)) {
+    uint64_t Val = cast<ConstantSDNode>(Addr)->getZExtValue();
+    if (!Subtarget.has65802() && isUInt<8>(Val)) {
       // Let zero-page addressing capture this.
-    } else if (!isInt<16>(Val)) {
+    } else if (!isUInt<16>(Val)) {
       // Address does not fit.
     } else {
       Offset = CurDAG->getTargetConstant(Val, MVT::i16);
@@ -146,8 +148,29 @@ bool C65DAGToDAGISel::SelectAddrI(SDValue Addr, SDValue &Offset) {
 
 /// Select address for long absolute, imm24
 ///
-bool C65DAGToDAGISel::SelectAddrL(SDValue Addr, SDValue &Offset) {
-  // TODO
+bool C65DAGToDAGISel::SelectAddrAbsL(SDValue Addr, SDValue &Offset) {
+  if (Addr.getOpcode() == ISD::Constant) {
+    uint64_t Val = cast<ConstantSDNode>(Addr)->getZExtValue();
+    if (isUInt<16>(Val)) {
+      // Let 16-bit immediate addressing capture this.
+    } else if (!isUInt<24>(Val)) {
+      // Address does not fit.
+    } else {
+      Offset = CurDAG->getTargetConstant(Val, MVT::i32);
+      return true;
+    }
+  } else if (Addr.getOpcode() == C65ISD::FarWrapper) {
+    SDValue N = Addr.getOperand(0);
+    if (N->getOpcode() != ISD::TargetConstantPool &&
+        N->getOpcode() != ISD::TargetJumpTable &&
+        N->getOpcode() != ISD::TargetGlobalAddress &&
+        N->getOpcode() != ISD::TargetExternalSymbol &&
+        N->getOpcode() != ISD::TargetBlockAddress) {
+      llvm_unreachable("Unhandled wrapped far node.");
+    }
+    Offset = N;
+    return true;
+  }
   return false;
 }
 
@@ -155,34 +178,25 @@ bool C65DAGToDAGISel::SelectAddrL(SDValue Addr, SDValue &Offset) {
 ///
 bool C65DAGToDAGISel::SelectAddrRI(SDValue Addr, SDValue &Base,
                                    SDValue &Offset) {
-  if (Addr.getOpcode() == ISD::ADD) {
+  if (Addr.getSimpleValueType() == MVT::i32) {
+      // Let SelectAddrRIF capture this.
+  } else if (Addr.getOpcode() == ISD::ADD) {
     SDValue N0 = Addr.getOperand(0);
     SDValue N1 = Addr.getOperand(1);
     if (N0.getOpcode() == ISD::FrameIndex) {
       // Let stack addressing mode capture this.
     } else if (N1.getOpcode() == ISD::Constant) {
-      uint64_t Val = cast<ConstantSDNode>(N1)->getSExtValue();
-      if (isInt<16>(Val)) {
-        Base = N0;
+      uint64_t Val = cast<ConstantSDNode>(N1)->getZExtValue();
+      if (isUInt<16>(Val)) {
         Offset = CurDAG->getTargetConstant(Val, MVT::i16);
+        Base = N0;
         return true;
       }
-    } else if (N1.getOpcode() == C65ISD::Wrapper) {
-      N1 = N1.getOperand(0);
-      if (N1->getOpcode() != ISD::TargetConstantPool &&
-          N1->getOpcode() != ISD::TargetJumpTable &&
-          N1->getOpcode() != ISD::TargetGlobalAddress &&
-          N1->getOpcode() != ISD::TargetExternalSymbol &&
-          N1->getOpcode() != ISD::TargetBlockAddress) {
-        llvm_unreachable("Unhandled wrapped node.");
-      }
-      Base = N0;
-      Offset = N1;
-      return true;
     }
   } else if (Addr.getOpcode() == ISD::Constant ||
-             Addr.getOpcode() == C65ISD::Wrapper) {
-    // Let zp or i16 addressing mode capture this.
+             Addr.getOpcode() == C65ISD::Wrapper ||
+             Addr.getOpcode() == C65ISD::FarWrapper) {
+    // Let zp, abs or absl addressing mode capture this.
   } else {
     // There is currently no single-register addressing mode without
     // an offset, so handle this by having a zero offset.
@@ -197,7 +211,9 @@ bool C65DAGToDAGISel::SelectAddrRI(SDValue Addr, SDValue &Base,
 ///
 bool C65DAGToDAGISel::SelectAddrRR(SDValue Addr, SDValue &R1,
                                    SDValue &R2) {
-  if (Addr.getOpcode() == ISD::ADD) {
+  if (Addr.getSimpleValueType() == MVT::i32) {
+    // Let SelectAddrRRF handle this.
+  } else if (Addr.getOpcode() == ISD::ADD) {
     SDValue N0 = Addr.getOperand(0);
     SDValue N1 = Addr.getOperand(1);
     if (N0.getOpcode() == ISD::FrameIndex) {
@@ -207,6 +223,79 @@ bool C65DAGToDAGISel::SelectAddrRR(SDValue Addr, SDValue &R1,
     } else {
       R1 = Addr.getOperand(0);
       R2 = Addr.getOperand(1);
+      return true;
+    }
+  }
+  return false;
+}
+
+/// Select address for reg32 + imm16
+///
+bool C65DAGToDAGISel::SelectAddrRIF(SDValue Addr, SDValue &Base,
+                                    SDValue &Offset) {
+  if (Addr.getSimpleValueType() != MVT::i32) {
+    // Let SelectAddrRI handle this.
+  } else if (Addr.getOpcode() == ISD::ADD) {
+    SDValue N0 = Addr.getOperand(0);
+    SDValue N1 = Addr.getOperand(1);
+    if (N0.getOpcode() == ISD::FrameIndex) {
+      // Let stack addressing mode capture this.
+    } else if (N1.getOpcode() == ISD::Constant) {
+      uint64_t Val = cast<ConstantSDNode>(N1)->getZExtValue();
+      if (isUInt<16>(Val)) {
+        Base = N0;
+        Offset = CurDAG->getTargetConstant(Val, MVT::i16);
+        return true;
+      }
+    } else if (N0.getOpcode() != ISD::ZERO_EXTEND &&
+               N0.getOpcode() != ISD::SIGN_EXTEND &&
+               N1.getOpcode() != ISD::ZERO_EXTEND &&
+               N1.getOpcode() != ISD::SIGN_EXTEND) {
+      // If neither of the operands are extended from 16 bits, then
+      // both operands are 32 bits and selectAddrRRF will fail. Handle
+      // this case here.
+      Base = Addr;
+      Offset = CurDAG->getTargetConstant(0, MVT::i16);
+      return true;
+    }
+  } else if (Addr.getOpcode() == ISD::Constant ||
+             Addr.getOpcode() == C65ISD::Wrapper ||
+             Addr.getOpcode() == C65ISD::FarWrapper) {
+    // Let zp, abs or absl addressing mode capture this.
+  } else {
+    // There is currently no single-register addressing mode without
+    // an offset, so handle this by having a zero offset.
+    Base = Addr;
+    Offset = CurDAG->getTargetConstant(0, MVT::i16);
+    return true;
+  }
+  return false;
+}
+
+/// Select address for reg32 + reg16
+///
+bool C65DAGToDAGISel::SelectAddrRRF(SDValue Addr, SDValue &R1,
+                                    SDValue &R2) {
+  if (Addr.getSimpleValueType() != MVT::i32) {
+    // Let SelectAddrRR handle this.
+  } else if (Addr.getOpcode() == ISD::ADD) {
+    SDValue N0 = Addr.getOperand(0);
+    SDValue N1 = Addr.getOperand(1);
+    if (N0.getOpcode() == ISD::FrameIndex) {
+      // Let stack addressing mode capture this.
+    } else if (N1.getOpcode() == ISD::Constant) {
+      // Constant offset, let reg32 + imm16 capture this.
+    } else if (N0.getOpcode() == ISD::ZERO_EXTEND ||
+               N0.getOpcode() == ISD::SIGN_EXTEND) {
+      // N0 is 16-bit, N1 is 32-bit.
+      R1 = N1;
+      R2 = N0.getOperand(0);
+      return true;
+    } else if (N1.getOpcode() == ISD::ZERO_EXTEND ||
+               N1.getOpcode() == ISD::SIGN_EXTEND) {
+      // N0 is 32-bit, N1 is 16-bit.
+      R1 = N0;
+      R2 = N1.getOperand(0);
       return true;
     }
   }

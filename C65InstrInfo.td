@@ -118,6 +118,7 @@ def C65CALL            : SDNode<"C65ISD::CALL", SDTC65CALL,
 def C65RET             : SDNode<"C65ISD::RET", SDTNone,
                                 [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
 def C65Wrapper         : SDNode<"C65ISD::Wrapper", SDTC65Wrapper>;
+def C65FarWrapper      : SDNode<"C65ISD::FarWrapper", SDTC65Wrapper>;
 
 //  These are target-independent nodes, but have target-specific formats.
 def SDTC65CALLSEQ_START : SDCallSeqStart<[SDTCisVT<0, i32>]>;
@@ -302,12 +303,14 @@ def asmop_spostiy : AsmOperandClass {
 // C65 complex pattern definitions
 //===----------------------------------------------------------------------===//
 
-def addr_zp : ComplexPattern<iPTR, 1, "SelectAddrZP", [], []>;
-def addr_i  : ComplexPattern<iPTR, 1, "SelectAddrI", [], []>;
-def addr_l  : ComplexPattern<iPTR, 1, "SelectAddrL", [], []>;
-def addr_rr : ComplexPattern<iPTR, 2, "SelectAddrRR", [], []>;
-def addr_ri : ComplexPattern<iPTR, 2, "SelectAddrRI", [], []>;
-def addr_is : ComplexPattern<iPTR, 2, "SelectAddrS", [frameindex], []>;
+def addr_zp   : ComplexPattern<iPTR, 1, "SelectAddrZP", [], []>;
+def addr_abs  : ComplexPattern<iPTR, 1, "SelectAddrAbs", [], []>;
+def addr_absl : ComplexPattern<iPTR, 1, "SelectAddrAbsL", [], []>;
+def addr_rr   : ComplexPattern<iPTR, 2, "SelectAddrRR", [], []>;
+def addr_ri   : ComplexPattern<iPTR, 2, "SelectAddrRI", [], []>;
+def addr_rrf  : ComplexPattern<iPTR, 2, "SelectAddrRRF", [], []>;
+def addr_rif  : ComplexPattern<iPTR, 2, "SelectAddrRIF", [], []>;
+def addr_s    : ComplexPattern<iPTR, 2, "SelectAddrS", [frameindex], []>;
 
 //===----------------------------------------------------------------------===//
 // C65 operand class definitions
@@ -487,6 +490,12 @@ def mem_ri : Operand<iPTR> {
 }
 def mem_rr : Operand<iPTR> {
   let MIOperandInfo = (ops ZRC16, ZRC16);
+}
+def mem_rif : Operand<iPTR> {
+  let MIOperandInfo = (ops ZRC32, i16imm);
+}
+def mem_rrf : Operand<iPTR> {
+  let MIOperandInfo = (ops ZRC32, ZRC16);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1018,15 +1027,15 @@ let isBranch = 1, isTerminator = 1, isBarrier = 1 in {
 
 let isCall = 1 in {
   def JSRabs        : FF<0x20, (outs), (ins mem_abs:$addr), "jsr $addr",
-                         [(C65CALL addr_i:$addr)]>, OpSize16;
+                         [(C65CALL addr_abs:$addr)]>, OpSize16;
   def JSLabsl       : FF<0x22, (outs), (ins mem_absl:$addr), "jsl $addr",
-                         [(C65CALL addr_l:$addr)]>, OpSize24,
+                         [(C65CALL addr_absl:$addr)]>, OpSize24,
                         Requires<[Has65816]>;
   def JSRabspreix8  : FF<0xfc, (outs), (ins mem_abspreix:$addr), "jsr $addr",
-                         [(C65CALL addr_i:$addr)]>, Ix8Bit, OpSize16,
+                         [(C65CALL addr_abs:$addr)]>, Ix8Bit, OpSize16,
                         Requires<[Has65802, IsIx8Bit]>;
   def JSRabspreix16 : FF<0xfc, (outs), (ins mem_abspreix:$addr), "jsr $addr",
-                         [(C65CALL addr_i:$addr)]>, Ix16Bit, OpSize16,
+                         [(C65CALL addr_abs:$addr)]>, Ix16Bit, OpSize16,
                         Requires<[Has65802, IsIx16Bit]>;
 }
 
@@ -1079,24 +1088,24 @@ let Predicates = [Has65802] in {
 }
 
 let Predicates = [Has65C02, IsAcc8Bit] in {
-  def TSB8zp  : FF<0x04, (outs), (ins mem_zp:$addr), "tsb $addr", []>,
-                  Acc8Bit, OpSize8;
-  def TSB8i   : FF<0x0c, (outs), (ins mem_abs:$addr), "tsb $addr", []>,
-                  Acc8Bit, OpSize16;
-  def TRB8zp  : FF<0x04, (outs), (ins mem_zp:$addr), "trb $addr", []>,
-                  Acc8Bit, OpSize8;
-  def TRB8i   : FF<0x0c, (outs), (ins mem_abs:$addr), "trb $addr", []>,
-                  Acc8Bit, OpSize16;
+  def TSB8zp   : FF<0x04, (outs), (ins mem_zp:$addr), "tsb $addr", []>,
+                   Acc8Bit, OpSize8;
+  def TSB8abs  : FF<0x0c, (outs), (ins mem_abs:$addr), "tsb $addr", []>,
+                   Acc8Bit, OpSize16;
+  def TRB8zp   : FF<0x04, (outs), (ins mem_zp:$addr), "trb $addr", []>,
+                   Acc8Bit, OpSize8;
+  def TRB8abs  : FF<0x0c, (outs), (ins mem_abs:$addr), "trb $addr", []>,
+                   Acc8Bit, OpSize16;
 }
 let Predicates = [Has65C02, IsAcc16Bit] in {
-  def TSB16zp : FF<0x04, (outs), (ins mem_zp:$addr), "tsb $addr", []>,
-                  Acc16Bit, OpSize8;
-  def TSB16i  : FF<0x0c, (outs), (ins mem_abs:$addr), "tsb $addr", []>,
+  def TSB16zp  : FF<0x04, (outs), (ins mem_zp:$addr), "tsb $addr", []>,
+                   Acc16Bit, OpSize8;
+  def TSB16abs : FF<0x0c, (outs), (ins mem_abs:$addr), "tsb $addr", []>,
                   Acc16Bit, OpSize16;
-  def TRB16zp : FF<0x04, (outs), (ins mem_zp:$addr), "trb $addr", []>,
-                  Acc16Bit, OpSize8;
-  def TRB16i  : FF<0x0c, (outs), (ins mem_abs:$addr), "trb $addr", []>,
-                  Acc16Bit, OpSize16;
+  def TRB16zp  : FF<0x04, (outs), (ins mem_zp:$addr), "trb $addr", []>,
+                   Acc16Bit, OpSize8;
+  def TRB16abs : FF<0x0c, (outs), (ins mem_abs:$addr), "trb $addr", []>,
+                   Acc16Bit, OpSize16;
 }
 
 def WAI     : FF<0xcb, (outs), (ins), "wai", []>,
@@ -1198,18 +1207,27 @@ multiclass ZRI_ZLD<string mnemonic, RegisterClass RC, ValueType Ty,
   def zp   : ZRInstr<(outs RC:$reg1), (ins mem_zp:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
                      [(set RC:$reg1, (Ty (LoadNode addr_zp:$mem)))]>;
-  def i16  : ZRInstr<(outs RC:$reg1), (ins mem_abs:$mem),
+  def abs  : ZRInstr<(outs RC:$reg1), (ins mem_abs:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
-                     [(set RC:$reg1, (Ty (LoadNode addr_i:$mem)))]>;
+                     [(set RC:$reg1, (Ty (LoadNode addr_abs:$mem)))]>;
+  def absl : ZRInstr<(outs RC:$reg1), (ins mem_absl:$mem),
+                     !strconcat(mnemonic, " $reg1,$mem"),
+                     [(set RC:$reg1, (Ty (LoadNode addr_absl:$mem)))]>;
   def s    : ZRInstr<(outs RC:$reg1), (ins mem_srel:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
-                     [(set RC:$reg1, (Ty (LoadNode addr_is:$mem)))]>;
-  def zi16 : ZRInstr<(outs RC:$reg1), (ins mem_ri:$mem),
+                     [(set RC:$reg1, (Ty (LoadNode addr_s:$mem)))]>;
+  def ri   : ZRInstr<(outs RC:$reg1), (ins mem_ri:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
                      [(set RC:$reg1, (Ty (LoadNode addr_ri:$mem)))]>;
-  def zz16 : ZRInstr<(outs RC:$reg1), (ins mem_rr:$mem),
+  def rr   : ZRInstr<(outs RC:$reg1), (ins mem_rr:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
                      [(set RC:$reg1, (Ty (LoadNode addr_rr:$mem)))]>;
+  def rif  : ZRInstr<(outs RC:$reg1), (ins mem_rif:$mem),
+                     !strconcat(mnemonic, " $reg1,$mem"),
+                     [(set RC:$reg1, (Ty (LoadNode addr_rif:$mem)))]>;
+  def rrf  : ZRInstr<(outs RC:$reg1), (ins mem_rrf:$mem),
+                     !strconcat(mnemonic, " $reg1,$mem"),
+                     [(set RC:$reg1, (Ty (LoadNode addr_rrf:$mem)))]>;
 }
 
 // multiclass ZRI_R_M<string mnemonic, PatFrag frag> {
@@ -1254,18 +1272,27 @@ multiclass ZRI_ZST<string mnemonic, RegisterClass RC,
   def zp   : ZRInstr<(outs), (ins RC:$reg1, mem_zp:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
                      [(StoreNode RC:$reg1, addr_zp:$mem)]>;
-  def i16  : ZRInstr<(outs), (ins RC:$reg1, mem_abs:$mem),
+  def abs  : ZRInstr<(outs), (ins RC:$reg1, mem_abs:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
-                     [(StoreNode RC:$reg1, addr_i:$mem)]>;
+                     [(StoreNode RC:$reg1, addr_abs:$mem)]>;
+  def absl : ZRInstr<(outs), (ins RC:$reg1, mem_absl:$mem),
+                     !strconcat(mnemonic, " $reg1,$mem"),
+                     [(StoreNode RC:$reg1, addr_absl:$mem)]>;
   def s    : ZRInstr<(outs), (ins RC:$reg1, mem_srel:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
-                     [(StoreNode RC:$reg1, addr_is:$mem)]>;
-  def zi16 : ZRInstr<(outs), (ins RC:$reg1, mem_ri:$mem),
+                     [(StoreNode RC:$reg1, addr_s:$mem)]>;
+  def ri   : ZRInstr<(outs), (ins RC:$reg1, mem_ri:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
                      [(StoreNode RC:$reg1, addr_ri:$mem)]>;
-  def zz16 : ZRInstr<(outs), (ins RC:$reg1, mem_rr:$mem),
+  def rr   : ZRInstr<(outs), (ins RC:$reg1, mem_rr:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
                      [(StoreNode RC:$reg1, addr_rr:$mem)]>;
+  def rif  : ZRInstr<(outs), (ins RC:$reg1, mem_rif:$mem),
+                     !strconcat(mnemonic, " $reg1,$mem"),
+                     [(StoreNode RC:$reg1, addr_rif:$mem)]>;
+  def rrf  : ZRInstr<(outs), (ins RC:$reg1, mem_rrf:$mem),
+                     !strconcat(mnemonic, " $reg1,$mem"),
+                     [(StoreNode RC:$reg1, addr_rrf:$mem)]>;
 }
 
 // multiclass ZRI__RM<string mnemonic, PatFrag frag> {
@@ -1289,7 +1316,6 @@ let mayStore = 1 in {
   defm ZST64trunc16 : ZRI_ZST<"zst16", ZRC64, truncstorei16>, ZROpSize64;
   defm ZST64trunc32 : ZRI_ZST<"zst32", ZRC64, truncstorei32>, ZROpSize64;
 }
-
 
 // Form: (outs R1), (ins R2, R3)
 //   ZADD, ZSUB, ZAND, ZOR, ZXOR, ZSHL, ZLSHR
@@ -1420,6 +1446,11 @@ def ZLD16imm : ZLD_imm<ZRC16, i16, i16imm>, ZROpSize16;
 def ZLD32imm : ZLD_imm<ZRC32, i32, i32imm>, ZROpSize32;
 def ZLD64imm : ZLD_imm<ZRC64, i64, i64imm>, ZROpSize64;
 
+// "Load effective address"; allowing FrameIndex nodes to be resolved.
+def ZLEA16s : ZRInstr<(outs ZRC16:$reg1), (ins mem_srel:$mem),
+                      "zlea16s $reg1,$mem",
+                      [(set ZRC16:$reg1, (i16 addr_s:$mem))]>;
+
 //===----------------------------------------------------------------------===//
 // Non-Instruction Patterns
 //===----------------------------------------------------------------------===//
@@ -1477,6 +1508,11 @@ def : Pat<(i16 (C65Wrapper tjumptable:$dst)), (ZLD16imm tjumptable:$dst)>;
 def : Pat<(i16 (C65Wrapper tglobaladdr:$dst)), (ZLD16imm tglobaladdr:$dst)>;
 def : Pat<(i16 (C65Wrapper texternalsym:$dst)), (ZLD16imm texternalsym:$dst)>;
 def : Pat<(i16 (C65Wrapper tblockaddress:$dst)), (ZLD16imm tblockaddress:$dst)>;
+def : Pat<(i32 (C65FarWrapper tconstpool:$dst)), (ZLD32imm tconstpool:$dst)>;
+def : Pat<(i32 (C65FarWrapper tjumptable:$dst)), (ZLD32imm tjumptable:$dst)>;
+def : Pat<(i32 (C65FarWrapper tglobaladdr:$dst)), (ZLD32imm tglobaladdr:$dst)>;
+def : Pat<(i32 (C65FarWrapper texternalsym:$dst)), (ZLD32imm texternalsym:$dst)>;
+def : Pat<(i32 (C65FarWrapper tblockaddress:$dst)), (ZLD32imm tblockaddress:$dst)>;
 // def : Pat<(i32 (C65Wrapper tconstpool:$dst)), (ZLD32imm tconstpool:$dst)>;
 // def : Pat<(i32 (C65Wrapper tjumptable:$dst)), (ZLD32imm tjumptable:$dst)>;
 // def : Pat<(i32 (C65Wrapper tglobaladdr:$dst)), (ZLD32imm tglobaladdr:$dst)>;

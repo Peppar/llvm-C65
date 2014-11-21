@@ -33,4 +33,12 @@ namespace llvm {
                                     AsmPrinter &AP, bool isDarwin);
 } // end namespace llvm;
 
+namespace C65AS {
+  enum AddressSpaces {
+    NEAR_ADDRESS = 0, ///< Near "address space"
+    FAR_ADDRESS  = 1, ///< Far "address space"
+    LAST_ADDRESS = FAR_ADDRESS
+  };
+}
+
 #endif

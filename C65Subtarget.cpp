@@ -20,12 +20,19 @@ using namespace llvm;
 #define GET_SUBTARGETINFO_CTOR
 #include "C65GenSubtargetInfo.inc"
 
+static const char *DescriptionString6502 =
+  "e-p:16:8-i16:8-i32:8-i64:8-n8:16:32:64-S8";
+static const char *DescriptionString65816 =
+  "e-p:16:8-p1:32:8-i16:8-i32:8-i64:8-n8:16:32:64-S8";
+
 // Pin the vtable to this file.
 void C65Subtarget::anchor() {}
 
 static std::string computeDataLayout(const C65Subtarget &ST) {
-  // Stub 2 simulates handling all 8, 16, 32, 64-bit integers natively
-  return "e-p:16:8-i16:8-i32:8-i64:8-a:0:8-n8:16:32:64-a:0:8-S8";
+  if (ST.has65816())
+    return DescriptionString65816;
+  else
+    return DescriptionString6502;
 }
 
 C65Subtarget &

@@ -79,6 +79,53 @@ void C65FrameLowering::emitSAdjustment(MachineFunction &MF,
   }
 }
 
+// TODO: Implement this
+// bool C65FrameLowering::spillCalleeSavedRegisters(
+//     MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
+//     const std::vector<CalleeSavedInfo> &CSI,
+//     const TargetRegisterInfo *TRI) const {
+//   DebugLoc DL = MBB.findDebugLoc(MI);
+
+//   MachineFunction &MF = *MBB.getParent();
+//   const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+//   const C65Subtarget &STI = MF.getTarget().getSubtarget<C65Subtarget>();
+
+//   // Push GPRs. It increases frame size.
+//   unsigned Opc = STI.is64Bit() ? X86::PUSH64r : X86::PUSH32r;
+//   for (unsigned I = CSI.size(); I != 0; --I) {
+//     unsigned Reg = CSI[I - 1].getReg();
+
+//     if (!X86::GR64RegClass.contains(Reg) && !X86::GR32RegClass.contains(Reg))
+//       continue;
+//     // Add the callee-saved register as live-in. It's killed at the spill.
+//     MBB.addLiveIn(Reg);
+
+//     BuildMI(MBB, MI, DL, TII.get(Opc)).addReg(Reg, RegState::Kill)
+//       .setMIFlag(MachineInstr::FrameSetup);
+//   }
+
+//   // Make XMM regs spilled. X86 does not have ability of push/pop XMM.
+//   // It can be done by spilling XMMs to stack frame.
+//   for (unsigned i = CSI.size(); i != 0; --i) {
+//     unsigned Reg = CSI[i-1].getReg();
+//     if (X86::GR64RegClass.contains(Reg) ||
+//         X86::GR32RegClass.contains(Reg))
+//       continue;
+//     // Add the callee-saved register as live-in. It's killed at the spill.
+//     MBB.addLiveIn(Reg);
+//     const TargetRegisterClass *RC = TRI->getMinimalPhysRegClass(Reg);
+
+//     TII.storeRegToStackSlot(MBB, MI, Reg, true, CSI[i - 1].getFrameIdx(), RC,
+//                             TRI);
+//     --MI;
+//     MI->setFlag(MachineInstr::FrameSetup);
+//     ++MI;
+//   }
+
+//   return true;
+// }
+
+
 void C65FrameLowering::
 eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator I) const {

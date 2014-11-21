@@ -74,6 +74,10 @@ const
 TargetRegisterClass*
 C65RegisterInfo::getPointerRegClass(const MachineFunction &MF,
                                     unsigned Kind) const {
+  if (Kind == 0)
+    return &C65::ZRC16RegClass;
+  else
+    return &C65::ZRC32RegClass;
   // if (Kind == 0)
   //   return &C65::IX16RegClass;
   // else if (Kind == 1)
@@ -82,7 +86,28 @@ C65RegisterInfo::getPointerRegClass(const MachineFunction &MF,
   //   return &C65::IS16RegClass;
   // else
   // return &C65::ID16RegClass;
-  return &C65::ZRC16RegClass;
+}
+
+bool
+C65RegisterInfo::isZReg(unsigned RegNo) const {
+  return C65::ZRC8RegClass.contains(RegNo) ||
+         C65::ZRC16RegClass.contains(RegNo) ||
+         C65::ZRC32RegClass.contains(RegNo) ||
+         C65::ZRC64RegClass.contains(RegNo);
+}
+
+unsigned
+C65RegisterInfo::getZRSize(unsigned RegNo) const {
+  if (C65::ZRC8RegClass.contains(RegNo))
+    return 1;
+  else if (C65::ZRC16RegClass.contains(RegNo))
+    return 2;
+  else if (C65::ZRC32RegClass.contains(RegNo))
+    return 4;
+  else if (C65::ZRC64RegClass.contains(RegNo))
+    return 8;
+  else
+    return 0;
 }
 
 unsigned
