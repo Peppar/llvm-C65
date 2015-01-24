@@ -11,16 +11,18 @@
 #include "MCTargetDesc/C65MCFixups.h"
 #include "llvm/MC/MCAssembler.h"
 #include "llvm/MC/MCAsmLayout.h"
+#include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCObjectWriter.h"
 #include "llvm/MC/MCSection.h"
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/MC/MCValue.h"
+#include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/SourceMgr.h"
 
 using namespace llvm;
 
 namespace {
-
 
 namespace WLAK {
 enum {
@@ -35,7 +37,7 @@ enum {
 };
 }
 
-typedef llvm::DenseMap<const MCSection *, unsigned> SectionIDMapType;
+class WLAKObjectWriter;
 
 class WLAKCalcStackEntry {
   unsigned Type;
@@ -81,16 +83,7 @@ public:
     OP_LOW_BYTE    = 13,
     OP_HIGH_BYTE   = 14
   };
-  void Write(MCObjectWriter &Writer) const {
-    Writer.Write8(Type);
-    Writer.Write8(Sign);
-    if (Type == VALUE || Type == OPERATOR) {
-      uint64_t *X = (uint64_t *)(&Value);
-      Writer.WriteBE64(*X);
-    } else {
-      Writer.getStream() << Symbol->getName() << '\0';
-    }
-  }
+  void Write(MCAssembler &Asm, WLAKObjectWriter &Writer) const;
 };
 
 class WLAKRelocationEntry {
@@ -135,31 +128,11 @@ public:
   void addOp(unsigned Op) {
     Stack.push_back(WLAKCalcStackEntry::createOp(Op));
   }
-  void addSymb(const MCSymbol &Symb) {
-    Stack.push_back(WLAKCalcStackEntry::createSymb(Symb));
+  void addSymb(const MCSymbol &Symbol) {
+    Stack.push_back(WLAKCalcStackEntry::createSymb(Symbol));
   }
 
-  void Write(MCObjectWriter &Writer, unsigned ID, SectionIDMapType &Map) const {
-    Writer.WriteBE32(ID);
-    if (Type == WLAKRelocationEntry::DIRECT_8BIT)
-      Writer.Write8(0x0);
-    else if (Type == WLAKRelocationEntry::DIRECT_16BIT)
-      Writer.Write8(0x1);
-    else if (Type == WLAKRelocationEntry::DIRECT_24BIT)
-      Writer.Write8(0x2);
-    else if (Type == WLAKRelocationEntry::RELATIVE_8BIT)
-      Writer.Write8(0x80);
-    else /* Type == WLAKRelocationEntry::RELATIVE_16BIT */
-      Writer.Write8(0x81);
-    Writer.Write8(Map.lookup(Section));
-    Writer.Write8(FileID);
-    Writer.Write8(Stack.size());
-    Writer.Write8(0);
-    Writer.WriteBE32(Offset);
-    Writer.WriteBE32(LineNumber);
-    for (const WLAKCalcStackEntry &E : Stack)
-      E.Write(Writer);
-  }
+  void Write(MCAssembler &Asm, WLAKObjectWriter &Writer, unsigned ID) const;
 };
 
 class WLAKSimpleRelocationEntry : public WLAKRelocationEntry {
@@ -173,23 +146,7 @@ public:
     : WLAKRelocationEntry(Section, Type, FileID, LineNumber, Offset),
       Symbol(&Symbol) {};
 
-  void Write(MCObjectWriter &Writer, SectionIDMapType Map) const {
-    Writer.getStream() << Symbol->getName() << '\0';
-    if (Type == WLAKRelocationEntry::DIRECT_8BIT)
-      Writer.Write8(0x2);
-    else if (Type == WLAKRelocationEntry::DIRECT_16BIT)
-      Writer.Write8(0x0);
-    else if (Type == WLAKRelocationEntry::DIRECT_24BIT)
-      Writer.Write8(0x3);
-    else if (Type == WLAKRelocationEntry::RELATIVE_8BIT)
-      Writer.Write8(0x1);
-    else /* Type == WLAKRelocationEntry::RELATIVE_16BIT */
-      Writer.Write8(0x4);
-    Writer.Write8(Map.lookup(Section));
-    Writer.Write8(FileID);
-    Writer.WriteBE32(LineNumber);
-    Writer.WriteBE32(Offset);
-  }
+  void Write(MCAssembler &Asm, WLAKObjectWriter &Writer) const;
 };
 
 class WLAKObjectWriter : public MCObjectWriter {
@@ -200,7 +157,29 @@ protected:
 
   std::vector<WLAKComplexRelocationEntry> ComplexRelocations;
 
-  SectionIDMapType SectionIDMap;
+  // Maps MCSection to WLAK section ID.
+  llvm::DenseMap<const MCSection *, unsigned> SectionIDMap;
+
+  // Symbol information.
+  struct SymbolInfo {
+    bool Exported;
+    bool Private;
+    SymbolInfo() {}
+  };
+  DenseMap<const MCSymbol *, SymbolInfo> SymbolInfoMap;
+
+  // If we have symbols without file or line number information, they
+  // are assigned this file ID. Set to 0 if no such symbols are
+  // encountered, in which case this "unknown" file is not emitted to
+  // the source file list.
+  unsigned UnknownFileID;
+
+  unsigned NextSourceID;
+  SmallDenseMap<unsigned, unsigned> BufferIDMap;
+  SmallDenseMap<unsigned, const char*> SourceFilenameMap;
+
+  std::pair<unsigned, unsigned>
+  GetFileAndLine(const MCAssembler &Asm, const MCFixup &Fixup);
 
   void GetSections(MCAssembler &Asm, std::vector<const MCSection*> &Sections);
 
@@ -208,12 +187,27 @@ protected:
 
 public:
   WLAKObjectWriter(raw_ostream &_OS)
-    : MCObjectWriter(_OS, false) {};
+    : MCObjectWriter(_OS, false), UnknownFileID(0), NextSourceID(0) {};
 
   virtual ~WLAKObjectWriter() {}
 
-  unsigned getSectionID(const MCSection &Section) {
+  unsigned getSectionID(const MCSection &Section) const {
     return SectionIDMap.lookup(&Section);
+  }
+
+  bool symbolExists(const MCSymbol &Symb) const {
+    return SymbolInfoMap.find(&Symb) != SymbolInfoMap.end();
+  }
+
+  // bool isSymbolExternal(const MCSymbol &Symb) const {
+  //   return SymbolInfoMap.lookup(&Symb).External;
+  // }
+
+  bool isSymbolPrivate(const MCSymbol &Symb) const {
+    assert (symbolExists(Symb));
+    return SymbolInfoMap.lookup(&Symb).Private;
+ // &&
+ //       !SymbolInfoMap.lookup(&Symb).External);
   }
 
   raw_ostream &getStream() { return OS; }
@@ -236,22 +230,89 @@ public:
   /// complete.
   virtual void ExecutePostLayoutBinding(MCAssembler &Asm,
                                         const MCAsmLayout &Layout) override;
-
   void WriteSection(MCAssembler &Asm,
                     const MCAsmLayout &Layout,
                     const MCSection &Section);
 
+  void WriteSymbolName(MCAssembler &Asm,
+                       const MCSymbol &Symbol);
+
   void WriteSymbol(MCAssembler &Asm,
                    const MCAsmLayout &Layout,
-                   const MCSymbolData &SymbolData);
+                   const MCSymbol &Symbol);
 
   void WriteSymbolTable(MCAssembler &Asm,
                         const MCAsmLayout &Layout);
+
+  void WriteSourceFiles(MCAssembler &Asm, const MCAsmLayout &Layout);
 
   virtual void WriteObject(MCAssembler &Asm,
                            const MCAsmLayout &Layout) override;
 };
 } // end anonymous namespace
+
+// WLAKCalcStackEntry Impl
+
+void WLAKCalcStackEntry::Write(MCAssembler &Asm,
+                               WLAKObjectWriter &Writer) const {
+  Writer.Write8(Type);
+  Writer.Write8(Sign);
+  if (Type == VALUE || Type == OPERATOR) {
+    uint64_t *X = (uint64_t *)(&Value);
+    Writer.WriteBE64(*X);
+  } else {
+    Writer.WriteSymbolName(Asm, *Symbol);
+    Writer.Write8(0);
+  }
+}
+
+// WLAKComplexRelocationEntry Impl
+
+void WLAKComplexRelocationEntry::Write(MCAssembler &Asm,
+                                       WLAKObjectWriter &Writer,
+                                       unsigned ID) const {
+  Writer.WriteBE32(ID);
+  if (Type == WLAKRelocationEntry::DIRECT_8BIT)
+    Writer.Write8(0x0);
+  else if (Type == WLAKRelocationEntry::DIRECT_16BIT)
+    Writer.Write8(0x1);
+  else if (Type == WLAKRelocationEntry::DIRECT_24BIT)
+    Writer.Write8(0x2);
+  else if (Type == WLAKRelocationEntry::RELATIVE_8BIT)
+    Writer.Write8(0x80);
+  else /* Type == WLAKRelocationEntry::RELATIVE_16BIT */
+    Writer.Write8(0x81);
+  Writer.Write8(Writer.getSectionID(*Section));
+  Writer.Write8(FileID);
+  Writer.Write8(Stack.size());
+  Writer.Write8(0);
+  Writer.WriteBE32(Offset);
+  Writer.WriteBE32(LineNumber);
+  for (const WLAKCalcStackEntry &E : Stack)
+    E.Write(Asm, Writer);
+}
+
+// WLAKSimpleRelocationEntry Impl
+
+void WLAKSimpleRelocationEntry::Write(MCAssembler &Asm,
+                                      WLAKObjectWriter &Writer) const {
+  Writer.WriteSymbolName(Asm, *Symbol);
+  Writer.Write8(0);
+  if (Type == WLAKRelocationEntry::DIRECT_8BIT)
+    Writer.Write8(0x2);
+  else if (Type == WLAKRelocationEntry::DIRECT_16BIT)
+    Writer.Write8(0x0);
+  else if (Type == WLAKRelocationEntry::DIRECT_24BIT)
+    Writer.Write8(0x3);
+  else if (Type == WLAKRelocationEntry::RELATIVE_8BIT)
+    Writer.Write8(0x1);
+  else /* Type == WLAKRelocationEntry::RELATIVE_16BIT */
+    Writer.Write8(0x4);
+  Writer.Write8(Writer.getSectionID(*Section));
+  Writer.Write8(FileID);
+  Writer.WriteBE32(LineNumber);
+  Writer.WriteBE32(Offset);
+}
 
 // WLAKObjectWriter Impl
 
@@ -295,6 +356,39 @@ static unsigned GetFixupShiftAmt(const MCFixup &Fixup) {
     return 0;
 }
 
+std::pair<unsigned, unsigned>
+WLAKObjectWriter::GetFileAndLine(const MCAssembler &Asm,
+                                 const MCFixup &Fixup) {
+  MCContext &Ctx = Asm.getContext();
+  const SourceMgr *SrcMgr = Ctx.getSourceManager();
+  if (!SrcMgr) {
+    if (!UnknownFileID)
+      UnknownFileID = NextSourceID++;
+    return std::make_pair(UnknownFileID, 0);
+  }
+
+  SMLoc Loc = Fixup.getLoc();
+  if (!Loc.isValid()) {
+    if (!UnknownFileID)
+      UnknownFileID = NextSourceID++;
+    return std::make_pair(UnknownFileID, 0);
+  }
+
+  unsigned BufferID = SrcMgr->FindBufferContainingLoc(Loc);
+  unsigned SourceID;
+
+  // See if we have already assigned an ID for this buffer.
+  auto I = BufferIDMap.find(BufferID);
+  if (I != BufferIDMap.end()) {
+    SourceID = I->second;
+  } else {
+    SourceID = NextSourceID++;
+    BufferIDMap[BufferID] = SourceID;
+  }
+  unsigned LineNumber = SrcMgr->FindLineNumber(Loc, BufferID);
+  return std::make_pair(SourceID, LineNumber);
+}
+
 void WLAKObjectWriter::RecordRelocation(const MCAssembler &Asm,
                                         const MCAsmLayout &Layout,
                                         const MCFragment *Fragment,
@@ -303,12 +397,14 @@ void WLAKObjectWriter::RecordRelocation(const MCAssembler &Asm,
                                         bool &IsPCRel,
                                         uint64_t &FixedValue) {
   const MCSectionData *FixupSection = Fragment->getParent();
+  std::pair<unsigned, unsigned> FileAndLine = GetFileAndLine(Asm, Fixup);
+  unsigned FileID = FileAndLine.first;
+  unsigned LineNumber = FileAndLine.second;
+
   unsigned C = Target.getConstant();
   unsigned Offset = Layout.getFragmentOffset(Fragment) + Fixup.getOffset();
   unsigned Type = GetRelocType(Fixup);
   unsigned ShiftAmt = GetFixupShiftAmt(Fixup);
-  unsigned FileID = 1;
-  unsigned LineNumber = 0;
 
   const MCSymbolRefExpr *RefA = Target.getSymA();
   const MCSymbolRefExpr *RefB = Target.getSymB();
@@ -327,8 +423,6 @@ void WLAKObjectWriter::RecordRelocation(const MCAssembler &Asm,
              "Should not have constructed this");
 
       const MCSymbol &SymB = RefB->getSymbol();
-      //      const MCSection &SecB = SymB.getSection();
-      //      assert(&SecB == &FixupSection->getSection());
       assert(!SymB.isAbsolute() && "Should have been folded");
 
       Rel.addSymb(RefB->getSymbol());
@@ -351,7 +445,15 @@ void WLAKObjectWriter::RecordRelocation(const MCAssembler &Asm,
 }
 
 void WLAKObjectWriter::ExecutePostLayoutBinding(MCAssembler &Asm,
-                                                const MCAsmLayout &Layout) {}
+                                                const MCAsmLayout &Layout) {
+  for (const MCSymbolData &SD : Asm.symbols()) {
+    const MCSymbol &Symbol = SD.getSymbol();
+    SymbolInfo SI;
+    SI.Exported = Symbol.isInSection();
+    SI.Private = Symbol.isDefined() && !SD.isExternal();
+    SymbolInfoMap[&Symbol] = SI;
+  }
+}
 
 void WLAKObjectWriter::WriteSection(MCAssembler &Asm,
                                     const MCAsmLayout &Layout,
@@ -382,11 +484,36 @@ void WLAKObjectWriter::WriteSection(MCAssembler &Asm,
   Write8(0); // List file information, 0 - not present
 }
 
+// For the WLAK file type, we need to add underscores to names that
+// are not external and not guaranteed to be unique across all object
+// files. This function serves this purpose.
+//
+void WLAKObjectWriter::WriteSymbolName(MCAssembler &Asm,
+                                       const MCSymbol &Symbol) {
+  raw_ostream &OS = getStream();
+  // Append the file name to private symbols. We can't use underscores
+  // here, since they are section-private and does not resolve across
+  // sections.
+  if (isSymbolPrivate(Symbol)) {
+    if (Asm.file_names_begin() != Asm.file_names_end()) {
+      auto Name = *Asm.file_names_begin();
+      for (auto I = Name.begin(), E = Name.end(); I != E; ++I) {
+        if (*I == '_')
+          OS << '~';
+        else
+          OS << *I;
+      }
+      OS << '~';
+    }
+  }
+  getStream() << Symbol.getName();
+}
+
 void WLAKObjectWriter::WriteSymbol(MCAssembler &Asm,
                                    const MCAsmLayout &Layout,
-                                   const MCSymbolData &SymbolData) {
-  const MCSymbol &Symbol = SymbolData.getSymbol();
-  getStream() << Symbol.getName();
+                                   const MCSymbol &Symbol) {
+  const MCSymbolData &SymbolData = Asm.getSymbolData(Symbol);
+  WriteSymbolName(Asm, Symbol);
   // String terminator decides type
   Write8(0); // 0 - label, 1 - symbol, 2 - breakpoint
   Write8(getSectionID(Symbol.getSection())); // Section ID
@@ -397,23 +524,49 @@ void WLAKObjectWriter::WriteSymbol(MCAssembler &Asm,
 
 void WLAKObjectWriter::WriteSymbolTable(MCAssembler &Asm,
                                         const MCAsmLayout &Layout) {
-  unsigned NumSymbols = 0;
+  unsigned NumExportedSymbols = 0;
 
-  for (const MCSymbolData &SD : Asm.symbols()) {
-    const MCSymbol &Symbol = SD.getSymbol();
-    if (Symbol.isDefined() && Symbol.isInSection()) {
-      NumSymbols++;
-    }
+  for (auto I : SymbolInfoMap) {
+    if (I.second.Exported)
+      ++NumExportedSymbols;
   }
 
-  WriteBE32(NumSymbols);
+  WriteBE32(NumExportedSymbols);
 
-  for (const MCSymbolData &SD : Asm.symbols()) {
-    const MCSymbol &Symbol = SD.getSymbol();
-    if (Symbol.isDefined() && Symbol.isInSection()) {
-      WriteSymbol(Asm, Layout, SD);
-    }
+  for (auto I : SymbolInfoMap) {
+    if (I.second.Exported)
+      WriteSymbol(Asm, Layout, *I.first);
   }
+
+  // for (const MCSymbolData &SD : Asm.symbols()) {
+  //   const MCSymbol &Symbol = SD.getSymbol();
+  //   SymbolInfo SI;
+  //   if (Symbol.isDefined() && Symbol.isInSection()) {
+  //     SI.Exists = true;
+  //     SI.External =
+  //       SD.isExternal() ||
+  //       (!SD.getFragment() && !SD.getSymbol().isVariable());
+  //     SymbolInfoMap[&Symbol] = SI;
+  //     NumSymbols++;
+  //   }
+  // }
+  // for (const MCSymbolData &SD : Asm.symbols()) {
+  //   const MCSymbol &Symbol = SD.getSymbol();
+  //   if (Symbol.isDefined()) {
+  //     SymbolInfo SI;
+  //     SI.Exists = true;
+  //     SI.Exported = !Symbol.isTemporary() ||
+  //       (Symbol.isInSection() && !Symbol.isVariable());
+  //     SI.Local = !SD.isExternal() && Symbol.isInSection();
+  //     SI.External = SD.isExternal() ||
+  //       (!SD.getFragment() && !Symbol.isVariable());
+  //       // SD.isExternal() ||
+  //       // (!Symbol.isInSection() && !SD.getFragment() &&
+  //       //  !SD.getSymbol().isVariable());
+  //     SymbolInfoMap[&Symbol] = SI;
+  //   }
+  // }
+
 }
 
 void WLAKObjectWriter::EnumerateSections(MCAssembler &Asm,
@@ -421,6 +574,73 @@ void WLAKObjectWriter::EnumerateSections(MCAssembler &Asm,
   unsigned NextID = 1;
   for (const MCSectionData &SD : Asm.getSectionList())
     SectionIDMap[&SD.getSection()] = NextID++;
+}
+
+void WLAKObjectWriter::WriteSourceFiles(MCAssembler &Asm,
+                                        const MCAsmLayout &Layout) {
+  // If there is no buffer information, try to use the file names
+  // supplied in Asm.
+  if (BufferIDMap.empty()) {
+    // In case there are no symbols, UnknownFileID will be empty even
+    // here.
+    if (!UnknownFileID)
+      UnknownFileID = NextSourceID++;
+
+    //    unsigned SourceFileCount = 0;
+    if (Asm.file_names_begin() != Asm.file_names_end() &&
+        Asm.file_names_begin() + 1 == Asm.file_names_end()) {
+      // There is only one file name, use it as the "unknown file".
+      WriteBE32(1);
+      OS << *Asm.file_names_begin() << '\0';
+      Write8(UnknownFileID);
+      return;
+    }
+  }
+
+  // unsigned SourceFileCount = 0;
+  // for (auto I = Asm.file_names_begin(), E = Asm.file_names_end();
+  //      I != E; ++I)
+  //   ++SourceFileCount;
+  // WriteBE32(SourceFileCount);
+  // assert(SourceFileCount == (Asm.file_names_end() - Asm.file_names_begin()));
+  // assert(SourceFileCount < 255);
+
+  //  BufferIDMap[&SD.getSection()] = NextID++;
+
+  MCContext &Ctx = Asm.getContext();
+  const SourceMgr *SrcMgr = Ctx.getSourceManager();
+  if (UnknownFileID)
+    WriteBE32(BufferIDMap.size() + 1);
+  else
+    WriteBE32(BufferIDMap.size());
+
+  for (auto I = BufferIDMap.begin(), E = BufferIDMap.end(); I != E; ++I) {
+    unsigned BufferID = I->first;
+    const char *Identifier = nullptr;
+    if (SrcMgr) {
+      const MemoryBuffer *MemBuff = SrcMgr->getMemoryBuffer(BufferID);
+      if (MemBuff && MemBuff->getBufferIdentifier())
+        Identifier = MemBuff->getBufferIdentifier();
+    }
+    if (Identifier)
+      OS << Identifier;
+    else
+      OS << "anonymous file " << BufferID;
+    OS << '\0';
+    Write8(I->second);
+  }
+  if (UnknownFileID) {
+    OS << "unknown file" << '\0';
+    Write8(UnknownFileID);
+  }
+
+  //  SourceMgr::SrcBuffer Buff = SourceMgr->getBufferInfo(BufferID);
+  //  const char *BuffIdent = MemBuff->getBufferIdentifier();
+
+  // unsigned FileId = 1;
+  // for (auto I = Asm.file_names_begin(), E = Asm.file_names_end();
+  //      I != E; ++I) {
+  // }
 }
 
 void WLAKObjectWriter::WriteObject(MCAssembler &Asm,
@@ -433,28 +653,27 @@ void WLAKObjectWriter::WriteObject(MCAssembler &Asm,
   Write8('A');
   Write8('V'); // 'WLAV'
 
-  // Write source file name list
-  WriteBE32(1);
-  OS << "Sourcecode.c" << '\0';
-  Write8(1);
+  // Write the name of the source files, if available.
+  WriteSourceFiles(Asm, Layout);
 
   // Write exported definitions
   WriteBE32(0);
 
-  // Write labels, symbols and breakpoints
+  // Write labels, symbols and breakpoints. Also creates a table
+  // outlining which symbols are marked as private.
   WriteSymbolTable(Asm, Layout);
 
   // Write "Outside references"
   WriteBE32(SimpleRelocations.size());
   for (const WLAKSimpleRelocationEntry &Rel : SimpleRelocations) {
-    Rel.Write(*this, SectionIDMap);
+    Rel.Write(Asm, *this);
   }
 
   // Write "Pending calculations"
   WriteBE32(ComplexRelocations.size());
   unsigned CalcID = 1;
   for (const WLAKComplexRelocationEntry &Rel : ComplexRelocations) {
-    Rel.Write(*this, CalcID++, SectionIDMap);
+    Rel.Write(Asm, *this, CalcID++);
   }
 
   // Write data sections
@@ -478,3 +697,5 @@ MCObjectWriter *llvm::createC65WLAKObjectWriter(raw_ostream &OS,
                                                 uint8_t OSABI) {
   return new WLAKObjectWriter(OS);
 }
+
+

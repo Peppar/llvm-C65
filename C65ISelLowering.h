@@ -31,6 +31,8 @@ namespace llvm {
       SELECT_CC,
       CALL,
       RET,
+      PUSH,
+      PULL,
       Wrapper,
       FarWrapper
     };
@@ -90,6 +92,12 @@ namespace llvm {
                                 bool Signed = false) const;
     MachineBasicBlock *EmitZLEA(MachineInstr *MI,
                                 MachineBasicBlock *MBB) const;
+    MachineBasicBlock *EmitZPUSH(MachineInstr *MI,
+                                 MachineBasicBlock *MBB,
+                                 unsigned NumBytes) const;
+    MachineBasicBlock *EmitZPUSHimm(MachineInstr *MI,
+                                    MachineBasicBlock *MBB,
+                                    unsigned NumBytes) const;
     MachineBasicBlock *EmitZInstr(MachineInstr *MI,
                                   MachineBasicBlock *MBB) const;
     MachineBasicBlock *

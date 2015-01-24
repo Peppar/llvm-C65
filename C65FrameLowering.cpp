@@ -13,6 +13,7 @@
 
 #include "C65FrameLowering.h"
 #include "C65InstrInfo.h"
+#include "C65MachineFunctionInfo.h"
 #include "C65RegisterInfo.h"
 #include "C65Subtarget.h"
 #include "llvm/CodeGen/MachineFrameInfo.h"
@@ -143,10 +144,12 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
 void C65FrameLowering::emitEpilogue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
   const MachineFrameInfo *MFI = MF.getFrameInfo();
+  C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
   MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
   assert(MBBI->getOpcode() == C65::RTS &&
          "Can only put epilogue before 'rts' instruction!");
-  int Size = (int)MFI->getStackSize();
+  int Size = (int)MFI->getStackSize()
+    + (int)FuncInfo->getBytesToPopOnReturn();
   if (Size)
     emitSAdjustment(MF, MBB, MBBI, Size);
 }

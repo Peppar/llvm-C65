@@ -16,6 +16,7 @@ add_llvm_target(C65CodeGen
   C65InstrInfo.cpp
   C65ISelDAGToDAG.cpp
   C65ISelLowering.cpp
+  C65MachineFunctionInfo.cpp
   C65RegisterInfo.cpp
   C65RegSizeInsert.cpp
   C65SelectionDAGInfo.cpp

@@ -103,6 +103,8 @@ def SDTC65SELECT_CC   : SDTypeProfile<1, 5,  [SDTCisSameAs<0, 3>,
                                               SDTCisSameAs<1, 2>,
                                               SDTCisVT<5, i32>]>;
 def SDTC65CALL        : SDTypeProfile<0, -1, [SDTCisVT<0, iPTR>]>;
+def SDTC65PUSH        : SDTypeProfile<0, 1,  []>;
+def SDTC65PULL        : SDTypeProfile<1, 0,  []>;
 def SDTC65Wrapper     : SDTypeProfile<1, 1,  [SDTCisSameAs<0, 1>,
                                               SDTCisPtrTy<0>]>;
 
@@ -117,6 +119,10 @@ def C65CALL            : SDNode<"C65ISD::CALL", SDTC65CALL,
                                  SDNPVariadic]>;
 def C65RET             : SDNode<"C65ISD::RET", SDTNone,
                                 [SDNPHasChain, SDNPOptInGlue, SDNPVariadic]>;
+def C65PUSH            : SDNode<"C65ISD::PUSH", SDTC65PUSH,
+                                [SDNPHasChain, SDNPOutGlue]>;
+def C65PULL            : SDNode<"C65ISD::PULL", SDTC65PULL,
+                                [SDNPHasChain, SDNPOutGlue]>;
 def C65Wrapper         : SDNode<"C65ISD::Wrapper", SDTC65Wrapper>;
 def C65FarWrapper      : SDNode<"C65ISD::FarWrapper", SDTC65Wrapper>;
 
@@ -577,11 +583,11 @@ class F10<bits<3> op, bits<3> addrmode, dag outs, dag ins,
 }
 
 multiclass F10_acc<bits<3> op, string asmstr> {
-  def NAME#8acc : F10<op, 0b000, (outs), (ins),
-                      !strconcat(asmstr, " A"), []>, Acc8Bit,
+  def NAME#8acc : F10<op, 0b010, (outs), (ins),
+                      !strconcat(asmstr, "a"), []>, Acc8Bit,
                     Requires<[IsAcc8Bit]>;
-  def NAME#16acc : F10<op, 0b000, (outs), (ins),
-                       !strconcat(asmstr, " A"), []>, Acc16Bit,
+  def NAME#16acc : F10<op, 0b010, (outs), (ins),
+                       !strconcat(asmstr, "a"), []>, Acc16Bit,
                      Requires<[IsAcc16Bit]>;
 }
 
@@ -1446,6 +1452,28 @@ def ZLD16imm : ZLD_imm<ZRC16, i16, i16imm>, ZROpSize16;
 def ZLD32imm : ZLD_imm<ZRC32, i32, i32imm>, ZROpSize32;
 def ZLD64imm : ZLD_imm<ZRC64, i64, i64imm>, ZROpSize64;
 
+class ZPUSH_imm<ValueType Ty, Operand immOp>
+  : ZRInstr<(outs), (ins immOp:$imm), "zpush $imm",
+            [(C65PUSH (Ty imm:$imm))]> {
+  let hasSideEffects = 1;
+}
+
+def ZPUSH8imm  : ZPUSH_imm<i8,  i8imm>,  ZROpSize8;
+def ZPUSH16imm : ZPUSH_imm<i16, i16imm>, ZROpSize16;
+def ZPUSH32imm : ZPUSH_imm<i32, i32imm>, ZROpSize32;
+def ZPUSH64imm : ZPUSH_imm<i64, i64imm>, ZROpSize64;
+
+class ZPUSH<RegisterClass RC>
+  : ZRInstr<(outs), (ins RC:$reg), "zpush $reg",
+            [(C65PUSH RC:$reg)]> {
+  let hasSideEffects = 1;
+}
+
+def ZPUSH8  : ZPUSH<ZRC8>,  ZROpSize8;
+def ZPUSH16 : ZPUSH<ZRC16>, ZROpSize16;
+def ZPUSH32 : ZPUSH<ZRC32>, ZROpSize32;
+def ZPUSH64 : ZPUSH<ZRC64>, ZROpSize64;
+
 // "Load effective address"; allowing FrameIndex nodes to be resolved.
 def ZLEA16s : ZRInstr<(outs ZRC16:$reg1), (ins mem_srel:$mem),
                       "zlea16s $reg1,$mem",
@@ -1513,6 +1541,7 @@ def : Pat<(i32 (C65FarWrapper tjumptable:$dst)), (ZLD32imm tjumptable:$dst)>;
 def : Pat<(i32 (C65FarWrapper tglobaladdr:$dst)), (ZLD32imm tglobaladdr:$dst)>;
 def : Pat<(i32 (C65FarWrapper texternalsym:$dst)), (ZLD32imm texternalsym:$dst)>;
 def : Pat<(i32 (C65FarWrapper tblockaddress:$dst)), (ZLD32imm tblockaddress:$dst)>;
+
 // def : Pat<(i32 (C65Wrapper tconstpool:$dst)), (ZLD32imm tconstpool:$dst)>;
 // def : Pat<(i32 (C65Wrapper tjumptable:$dst)), (ZLD32imm tjumptable:$dst)>;
 // def : Pat<(i32 (C65Wrapper tglobaladdr:$dst)), (ZLD32imm tglobaladdr:$dst)>;
