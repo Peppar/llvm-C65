@@ -20,8 +20,16 @@ def CC_C65 : CallingConv<[
 
 
 def RetCC_C65 : CallingConv<[
-  // Return values are passed exactly like arguments.
-  CCDelegateTo<CC_C65>
+  CCIfType<[i8],  CCAssignToReg<[ZR0, ZR1, ZR2, ZR3,
+                                 ZR4, ZR5, ZR6, ZR7,
+                                 ZR8, ZR9, ZR10, ZR11,
+                                 ZR12, ZR13, ZR14, ZR15]>>,
+  CCIfType<[i16], CCAssignToReg<[ZR0W, ZR2W, ZR4W, ZR6W,
+                                 ZR8W, ZR10W, ZR12W, ZR14W]>>,
+  CCIfType<[i32], CCAssignToReg<[ZR0D, ZR4D, ZR8D, ZR12D]>>,
+  CCIfType<[i64], CCAssignToReg<[ZR0Q, ZR8Q]>>
+  //// Return values are passed exactly like arguments.
+  //CCDelegateTo<CC_C65>
 ]>;
 
 // By default, save half of the ZP registers.

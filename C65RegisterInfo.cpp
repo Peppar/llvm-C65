@@ -38,7 +38,7 @@ using namespace llvm;
 C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
   : C65GenRegisterInfo(C65::PC), Subtarget(ST) {
 
-  if (ST.has65802) {
+  if (ST.has65802()) {
     StackPtr = C65::S;
     FramePtr = C65::X;
   } else {
@@ -203,11 +203,17 @@ C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   MachineInstr &MI = *II;
   MachineFunction &MF = *MI.getParent()->getParent();
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
+  unsigned FrameRegister = getFrameRegister(MF);
 
   unsigned Opc = MI.getOpcode();
+  int64_t FIOffset;
 
-  int64_t FIOffset = MF.getFrameInfo()->getObjectOffset(FrameIndex) +
-    MF.getFrameInfo()->getStackSize() + 1;
+  if (FrameRegister == C65::X || FrameRegister == C65::XL) {
+    FIOffset = MF.getFrameInfo()->getObjectOffset(FrameIndex) + 1;
+  } else if (FrameRegister == C65::S) {
+    FIOffset = MF.getFrameInfo()->getObjectOffset(FrameIndex) + 1
+      + MF.getFrameInfo()->getStackSize();
+  }
 
   if (MI.getOperand(FIOperandNum + 1).isImm()) {
     // Offset is an 8-bit integer.

@@ -51,6 +51,38 @@ namespace llvm {
   class C65TargetLowering : public TargetLowering {
     const C65Subtarget *Subtarget;
   public:
+    struct CallReturnInfo {
+      Type *Ty;
+      bool SExt        : 1;
+      bool ZExt        : 1;
+      bool IsInReg     : 1;
+      bool IsValueUsed : 1;
+
+      CallReturnInfo()
+        : Ty(nullptr), SExt(false), ZExt(false), IsInReg(false),
+          IsValueUsed(true) {}
+
+      CallReturnInfo &setInRegister(bool Value = true) {
+        IsInReg = Value;
+        return *this;
+      }
+
+      CallReturnInfo &setDiscard(bool Value = true) {
+        IsValueUsed = !Value;
+        return *this;
+      }
+
+      CallReturnInfo &setSExt(bool Value = true) {
+        RetSExt = Value;
+        return *this;
+      }
+
+      CallReturnInfo &setZExtResult(bool Value = true) {
+        RetZExt = Value;
+        return *this;
+      }
+    };
+
     C65TargetLowering(TargetMachine &TM);
 
     /// computeKnownBitsForTargetNode - Determine which of the bits specified

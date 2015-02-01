@@ -325,6 +325,43 @@ SDValue C65TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
   }
 }
 
+SDValue C65TargetLowering::LowerDivRem(SDValue Op, SelectionDAG &DAG) const {
+  EVT VT = Op.getValueType();
+  SDLoc DL(Op);
+  //  SDValue Chain = DAG.getEntryNode();
+  Type *RetTy = VT.getTypeForEVT(*DAG.getContext());
+  bool isSigned = Opcode == ISD::SDIVREM;
+
+  // Emit a libcall.
+  const char *LCName = 0;
+  bool isSigned;
+  if (Op.getOpcode() == ISD::SDIVREM) {
+    isSigned = true;
+    if      (VT == MVT::i8)  LCName = "c65_sdivrem8";
+    else if (VT == MVT::i16) LCName = "c65_sdivrem16";
+    else if (VT == MVT::i32) LCName = "c65_sdivrem32";
+    else if (VT == MVT::i64) LCName = "c65_sdivrem64";
+  } else {
+    isSigned = false;
+    if      (VT == MVT::i8)  LCName = "c65_divrem8";
+    else if (VT == MVT::i16) LCName = "c65_divrem16";
+    else if (VT == MVT::i32) LCName = "c65_divrem32";
+    else if (VT == MVT::i64) LCName = "c65_divrem64";
+  }
+
+  if (LCName) {
+    SDValue Ops[2] = { Op.getOperand(0), Op.getOperand(1) };
+    // TargetLowering::CallLoweringInfo CLI(DAG);
+    // CLI.setDebugLoc(DL).setChain(Chain)
+    //   .setCallee(CallingConv::C, RetTy, Callee, std::move(Args), 0);
+    // std::pair<SDValue, SDValue> CallInfo = LowerCall(CLI);
+    // return CallInfo.first;
+    return makeC65LibCall(DAG, LCName, VT, Ops, 2, isSigned, DL).first;
+  } else {
+    llvm_unreachable("Unable to expand divrem.");
+  }
+}
+
 SDValue
 C65TargetLowering::LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const {
   MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
@@ -930,18 +967,20 @@ C65TargetLowering::EmitZST(MachineInstr *MI,
     assert(!Op1->isReg());
     unsigned FrameReg = RI->getFrameRegister(*MBB->getParent());
     if (FrameReg == C65::S)
-      STAInstr = Use8Bit ? C65::STA8srel  : C65::STA16srel;
+      STAInstr = Use8Bit ? C65::STA8srel : C65::STA16srel;
     else if (FrameReg == C65::X)
-      STAInstr = Use8Bit ? C65::STA8absx16  : C65::STA16absx16;
+      STAInstr = Use8Bit ? C65::STA8absx16 : C65::STA16absx16;
+    else if (FrameReg == C65::XL)
+      STAInstr = C65::STA8absx8;
     else
       llvm_unreachable("Unknown frame register");
     YIndirect = false;
   } else if (NumOperands == 2) {
     assert(!Op1->isReg());
     if (Far)
-      STAInstr = Use8Bit ? C65::STA8absl  : C65::STA16absl;
+      STAInstr = Use8Bit ? C65::STA8absl : C65::STA16absl;
     else
-      STAInstr = Use8Bit ? C65::STA8abs  : C65::STA16abs;
+      STAInstr = Use8Bit ? C65::STA8abs : C65::STA16abs;
     YIndirect = false;
   } else /* NumOperands == 3 */ {
     assert(Op1->isReg());
@@ -1000,7 +1039,7 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
   const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
   unsigned STAInstr = Use8Bit ? C65::STA8zp : C65::STA16zp;
-  unsigned STZInstr = Use8Bit ? C65::STZ8zp  : C65::STZ16zp;
+  unsigned STZInstr = Use8Bit ? C65::STZ8zp : C65::STZ16zp;
   unsigned LDAInstr;
   unsigned NumOperands = TII->get(MI->getOpcode()).getNumOperands();
 
@@ -1011,14 +1050,22 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
 
   if (Stack) {
     assert(!Op1->isReg());
-    LDAInstr = Use8Bit ? C65::LDA8srel : C65::LDA16srel;
+    unsigned FrameReg = RI->getFrameRegister(*MBB->getParent());
+    if (FrameReg == C65::S)
+      LDAInstr = Use8Bit ? C65::LDA8srel : C65::LDA16srel;
+    else if (FrameReg == C65::X)
+      LDAInstr = Use8Bit ? C65::LDA8absx16 : C65::LDA16absx16;
+    else if (FrameReg == C65::XL)
+      LDAInstr = C65::LDA8absx8;
+    else
+      llvm_unreachable("Unknown frame register");
     YIndirect = false;
   } else if (NumOperands == 2) {
     assert(!Op1->isReg());
     if (Far)
-      LDAInstr = Use8Bit ? C65::LDA8absl  : C65::LDA16absl;
+      LDAInstr = Use8Bit ? C65::LDA8absl : C65::LDA16absl;
     else
-      LDAInstr = Use8Bit ? C65::LDA8abs  : C65::LDA16abs;
+      LDAInstr = Use8Bit ? C65::LDA8abs : C65::LDA16abs;
     YIndirect = false;
   } else /* NumOperands == 3 */ {
     assert(Op1->isReg());
@@ -1310,9 +1357,18 @@ C65TargetLowering::EmitZLEA(MachineInstr *MI,
   const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
   DebugLoc DL = MI->getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
+  unsigned FrameReg = RI->getFrameRegister(*MBB->getParent());
 
   BuildMI(*MBB, MBBI, DL, TII->get(C65::CLC));
-  BuildMI(*MBB, MBBI, DL, TII->get(C65::TSC));
+  if (FrameReg == C65::S)
+    BuildMI(*MBB, MBBI, DL, TII->get(C65::TSC));
+  else if (FrameReg == C65::X)
+    BuildMI(*MBB, MBBI, DL, TII->get(C65::TXA16));
+  else if (FrameReg == C65::XL)
+    BuildMI(*MBB, MBBI, DL, TII->get(C65::TXA8));
+  else
+    llvm_unreachable("Unknown frame register");
+
   BuildMI(*MBB, MBBI, DL, TII->get(C65::ADC16imm))
     .addImm(MI->getOperand(1).getImm());
   BuildMI(*MBB, MBBI, DL, TII->get(C65::STA16zp))
@@ -1957,8 +2013,11 @@ LowerFormalArguments(SDValue Chain,
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
                  ArgLocs, *DAG.getContext());
 
+  bool Is16Bit = Subtarget->has65802();
   unsigned RetAddrSize = FuncInfo->getIsFar() ? 3 : 2;
+  unsigned FramePtrSize = Is16Bit ? 2 : 1;
   CCInfo.AllocateStack(RetAddrSize, 1);
+  CCInfo.AllocateStack(FramePtrSize, 1);
   CCInfo.AnalyzeFormalArguments(Ins, CC_C65);
 
   // The first stack object is the return address.
@@ -2215,14 +2274,263 @@ C65TargetLowering::makeC65LibCall(SelectionDAG &DAG,
   }
   SDValue Callee = DAG.getExternalSymbol(LCName, getPointerTy());
 
+  CLI.RetTy = ;
   Type *RetTy = RetVT.getTypeForEVT(*DAG.getContext());
   TargetLowering::CallLoweringInfo CLI(DAG);
   CLI.setDebugLoc(DL).setChain(DAG.getEntryNode())
-    .setCallee(CallingConv::PreserveAll, RetTy, Callee, std::move(Args), 0)
+    .setCallee(CallingConv::PreserveAll,
+               Type::getVoidTy(DAG.getContext()),
+               Callee, std::move(Args), 0)
     .setNoReturn(doesNotReturn).setDiscardResult(!isReturnValueUsed)
     .setSExtResult(isSigned).setZExtResult(!isSigned);
   return LowerCallTo(CLI);
 }
+
+  /// This structure contains all information that is necessary for lowering
+  /// calls. It is passed to TLI::LowerCallTo when the SelectionDAG builder
+  /// needs to lower a call, and targets will see this struct in their LowerCall
+  /// implementation.
+
+
+// std::pair<SDValue, SDValue>
+// C65ISelLowering::LowerLibCallTo(SelectionDAG &DAG,
+//                                 CallLoweringInfo &CLI,
+//                                 SmallVector<CallReturnInfo> RetTys,
+//                                 SDLoc DL) const {
+//   // Handle all of the incoming values (return values).
+//   CLI.Ins.clear();
+//   for (unsigned I = 0, E = RetTys.size(); I != E; ++I) {
+//     Type *RetTy = RetTys[I].Ty;
+
+//     SmallVector<EVT, 4> RetVTs;
+//     SmallVector<uint64_t, 4> RetOffsets;
+//     ComputeValueVTs(*this, RetTy, RetVTs, &RetOffsets);
+//     SmallVector<ISD::OutputArg, 4> Outs;
+//     GetReturnInfo(CLI.RetTy, getReturnAttrs(CLI), Outs, *this);
+
+//     for (unsigned J = 0, F = RetTys.size(); J != F; ++J) {
+//       EVT VT = RetVTs[J];
+//       MVT RegisterVT = getRegisterType(RetTy->getContext(), VT);
+//       unsigned NumRegs = getNumRegisters(RetTy->getContext(), VT);
+//       for (unsigned K = 0; K != NumRegs; ++K) {
+//         ISD::InputArg MyFlags;
+//         MyFlags.VT = RegisterVT;
+//         MyFlags.ArgVT = VT;
+//         MyFlags.Used = RetTys[I].IsValueUsed;
+//         if (RetTys[I].SExt)
+//           MyFlags.Flags.setSExt();
+//         if (RetTys[I].ZExt)
+//           MyFlags.Flags.setZExt();
+//         if (RetTys[I].IsInReg)
+//           MyFlags.Flags.setInReg();
+//         CLI.Ins.push_back(MyFlags);
+//       }
+//     }
+//   }
+
+//   // Handle all of the outgoing values (arguments).
+//   CLI.Outs.clear();
+//   CLI.OutVals.clear();
+//   ArgListTy &Args = CLI.getArgs();
+//   for (unsigned I = 0, E = Args.size(); I != E; ++I) {
+//     SmallVector<EVT, 4> ValueVTs;
+//     ComputeValueVTs(*this, Args[I].Ty, ValueVTs);
+//     Type *FinalType = Args[I].Ty;
+
+//     if (Args[I].isByVal)
+//       FinalType = cast<PointerType>(Args[I].Ty)->getElementType();
+
+//     bool NeedsRegBlock = functionArgumentNeedsConsecutiveRegisters(
+//         FinalType, CLI.CallConv, CLI.IsVarArg);
+//     for (unsigned Value = 0, NumValues = ValueVTs.size(); Value != NumValues;
+//          ++Value) {
+//       EVT VT = ValueVTs[Value];
+//       Type *ArgTy = VT.getTypeForEVT(CLI.RetTy->getContext());
+//       SDValue Op = SDValue(Args[I].Node.getNode(),
+//                            Args[I].Node.getResNo() + Value);
+//       ISD::ArgFlagsTy Flags;
+//       unsigned OriginalAlignment = getDataLayout()->getABITypeAlignment(ArgTy);
+
+//       if (Args[I].isZExt)
+//         Flags.setZExt();
+//       if (Args[I].isSExt)
+//         Flags.setSExt();
+//       if (Args[I].isInReg)
+//         Flags.setInReg();
+//       if (Args[I].isSRet)
+//         Flags.setSRet();
+//       if (Args[I].isByVal)
+//         Flags.setByVal();
+//       if (Args[I].isInAlloca) {
+//         Flags.setInAlloca();
+//         // Set the byval flag for CCAssignFn callbacks that don't know
+//         // about inalloca.  This way we can know how many bytes we
+//         // should've allocated and how many bytes a callee cleanup
+//         // function will pop.  If we port inalloca to more targets,
+//         // we'll have to add custom inalloca handling in the various
+//         // CC lowering callbacks.
+//         Flags.setByVal();
+//       }
+//       if (Args[I].isByVal || Args[I].isInAlloca) {
+//         PointerType *Ty = cast<PointerType>(Args[I].Ty);
+//         Type *ElementTy = Ty->getElementType();
+//         Flags.setByValSize(getDataLayout()->getTypeAllocSize(ElementTy));
+//         // For ByVal, alignment should come from FE.  BE will guess if
+//         // this info is not there but there are cases it cannot get
+//         // right.
+//         unsigned FrameAlign;
+//         if (Args[I].Alignment)
+//           FrameAlign = Args[I].Alignment;
+//         else
+//           FrameAlign = getByValTypeAlignment(ElementTy);
+//         Flags.setByValAlign(FrameAlign);
+//       }
+//       if (Args[I].isNest)
+//         Flags.setNest();
+//       if (NeedsRegBlock) {
+//         Flags.setInConsecutiveRegs();
+//         if (Value == NumValues - 1)
+//           Flags.setInConsecutiveRegsLast();
+//       }
+//       Flags.setOrigAlign(OriginalAlignment);
+
+//       MVT PartVT = getRegisterType(CLI.RetTy->getContext(), VT);
+//       unsigned NumParts = getNumRegisters(CLI.RetTy->getContext(), VT);
+//       SmallVector<SDValue, 4> Parts(NumParts);
+//       ISD::NodeType ExtendKind = ISD::ANY_EXTEND;
+
+//       if (Args[i].isSExt)
+//         ExtendKind = ISD::SIGN_EXTEND;
+//       else if (Args[i].isZExt)
+//         ExtendKind = ISD::ZERO_EXTEND;
+
+//       // Conservatively only handle 'returned' on non-vectors for now
+//       if (Args[I].isReturned && !Op.getValueType().isVector()) {
+//         assert(CLI.RetTy == Args[I].Ty && RetTys.size() == NumValues &&
+//                "unexpected use of 'returned'");
+//         // Before passing 'returned' to the target lowering code,
+//         // ensure that either the register MVT and the actual EVT are
+//         // the same size or that the return value and argument are
+//         // extended in the same way; in these cases it's safe to pass
+//         // the argument register value unchanged as the return
+//         // register value (although it's at the target's option
+//         // whether to do so) TODO: allow code generation to take
+//         // advantage of partially preserved registers rather than
+//         // clobbering the entire register when the parameter extension
+//         // method is not compatible with the return extension method
+//         if ((NumParts * PartVT.getSizeInBits() == VT.getSizeInBits()) ||
+//             (ExtendKind != ISD::ANY_EXTEND &&
+//              CLI.RetSExt == Args[i].isSExt && CLI.RetZExt == Args[i].isZExt))
+//         Flags.setReturned();
+//       }
+
+//       getCopyToParts(CLI.DAG, CLI.DL, Op, &Parts[0], NumParts, PartVT,
+//                      CLI.CS ? CLI.CS->getInstruction() : nullptr, ExtendKind);
+
+//       for (unsigned J = 0; J != NumParts; ++J) {
+//         // if it isn't first piece, alignment must be 1
+//         ISD::OutputArg MyFlags(Flags, Parts[j].getValueType(), VT,
+//                                I < CLI.NumFixedArgs,
+//                                I, J*Parts[j].getValueType().getStoreSize());
+//         if (NumParts > 1 && J == 0)
+//           MyFlags.Flags.setSplit();
+//         else if (J != 0)
+//           MyFlags.Flags.setOrigAlign(1);
+
+//         CLI.Outs.push_back(MyFlags);
+//         CLI.OutVals.push_back(Parts[J]);
+//       }
+//     }
+//   }
+
+//   SmallVector<SDValue, 4> InVals;
+//   CLI.Chain = LowerCall(CLI, InVals);
+
+//   // Verify that the target's LowerCall behaved as expected.
+//   assert(CLI.Chain.getNode() && CLI.Chain.getValueType() == MVT::Other &&
+//          "LowerCall didn't return a valid chain!");
+//   assert((!CLI.IsTailCall || InVals.empty()) &&
+//          "LowerCall emitted a return value for a tail call!");
+//   assert((CLI.IsTailCall || InVals.size() == CLI.Ins.size()) &&
+//          "LowerCall didn't emit the correct number of values!");
+
+//   // For a tail call, the return value is merely live-out and there aren't
+//   // any nodes in the DAG representing it. Return a special value to
+//   // indicate that a tail call has been emitted and no more Instructions
+//   // should be processed in the current block.
+//   if (CLI.IsTailCall) {
+//     CLI.DAG.setRoot(CLI.Chain);
+//     return std::make_pair(SDValue(), SDValue());
+//   }
+
+//   DEBUG(for (unsigned i = 0, e = CLI.Ins.size(); i != e; ++i) {
+//           assert(InVals[i].getNode() &&
+//                  "LowerCall emitted a null value!");
+//           assert(EVT(CLI.Ins[i].VT) == InVals[i].getValueType() &&
+//                  "LowerCall emitted a value with the wrong type!");
+//         });
+
+//   SmallVector<SDValue, 4> ReturnValues;
+//   if (!CanLowerReturn) {
+//     // The instruction result is the result of loading from the
+//     // hidden sret parameter.
+//     SmallVector<EVT, 1> PVTs;
+//     Type *PtrRetTy = PointerType::getUnqual(OrigRetTy);
+
+//     ComputeValueVTs(*this, PtrRetTy, PVTs);
+//     assert(PVTs.size() == 1 && "Pointers should fit in one register");
+//     EVT PtrVT = PVTs[0];
+
+//     unsigned NumValues = RetTys.size();
+//     ReturnValues.resize(NumValues);
+//     SmallVector<SDValue, 4> Chains(NumValues);
+
+//     for (unsigned i = 0; i < NumValues; ++i) {
+//       SDValue Add = CLI.DAG.getNode(ISD::ADD, CLI.DL, PtrVT, DemoteStackSlot,
+//                                     CLI.DAG.getConstant(Offsets[i], PtrVT));
+//       SDValue L = CLI.DAG.getLoad(
+//           RetTys[i], CLI.DL, CLI.Chain, Add,
+//           MachinePointerInfo::getFixedStack(DemoteStackIdx, Offsets[i]), false,
+//           false, false, 1);
+//       ReturnValues[i] = L;
+//       Chains[i] = L.getValue(1);
+//     }
+
+//     CLI.Chain = CLI.DAG.getNode(ISD::TokenFactor, CLI.DL, MVT::Other, Chains);
+//   } else {
+//     // Collect the legal value parts into potentially illegal values
+//     // that correspond to the original function's return values.
+//     ISD::NodeType AssertOp = ISD::DELETED_NODE;
+//     if (CLI.RetSExt)
+//       AssertOp = ISD::AssertSext;
+//     else if (CLI.RetZExt)
+//       AssertOp = ISD::AssertZext;
+//     unsigned CurReg = 0;
+//     for (unsigned I = 0, E = RetTys.size(); I != E; ++I) {
+//       EVT VT = RetTys[I];
+//       MVT RegisterVT = getRegisterType(CLI.RetTy->getContext(), VT);
+//       unsigned NumRegs = getNumRegisters(CLI.RetTy->getContext(), VT);
+
+//       ReturnValues.push_back(getCopyFromParts(CLI.DAG, CLI.DL, &InVals[CurReg],
+//                                               NumRegs, RegisterVT, VT, nullptr,
+//                                               AssertOp));
+//       CurReg += NumRegs;
+//     }
+
+//     // For a function returning void, there is no return value. We
+//     // can't create such a node, so we just return a null return value
+//     // in that case. In that case, nothing will actually look at the
+//     // value.
+//     if (ReturnValues.empty())
+//       return std::make_pair(SDValue(), CLI.Chain);
+//   }
+
+//   SDValue Res = CLI.DAG.getNode(ISD::MERGE_VALUES, CLI.DL,
+//                                 CLI.DAG.getVTList(RetTys), ReturnValues);
+//   return std::make_pair(Res, CLI.Chain);
+// }
+
+
 
 /// This callback is invoked when a node result type is illegal for
 /// the target, and the operation was registered to use 'custom'
