@@ -1057,6 +1057,10 @@ let Predicates = [IsAcc8Bit, IsIx8Bit] in {
   def TYA8   : FF<0xa8, (outs), (ins), "tya", []>, Acc8Bit, Ix8Bit;
 }
 let Predicates = [IsIx8Bit] in {
+  def TXS8 : FF<0x9a, (outs), (ins), "txs", []>, Ix8Bit;
+  def TSX8 : FF<0xba, (outs), (ins), "tsx", []>, Ix8Bit;
+}
+let Predicates = [Has65802, IsIx8Bit] in {
   def TXY8   : FF<0x9b, (outs), (ins), "txy", []>, Ix8Bit;
   def TYX8   : FF<0xbb, (outs), (ins), "tyx", []>, Ix8Bit;
 }

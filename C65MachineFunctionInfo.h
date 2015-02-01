@@ -30,14 +30,31 @@ class C65MachineFunctionInfo : public MachineFunctionInfo {
   /// addition to the space used by the return address).
   unsigned BytesToPopOnReturn;
 
+  /// ReturnAddrIndex - FrameIndex for return slot.
+  int ReturnAddrIndex;
+
+  /// Far - True if this function has a 24-bit return address.
+  bool IsFar;
+
 public:
-  C65MachineFunctionInfo() : BytesToPopOnReturn(0) {}
+  C65MachineFunctionInfo() : BytesToPopOnReturn(0),
+                             ReturnAddrIndex(0),
+                             IsFar(false) {}
 
   explicit C65MachineFunctionInfo(MachineFunction &MF)
-    : BytesToPopOnReturn(0) {}
+    : BytesToPopOnReturn(0),
+      ReturnAddrIndex(0),
+      IsFar(false) {}
 
   unsigned getBytesToPopOnReturn() const { return BytesToPopOnReturn; }
   void setBytesToPopOnReturn (unsigned bytes) { BytesToPopOnReturn = bytes; }
+
+  int getRAIndex() const { return ReturnAddrIndex; }
+  void setRAIndex(int Index) { ReturnAddrIndex = Index; }
+
+  bool getIsFar() const { return IsFar; }
+  void setIsFar(bool far) { IsFar = far; }
+
 };
 
 } // End llvm namespace

@@ -33,12 +33,55 @@ C65FrameLowering::C65FrameLowering(const C65Subtarget &ST)
     ST(ST) {}
 
 void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
-  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  MachineFrameInfo *MFI = MF.getFrameInfo();
+  C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
+  const C65RegisterInfo *RegInfo =
+    static_cast<const C65RegisterInfo *>(MF.getSubtarget().getRegisterInfo());
+
+  bool HasFP = hasFP(MF);
+
   MachineBasicBlock &MBB = MF.front();
   MachineBasicBlock::iterator MBBI = MBB.begin();
   int Size = (int)MFI->getStackSize();
-  if (Size)
-    emitSAdjustment(MF, MBB, MBBI, -Size);
+
+  unsigned FramePtr = RegInfo->getFrameRegister(MF);
+  bool Is16Bit = ST.has65802();
+
+  // PHX
+  // TSX
+  // TXA
+  // CLC
+  // ADC #XXX
+  // TAX
+  // TXS
+
+  if (HasFP) {
+    if (FramePtr == C65::X || FramePtr == C65::XL) {
+      // Save the frame pointer.
+      BuildMI(MBB, MBBI, DL, TII.get(Is16Bit ? C65::PHX16 : C65::PHX8))
+        .setMIFlag(MachineInstr::FrameSetup);
+
+      // Update the frame pointer with the new base value.
+      BuildMI(MBB, MBBI, DL, TII.get(Is16Bit ? C65::TSX16 : C65::TSX8))
+        .setMIFlag(MachineInstr::FrameSetup);
+
+    } else
+      llvm_unreachable("Only X may be a frame pointer");
+  }
+  //if (Size)
+  //  emitSAdjustment(MF, MBB, MBBI, -Size);
+
+
+  // Create the frame index object for the return address.
+  // unsigned RetAddrSize = FuncInfo->getIsFar() ? 3 : 2;
+  // int ReturnAddrIndex = MFI->CreateFixedObject(RetAddrSize,
+  //                                              -(int64_t)RetAddrSize,
+  //                                              false);
+  // FuncInfo->setRAIndex(ReturnAddrIndex);
+  //unsigned RetAddrSize = FuncInfo->getIsFar() ? 3 : 2;
+  //int ReturnAddrIndex = MFI->CreateStackObject(RetAddrSize, 1,
+  //                                             false);
+  //FuncInfo->setRAIndex(ReturnAddrIndex);
 }
 
 void C65FrameLowering::emitSAdjustment(MachineFunction &MF,
@@ -160,9 +203,11 @@ void C65FrameLowering::emitEpilogue(MachineFunction &MF,
 // In addition, for C65 as well when we do not have 65802 capabilities (TSC,
 // TCS) or when the frame is too large for stack relative indexing (255 bytes)
 bool C65FrameLowering::hasFP(const MachineFunction &MF) const {
-  const MachineFrameInfo *MFI = MF.getFrameInfo();
-  return MF.getTarget().Options.DisableFramePointerElim(MF) ||
-    MFI->hasVarSizedObjects() || MFI->isFrameAddressTaken() ||
-    MFI->getStackSize() > 0xFF ||
-    !ST.has65802();
+  //  const MachineFrameInfo *MFI = MF.getFrameInfo();
+  return true;
+
+  //  return MF.getTarget().Options.DisableFramePointerElim(MF) ||
+  //    MFI->hasVarSizedObjects() || MFI->isFrameAddressTaken() ||
+  //    MFI->getStackSize() > 0xFF ||
+  //    !ST.has65802();
 }

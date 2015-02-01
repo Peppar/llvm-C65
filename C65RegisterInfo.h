@@ -26,8 +26,20 @@ class TargetInstrInfo;
 class Type;
 
 struct C65RegisterInfo : public C65GenRegisterInfo {
+public:
   C65Subtarget &Subtarget;
 
+private:
+
+  /// StackPtr - Physical register used as stack ptr.
+  ///
+  unsigned StackPtr;
+
+  /// FramePtr - Physical register used as frame ptr.
+  ///
+  unsigned FramePtr;
+
+public:
   C65RegisterInfo(C65Subtarget &st);
 
   /// Code Generation virtual methods...
@@ -53,6 +65,7 @@ struct C65RegisterInfo : public C65GenRegisterInfo {
 
   // Debug information queries.
   unsigned getFrameRegister(const MachineFunction &MF) const override;
+  unsigned getStackRegister() const { return StackPtr; }
 };
 
 } // end namespace llvm

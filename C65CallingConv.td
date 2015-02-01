@@ -34,16 +34,16 @@ def CSR_C65_AllRegs : CalleeSavedRegs<(add CSR_C65, ZR0W, ZR2W, ZR4W, ZR8W,
 
 /// WDC W65816 C compiler calling convention.
 ///
-def CC_W65816CC : CallingConv<[
-  // All arguments are passed via the stack.
-  CCIfType<[i8],  CCAssignToStack<1, 1>>,
-  CCIfType<[i16], CCAssignToStack<2, 1>>,
-  CCIfType<[i32], CCAssignToStack<4, 1>>,
-  CCIfType<[i64], CCAssignToStack<8, 1>>
-]>;
+// def CC_W65816CC : CallingConv<[
+//   // All arguments are passed via the stack.
+//   CCIfType<[i8],  CCAssignToStack<1, 1>>,
+//   CCIfType<[i16], CCAssignToStack<2, 1>>,
+//   CCIfType<[i32], CCAssignToStack<4, 1>>,
+//   CCIfType<[i64], CCAssignToStack<8, 1>>
+// ]>;
 
-def RetCC_W65816CC : CallingConv<[
-  // Return values are passed via A, or X:A for 32-bit integers.
-  CCIfType<[i8], CCAssignToReg<[AL]>>,
-  CCIfType<[i16], CCAssignToReg<[A, X]>>
-]>;
+// def RetCC_W65816CC : CallingConv<[
+//   // Return values are passed via A, or X:A for 32-bit integers.
+//   CCIfType<[i8], CCAssignToReg<[AL]>>,
+//   CCIfType<[i16], CCAssignToReg<[A, X]>>
+// ]>;

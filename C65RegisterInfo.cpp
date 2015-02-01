@@ -36,7 +36,16 @@ using namespace llvm;
 #include "C65GenRegisterInfo.inc"
 
 C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
-  : C65GenRegisterInfo(C65::PC), Subtarget(ST) {}
+  : C65GenRegisterInfo(C65::PC), Subtarget(ST) {
+
+  if (ST.has65802) {
+    StackPtr = C65::S;
+    FramePtr = C65::X;
+  } else {
+    StackPtr = C65::SL;
+    FramePtr = C65::XL;
+  }
+}
 
 const MCPhysReg*
 C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
@@ -213,5 +222,7 @@ C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 }
 
 unsigned C65RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
-  return C65::S;
+  const TargetFrameLowering *TFI = MF.getSubtarget().getFrameLowering();
+
+  return TFI->hasFP(MF) ? FramePtr : StackPtr;
 }

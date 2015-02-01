@@ -274,7 +274,7 @@ SDValue C65TargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
 SDValue C65TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
   EVT VT = Op.getValueType();
   SDLoc DL(Op);
-  SDValue Chain = DAG.getEntryNode();
+  //  SDValue Chain = DAG.getEntryNode();
   Type *RetTy = VT.getTypeForEVT(*DAG.getContext());
 
   // Emit a libcall.
@@ -928,7 +928,13 @@ C65TargetLowering::EmitZST(MachineInstr *MI,
 
   if (Stack) {
     assert(!Op1->isReg());
-    STAInstr = Use8Bit ? C65::STA8srel  : C65::STA16srel;
+    unsigned FrameReg = RI->getFrameRegister(*MBB->getParent());
+    if (FrameReg == C65::S)
+      STAInstr = Use8Bit ? C65::STA8srel  : C65::STA16srel;
+    else if (FrameReg == C65::X)
+      STAInstr = Use8Bit ? C65::STA8absx16  : C65::STA16absx16;
+    else
+      llvm_unreachable("Unknown frame register");
     YIndirect = false;
   } else if (NumOperands == 2) {
     assert(!Op1->isReg());
@@ -1951,7 +1957,15 @@ LowerFormalArguments(SDValue Chain,
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
                  ArgLocs, *DAG.getContext());
 
+  unsigned RetAddrSize = FuncInfo->getIsFar() ? 3 : 2;
+  CCInfo.AllocateStack(RetAddrSize, 1);
   CCInfo.AnalyzeFormalArguments(Ins, CC_C65);
+
+  // The first stack object is the return address.
+  //  int ReturnAddrIndex = MFI->CreateStackObject(RetAddrSize, 1,
+  //                                               false);
+  //  int ReturnAddrIndex = MFI->CreateFixedObject(RetAddrSize, , true);
+  //  FuncInfo->setRAIndex(ReturnAddrIndex);
 
   for (unsigned I = 0, E = ArgLocs.size(); I != E; ++I) {
     SDValue ArgValue;
@@ -1992,7 +2006,7 @@ LowerFormalArguments(SDValue Chain,
     InVals.push_back(ArgValue);
   }
 
-  FuncInfo->setBytesToPopOnReturn(CCInfo.getNextStackOffset());
+  // FuncInfo->setBytesToPopOnReturn(CCInfo.getNextStackOffset());
 
   return Chain;
 }
@@ -2137,7 +2151,7 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
   // Mark the end of the call, which is glued to the call itself.
   Chain = DAG.getCALLSEQ_END(Chain,
-                             DAG.getIntPtrConstant(0, true),
+                             DAG.getIntPtrConstant(NumBytes, true),
                              DAG.getIntPtrConstant(0, true),
                              Glue, DL);
   Glue = Chain.getValue(1);
