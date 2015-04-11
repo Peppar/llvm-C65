@@ -1214,6 +1214,7 @@ class ZRInstr<dag outs, dag ins, string asmstr, list<dag> pattern>
 //   ZLD
 multiclass ZRI_ZLD<string mnemonic, RegisterClass RC, ValueType Ty,
                    SDPatternOperator LoadNode> {
+  let Constraints = "@earlyclobber $reg1" in {
   def zp   : ZRInstr<(outs RC:$reg1), (ins mem_zp:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
                      [(set RC:$reg1, (Ty (LoadNode addr_zp:$mem)))]>;
@@ -1238,6 +1239,7 @@ multiclass ZRI_ZLD<string mnemonic, RegisterClass RC, ValueType Ty,
   def rrf  : ZRInstr<(outs RC:$reg1), (ins mem_rrf:$mem),
                      !strconcat(mnemonic, " $reg1,$mem"),
                      [(set RC:$reg1, (Ty (LoadNode addr_rrf:$mem)))]>;
+  }
 }
 
 // multiclass ZRI_R_M<string mnemonic, PatFrag frag> {
