@@ -74,11 +74,14 @@ BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
 const
 TargetRegisterClass*
 C65RegisterInfo::getPointerRegClass(const MachineFunction &MF,
-                                    unsigned Kind) const {
-  if (Kind == 0)
+                                    unsigned RegClass) const {
+  // TODO: Find out why X86 doesn't do it like this...
+  if (RegClass == C65::ZRC16RegClassID)
     return &C65::ZRC16RegClass;
-  else
+  else if (RegClass == C65::ZRC32RegClassID)
     return &C65::ZRC32RegClass;
+  else
+    llvm_unreachable("Unsupported pointer register class.");
   // if (Kind == 0)
   //   return &C65::IX16RegClass;
   // else if (Kind == 1)

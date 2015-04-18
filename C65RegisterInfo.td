@@ -68,8 +68,8 @@ def ZRC8  : RegisterClass<"C65", [i8], 8, (sequence "ZR%u", 0, 31)>;
 def ZRC16 : RegisterClass<"C65", [i16], 8, (add ZR0W, ZR2W, ZR4W, ZR6W, ZR8W,
                                                 ZR10W, ZR12W, ZR14W, ZR16W,
                                                 ZR18W, ZR20W, ZR22W, ZR24W,
-                                                ZR26W, ZR28W, ZR30W)>,
-              PointerLikeRegClass<0>;
+                                                ZR26W, ZR28W, ZR30W)>;
+//              PointerLikeRegClass<0>;
 def ZRC32 : RegisterClass<"C65", [i32], 8, (add ZR0D, ZR4D, ZR8D, ZR12D,
                                                 ZR16D, ZR20D, ZR24D, ZR28D)>;
 //              PointerLikeRegClass<1>;

@@ -111,7 +111,9 @@ namespace llvm {
 
     MVT getScalarShiftAmountTy(EVT LHSTy) const override { return MVT::i8; }
 
-    /// Return the ISD::SETCC ValueType
+    EVT getTypeForExtArgOrReturn(LLVMContext &Context, EVT VT,
+                                 ISD::NodeType ExtendKind) const override;
+
     EVT getSetCCResultType(LLVMContext &Context, EVT VT) const override;
 
     SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;

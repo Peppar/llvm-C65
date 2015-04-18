@@ -230,6 +230,14 @@ EVT C65TargetLowering::getSetCCResultType(LLVMContext &, EVT VT) const {
   return VT.changeVectorElementTypeToInteger();
 }
 
+/// Return the type that should be used to zero or sign extend a
+/// zeroext/signext integer argument or return value.
+EVT C65TargetLowering::
+getTypeForExtArgOrReturn(LLVMContext &Context, EVT VT,
+                         ISD::NodeType ExtendKind) const {
+  return VT;
+}
+
 /// This callback is invoked for operations that are unsupported by
 /// the target, which are registered to use 'custom' lowering, and
 /// whose defined values are all legal.
