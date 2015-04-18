@@ -55,8 +55,6 @@ namespace llvm {
 
       InlineAsmStart = ";APP\n";
       InlineAsmEnd = ";NO_APP\n";
-
-      HasSetDirective = false;
     }
   };
 }
@@ -103,24 +101,21 @@ static MCSubtargetInfo *createC65MCSubtargetInfo(StringRef TT, StringRef CPU,
   return X;
 }
 
-static MCInstPrinter *createC65MCInstPrinter(const Target &T,
+static MCInstPrinter *createC65MCInstPrinter(const Triple &T,
                                              unsigned SyntaxVariant,
                                              const MCAsmInfo &MAI,
                                              const MCInstrInfo &MII,
-                                             const MCRegisterInfo &MRI,
-                                             const MCSubtargetInfo &STI) {
-  return new C65InstPrinter(MAI, MII, MRI, STI);
+                                             const MCRegisterInfo &MRI) {
+  return new C65InstPrinter(MAI, MII, MRI);
 }
 
-static MCStreamer *createC65MCObjectStreamer(const Target &T, StringRef TT,
+static MCStreamer *createC65MCObjectStreamer(const Triple &T,
                                              MCContext &Ctx,
                                              MCAsmBackend &MAB,
                                              raw_ostream &OS,
                                              MCCodeEmitter *Emitter,
-                                             const MCSubtargetInfo &STI,
-                                             bool RelaxAll,
-                                             bool NoExecStack) {
-  return createELFStreamer(Ctx, MAB, OS, Emitter, RelaxAll, NoExecStack);
+                                             bool RelaxAll) {
+  return createELFStreamer(Ctx, MAB, OS, Emitter, RelaxAll);
 }
 
 extern "C" void LLVMInitializeC65TargetMC() {
@@ -150,6 +145,6 @@ extern "C" void LLVMInitializeC65TargetMC() {
   TargetRegistry::RegisterMCInstPrinter(The65C816Target,
                                         createC65MCInstPrinter);
 
-  TargetRegistry::RegisterMCObjectStreamer(The65C816Target,
-                                           createC65MCObjectStreamer);
+  TargetRegistry::RegisterELFStreamer(The65C816Target,
+                                      createC65MCObjectStreamer);
 }

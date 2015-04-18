@@ -22,10 +22,8 @@ namespace llvm {
 class C65Subtarget;
 
 class C65FrameLowering : public TargetFrameLowering {
-protected:
-  const C65Subtarget &ST;
 public:
-  explicit C65FrameLowering(const C65Subtarget &ST);
+  explicit C65FrameLowering();
 
   void emitSAdjustment(MachineFunction &MF,
                        MachineBasicBlock &MBB,

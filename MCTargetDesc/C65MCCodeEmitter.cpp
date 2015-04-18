@@ -57,7 +57,6 @@ private:
 
 MCCodeEmitter *llvm::createC65MCCodeEmitter(const MCInstrInfo &MCII,
                                             const MCRegisterInfo &MRI,
-                                            const MCSubtargetInfo &MCSTI,
                                             MCContext &Ctx) {
   return new C65MCCodeEmitter(MCII, Ctx);
 }

@@ -28,26 +28,25 @@
 
 using namespace llvm;
 
-C65FrameLowering::C65FrameLowering(const C65Subtarget &ST)
-  : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 1, 0),
-    ST(ST) {}
+C65FrameLowering::C65FrameLowering()
+  : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 1, 0) {}
 
 void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
-  MachineFrameInfo *MFI = MF.getFrameInfo();
-  C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
-  const C65RegisterInfo *RegInfo =
-    static_cast<const C65RegisterInfo *>(MF.getSubtarget().getRegisterInfo());
-  const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+  const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
+  const C65RegisterInfo &RegInfo = *STI.getRegisterInfo();
+  const C65InstrInfo &TII = *STI.getInstrInfo();
+  const MachineFrameInfo &MFI = *MF.getFrameInfo();
+  //C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
 
   bool HasFP = hasFP(MF);
 
   MachineBasicBlock &MBB = MF.front();
   MachineBasicBlock::iterator MBBI = MBB.begin();
   DebugLoc DL = MBBI->getDebugLoc();
-  int Size = (int)MFI->getStackSize();
+  int Size = (int)MFI.getStackSize();
 
-  unsigned FramePtr = RegInfo->getFrameRegister(MF);
-  bool Is16Bit = ST.has65802();
+  unsigned FramePtr = RegInfo.getFrameRegister(MF);
+  bool Is16Bit = STI.has65802();
 
   if (HasFP) {
     if (FramePtr == C65::X || FramePtr == C65::XL) {
@@ -89,39 +88,11 @@ void C65FrameLowering::emitSAdjustment(MachineFunction &MF,
                                        MachineBasicBlock &MBB,
                                        MachineBasicBlock::iterator MBBI,
                                        int NumBytes) const {
+  const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
+  const C65InstrInfo &TII = *STI.getInstrInfo();
   DebugLoc DL = (MBBI != MBB.end()) ? MBBI->getDebugLoc() : DebugLoc();
-  const C65InstrInfo &TII = *ST.getInstrInfo();
 
-  if (!ST.has65802()) {
-    const int PushPullThreshold = 7;
-
-    if (NumBytes >= PushPullThreshold
-        || NumBytes <= -PushPullThreshold) {
-      BuildMI(MBB, MBBI, DL, TII.get(C65::TSX8));
-      BuildMI(MBB, MBBI, DL, TII.get(C65::TXA8));
-      if (NumBytes < 0) {
-        BuildMI(MBB, MBBI, DL, TII.get(C65::SEC));
-        BuildMI(MBB, MBBI, DL, TII.get(C65::SBC8imm))
-          .addImm(-NumBytes);
-      } else {
-        BuildMI(MBB, MBBI, DL, TII.get(C65::CLC));
-        BuildMI(MBB, MBBI, DL, TII.get(C65::ADC8imm))
-          .addImm(NumBytes);
-      }
-      BuildMI(MBB, MBBI, DL, TII.get(C65::TAX8));
-      BuildMI(MBB, MBBI, DL, TII.get(C65::TXS8));
-    } else {
-      while (NumBytes != 0) {
-        if (NumBytes >= 1) {
-          BuildMI(MBB, MBBI, DL, TII.get(C65::PLA8));
-          --NumBytes;
-        } else if (NumBytes <= -1) {
-          BuildMI(MBB, MBBI, DL, TII.get(C65::PHA8));
-          ++NumBytes;
-        }
-      }
-    }
-  } else {
+  if (STI.has65802()) {
     const int PushPullThreshold = 6;
     if (NumBytes >= PushPullThreshold
         || NumBytes <= -PushPullThreshold) {
@@ -150,6 +121,35 @@ void C65FrameLowering::emitSAdjustment(MachineFunction &MF,
         } else if (NumBytes <= -1) {
           BuildMI(MBB, MBBI, DL, TII.get(C65::PHP));
           NumBytes += 1;
+        }
+      }
+    }
+  } else {
+    const int PushPullThreshold = 7;
+
+    if (NumBytes >= PushPullThreshold
+        || NumBytes <= -PushPullThreshold) {
+      BuildMI(MBB, MBBI, DL, TII.get(C65::TSX8));
+      BuildMI(MBB, MBBI, DL, TII.get(C65::TXA8));
+      if (NumBytes < 0) {
+        BuildMI(MBB, MBBI, DL, TII.get(C65::SEC));
+        BuildMI(MBB, MBBI, DL, TII.get(C65::SBC8imm))
+          .addImm(-NumBytes);
+      } else {
+        BuildMI(MBB, MBBI, DL, TII.get(C65::CLC));
+        BuildMI(MBB, MBBI, DL, TII.get(C65::ADC8imm))
+          .addImm(NumBytes);
+      }
+      BuildMI(MBB, MBBI, DL, TII.get(C65::TAX8));
+      BuildMI(MBB, MBBI, DL, TII.get(C65::TXS8));
+    } else {
+      while (NumBytes != 0) {
+        if (NumBytes >= 1) {
+          BuildMI(MBB, MBBI, DL, TII.get(C65::PLA8));
+          --NumBytes;
+        } else if (NumBytes <= -1) {
+          BuildMI(MBB, MBBI, DL, TII.get(C65::PHA8));
+          ++NumBytes;
         }
       }
     }
@@ -219,19 +219,19 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
 
 void C65FrameLowering::emitEpilogue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {
-  const MachineFrameInfo *MFI = MF.getFrameInfo();
-  C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
-  const C65RegisterInfo *RegInfo =
-    static_cast<const C65RegisterInfo *>(MF.getSubtarget().getRegisterInfo());
-  const TargetInstrInfo &TII = *MF.getSubtarget().getInstrInfo();
+  const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
+  const C65RegisterInfo &RegInfo = *STI.getRegisterInfo();
+  const TargetInstrInfo &TII = *STI.getInstrInfo();
+  const MachineFrameInfo &MFI = *MF.getFrameInfo();
+  C65MachineFunctionInfo &FuncInfo = *MF.getInfo<C65MachineFunctionInfo>();
 
   MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
 
-  int Size = (int)MFI->getStackSize()
-    + (int)FuncInfo->getBytesToPopOnReturn();
-  bool Is16Bit = ST.has65802();
-  unsigned FramePtr = RegInfo->getFrameRegister(MF);
+  int Size = (int)MFI.getStackSize()
+    + (int)FuncInfo.getBytesToPopOnReturn();
+  bool Is16Bit = STI.has65802();
+  unsigned FramePtr = RegInfo.getFrameRegister(MF);
 
   assert((MBBI->getOpcode() == C65::RTS ||
           MBBI->getOpcode() == C65::RTL) &&

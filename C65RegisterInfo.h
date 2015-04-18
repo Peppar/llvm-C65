@@ -26,27 +26,28 @@ class TargetInstrInfo;
 class Type;
 
 struct C65RegisterInfo : public C65GenRegisterInfo {
-public:
   C65Subtarget &Subtarget;
 
 private:
 
   /// StackPtr - Physical register used as stack ptr.
   ///
-  unsigned StackPtr;
+  //  unsigned StackPtr;
 
   /// FramePtr - Physical register used as frame ptr.
   ///
-  unsigned FramePtr;
+  //  unsigned FramePtr;
 
 public:
   C65RegisterInfo(C65Subtarget &st);
 
-  /// Code Generation virtual methods...
+  /// getCalleeSavedRegs - Return a null-terminated list of all of the
+  /// callee-save registers on this target.
   const MCPhysReg *
-  getCalleeSavedRegs(const MachineFunction *MF = nullptr) const override;
+  getCalleeSavedRegs(const MachineFunction *MF) const override;
 
-  const uint32_t *getCallPreservedMask(CallingConv::ID CC) const override;
+  const uint32_t *getCallPreservedMask(const MachineFunction &MF,
+                                       CallingConv::ID) const override;
 
   BitVector getReservedRegs(const MachineFunction &MF) const override;
 
@@ -63,9 +64,8 @@ public:
                            int SPAdj, unsigned FIOperandNum,
                            RegScavenger *RS = nullptr) const override;
 
-  // Debug information queries.
   unsigned getFrameRegister(const MachineFunction &MF) const override;
-  unsigned getStackRegister() const { return StackPtr; }
+  //  unsigned getStackRegister() const { return StackPtr; }
 };
 
 } // end namespace llvm

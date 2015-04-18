@@ -21,18 +21,17 @@ namespace llvm {
 
 class MCOperand;
 
-class C65InstPrinter : public MCInstPrinter {
-  const MCSubtargetInfo &STI;
+class C65InstPrinter final : public MCInstPrinter {
 public:
  C65InstPrinter(const MCAsmInfo &MAI,
                 const MCInstrInfo &MII,
-                const MCRegisterInfo &MRI,
-                const MCSubtargetInfo &sti)
-   : MCInstPrinter(MAI, MII, MRI), STI(sti) {}
+                const MCRegisterInfo &MRI)
+   : MCInstPrinter(MAI, MII, MRI) {}
 
   void printRegName(raw_ostream &OS, unsigned RegNo) const override;
   void printComments(const MCInst *MI, raw_ostream &O);
-  void printInst(const MCInst *MI, raw_ostream &O, StringRef Annot) override;
+  void printInst(const MCInst *MI, raw_ostream &O, StringRef Annot,
+                 const MCSubtargetInfo &STI) override;
   void printOperand(const MCInst *MI, int OpNum, raw_ostream &OS,
                     bool Imm = false);
 

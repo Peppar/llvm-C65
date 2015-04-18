@@ -205,7 +205,7 @@ public:
 
   bool isSymbolPrivate(const MCSymbol &Symb) const {
     assert (symbolExists(Symb));
-    return SymbolInfoMap.lookup(&Symb).Private;
+    return Symb.isTemporary() || SymbolInfoMap.lookup(&Symb).Private;
  // &&
  //       !SymbolInfoMap.lookup(&Symb).External);
   }
@@ -218,10 +218,10 @@ public:
   /// post layout binding. The implementation is responsible for storing
   /// information about the relocation so that it can be emitted during
   /// WriteObject().
-  void RecordRelocation(const MCAssembler &Asm, const MCAsmLayout &Layout,
-                        const MCFragment *Fragment, const MCFixup &Fixup,
-                        MCValue Target, bool &IsPCRel,
-                        uint64_t &FixedValue) override;
+  void RecordRelocation(MCAssembler &Asm, const MCAsmLayout &Layout,
+                        const MCFragment *Fragment,
+                        const MCFixup &Fixup, MCValue Target,
+                        bool &IsPCRel, uint64_t &FixedValue) override;
 
   /// \brief Perform any late binding of symbols (for example, to assign symbol
   /// indices for use when generating relocations).
@@ -258,7 +258,7 @@ void WLAKCalcStackEntry::Write(MCAssembler &Asm,
   Writer.Write8(Type);
   Writer.Write8(Sign);
   if (Type == VALUE || Type == OPERATOR) {
-    uint64_t *X = (uint64_t *)(&Value);
+    const uint64_t *X = (const uint64_t *)(&Value);
     Writer.WriteBE64(*X);
   } else {
     Writer.WriteSymbolName(Asm, *Symbol);
@@ -389,7 +389,7 @@ WLAKObjectWriter::GetFileAndLine(const MCAssembler &Asm,
   return std::make_pair(SourceID, LineNumber);
 }
 
-void WLAKObjectWriter::RecordRelocation(const MCAssembler &Asm,
+void WLAKObjectWriter::RecordRelocation(MCAssembler &Asm,
                                         const MCAsmLayout &Layout,
                                         const MCFragment *Fragment,
                                         const MCFixup &Fixup,
@@ -504,6 +504,9 @@ void WLAKObjectWriter::WriteSymbolName(MCAssembler &Asm,
           OS << *I;
       }
       OS << '~';
+    } else {
+      // With no file name defined, prepend an underscore.
+      OS << '_';
     }
   }
   getStream() << Symbol.getName();

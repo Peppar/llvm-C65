@@ -16,11 +16,13 @@
 #define LLVM_TARGET_C65TARGETMACHINE_H
 
 #include "C65Subtarget.h"
+#include "llvm/IR/DataLayout.h"
 #include "llvm/Target/TargetMachine.h"
 
 namespace llvm {
 
 class C65TargetMachine : public LLVMTargetMachine {
+  std::unique_ptr<TargetLoweringObjectFile> TLOF;
   C65Subtarget Subtarget;
 
 public:
@@ -30,12 +32,13 @@ public:
                    Reloc::Model RM, CodeModel::Model CM,
                    CodeGenOpt::Level OL);
 
-  const C65Subtarget *getSubtargetImpl() const override {
-    return &Subtarget;
-  }
+  const C65Subtarget *getSubtargetImpl(const Function &F) const override;
 
   // Override LLVMTargetMachine
   TargetPassConfig *createPassConfig(PassManagerBase &PM) override;
+  TargetLoweringObjectFile *getObjFileLowering() const override {
+    return TLOF.get();
+  }
 };
 
 } // end namespace llvm

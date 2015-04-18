@@ -4,22 +4,22 @@
 // C65 predicates
 //===----------------------------------------------------------------------===//
 
-def Has65C02  : Predicate<"Subtarget.has65C02()">;
+def Has65C02  : Predicate<"Subtarget->has65C02()">;
 
-def Has65802  : Predicate<"Subtarget.has65802()">;
+def Has65802  : Predicate<"Subtarget->has65802()">;
 
-def Has65816 : Predicate<"Subtarget.has65816()">;
+def Has65816 : Predicate<"Subtarget->has65816()">;
 
-def IsAcc8Bit  : Predicate<"Subtarget.isAcc8Bit()">,
+def IsAcc8Bit  : Predicate<"Subtarget->isAcc8Bit()">,
                  AssemblerPredicate<"ModeAcc8Bit",
                                     "8-bit accumulator mode">;
-def IsAcc16Bit : Predicate<"Subtarget.isAcc16Bit()">,
+def IsAcc16Bit : Predicate<"Subtarget->isAcc16Bit()">,
                  AssemblerPredicate<"ModeAcc16Bit",
                                     "16-bit accumulator mode">;
-def IsIx8Bit   : Predicate<"Subtarget.isIx8Bit()">,
+def IsIx8Bit   : Predicate<"Subtarget->isIx8Bit()">,
                  AssemblerPredicate<"ModeIx8Bit",
                                     "8-bit index mode">;
-def IsIx16Bit  : Predicate<"Subtarget.isIx16Bit()">,
+def IsIx16Bit  : Predicate<"Subtarget->isIx16Bit()">,
                  AssemblerPredicate<"ModeIx16Bit",
                                     "16-bit index mode">;
 
@@ -1483,7 +1483,7 @@ def ZPUSH64 : ZPUSH<ZRC64>, ZROpSize64;
 // "Load effective address"; allowing FrameIndex nodes to be resolved.
 def ZLEA16s : ZRInstr<(outs ZRC16:$reg1), (ins mem_srel:$mem),
                       "zlea16s $reg1,$mem",
-                      [(set ZRC16:$reg1, (i16 addr_s:$mem))]>;
+                      [(set ZRC16:$reg1, addr_s:$mem)]>;
 
 //===----------------------------------------------------------------------===//
 // Non-Instruction Patterns
@@ -1513,9 +1513,15 @@ def : Pat<(i32 (trunc ZRC64:$src)),
 
 //def : Pat<(i16 (anyext ZRC8:$src)), (EXTRACT
 
-// // h-register tricks
-// def : Pat<(i8 (trunc (srl_su ZRC16:$src, (i8 8)))),
-//           (EXTRACT_SUBREG ZRC16:$src, sub_8bit_hi)>;
+// An 'srl' node with a single use.
+def srl_su : PatFrag<(ops node:$lhs, node:$rhs),
+                     (srl node:$lhs, node:$rhs), [{
+  return N->hasOneUse();
+}]>;
+
+// h-register tricks
+def : Pat<(i8 (trunc (srl_su ZRC16:$src, (i8 8)))),
+          (EXTRACT_SUBREG ZRC16:$src, sub_8bit_hi)>;
 
 // def : Pat<(i8 (trunc (srl_su ZRC32:$src, (i8 8)))),
 //           (EXTRACT_SUBREG

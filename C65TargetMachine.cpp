@@ -11,6 +11,8 @@
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Transforms/Scalar.h"
+#include "llvm/CodeGen/TargetLoweringObjectFileImpl.h"
+#include "llvm/Target/TargetLoweringObjectFile.h"
 
 using namespace llvm;
 
@@ -19,14 +21,39 @@ extern "C" void LLVMInitializeC65Target() {
   RegisterTargetMachine<C65TargetMachine> X(The65C816Target);
 }
 
+static const char *DescriptionString6502 =
+  "e-m:e-p:16:8-i16:8-i32:8-i64:8-n8:16:32:64-S8";
+static const char *DescriptionString65816 =
+  "e-m:e-p:16:8-p1:32:8-i16:8-i32:8-i64:8-n8:16:32:64-S8";
+
+static std::string computeDataLayout(StringRef TT, StringRef CPU,
+                                     const TargetOptions &Options) {
+  // TODO: Make the CPU distinctions conform better to the triple
+  // system
+  if (CPU.empty() || CPU == "generic") {
+    CPU = "65816";
+  }
+  if (CPU == "65816" || CPU == "65802")
+    return DescriptionString65816;
+  else
+    return DescriptionString6502;
+}
+
 C65TargetMachine::C65TargetMachine(const Target &T, StringRef TT,
                                    StringRef CPU, StringRef FS,
                                    const TargetOptions &Options,
                                    Reloc::Model RM, CodeModel::Model CM,
                                    CodeGenOpt::Level OL)
-  : LLVMTargetMachine(T, TT, CPU, FS, Options, RM, CM, OL),
+  : LLVMTargetMachine(T, computeDataLayout(TT, CPU, Options), TT, CPU, FS,
+                      Options, RM, CM, OL),
+    TLOF(make_unique<TargetLoweringObjectFileELF>()),
     Subtarget(TT, CPU, FS, *this) {
   initAsmInfo();
+}
+
+const C65Subtarget *
+C65TargetMachine::getSubtargetImpl(const Function &F) const {
+  return &Subtarget;
 }
 
 namespace {
@@ -41,8 +68,8 @@ public:
   }
 
   bool addInstSelector() override;
-  bool addPostRegAlloc() override;
-  bool addPreEmitPass() override;
+  void addPostRegAlloc() override;
+  void addPreEmitPass() override;
 };
 } // end anonymous namespace
 
@@ -51,14 +78,12 @@ bool C65PassConfig::addInstSelector() {
   return false;
 }
 
-bool C65PassConfig::addPostRegAlloc() {
-  return false;
+void C65PassConfig::addPostRegAlloc() {
 }
 
-bool C65PassConfig::addPreEmitPass() {
+void C65PassConfig::addPreEmitPass() {
   addPass(createC65ZInstrExpanderPass());
   addPass(createC65RegSizeInsertPass());
-  return true;
 }
 
 TargetPassConfig *C65TargetMachine::createPassConfig(PassManagerBase &PM) {

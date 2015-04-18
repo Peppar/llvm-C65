@@ -58,21 +58,21 @@ FunctionPass *llvm::createC65RegSizeInsertPass() {
 }
 
 bool RegSizeInsert::insertDefaultSizes(MachineFunction &MF) {
-  const C65Subtarget &ST = MF.getTarget().getSubtarget<C65Subtarget>();
-  const C65InstrInfo *TII = ST.getInstrInfo();
+  const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
+  const C65InstrInfo &TII = *STI.getInstrInfo();
   MachineBasicBlock *MBB = MF.begin();
   DebugLoc DL; // Empty DebugLoc
-  unsigned LONGAOpcode = ST.has65802() ? C65::LONGA_ON : C65::LONGA_OFF;
-  unsigned LONGIOpcode = ST.has65802() ? C65::LONGI_ON : C65::LONGI_OFF;
-  BuildMI(*MBB, MBB->begin(), DL, TII->get(LONGIOpcode));
-  BuildMI(*MBB, MBB->begin(), DL, TII->get(LONGAOpcode));
+  unsigned LONGAOpcode = STI.has65802() ? C65::LONGA_ON : C65::LONGA_OFF;
+  unsigned LONGIOpcode = STI.has65802() ? C65::LONGI_ON : C65::LONGI_OFF;
+  BuildMI(*MBB, MBB->begin(), DL, TII.get(LONGIOpcode));
+  BuildMI(*MBB, MBB->begin(), DL, TII.get(LONGAOpcode));
   return true;
 }
 
 bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
   bool Changed = false;
-  const C65Subtarget &ST = MF.getTarget().getSubtarget<C65Subtarget>();
-  const C65InstrInfo *TII = ST.getInstrInfo();
+  const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
+  const C65InstrInfo &TII = *STI.getInstrInfo();
 
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
     MachineBasicBlock *MBB = I;
@@ -104,11 +104,11 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
 
         DebugLoc DL = MI->getDebugLoc();
         if (ResetBits) {
-          BuildMI(*MBB, MBBI, DL, TII->get(C65::REP))
+          BuildMI(*MBB, MBBI, DL, TII.get(C65::REP))
             .addImm(ResetBits);
         }
         if (SetBits) {
-          BuildMI(*MBB, MBBI, DL, TII->get(C65::SEP))
+          BuildMI(*MBB, MBBI, DL, TII.get(C65::SEP))
             .addImm(SetBits);
         }
         if (AccSize) CurAccSize = AccSize;
@@ -121,7 +121,7 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
       unsigned ResetBits =
         ((CurAccSize != C65II::Acc16Bit) ? 0x20 : 0) |
         ((CurIxSize != C65II::Ix16Bit)  ? 0x10 : 0);
-      BuildMI(MBB, DL, TII->get(C65::REP))
+      BuildMI(MBB, DL, TII.get(C65::REP))
         .addImm(ResetBits);
     }
     for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
@@ -132,11 +132,11 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
         if (MI->getOperand(0).isImm()) {
           unsigned Reset = MI->getOperand(0).getImm();
           if (Reset & 0x20) {
-            BuildMI(*MBB, MBBI, DL, TII->get(C65::LONGA_ON));
+            BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGA_ON));
             Changed = true;
           }
           if (Reset & 0x10) {
-            BuildMI(*MBB, MBBI, DL, TII->get(C65::LONGI_ON));
+            BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGI_ON));
             Changed = true;
           }
         }
@@ -144,11 +144,11 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
         if (MI->getOperand(0).isImm()) {
           unsigned Set = MI->getOperand(0).getImm();
           if (Set & 0x20) {
-            BuildMI(*MBB, MBBI, DL, TII->get(C65::LONGA_OFF));
+            BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGA_OFF));
             Changed = true;
           }
           if (Set & 0x10) {
-            BuildMI(*MBB, MBBI, DL, TII->get(C65::LONGI_OFF));
+            BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGI_OFF));
             Changed = true;
           }
         }

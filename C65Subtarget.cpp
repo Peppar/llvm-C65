@@ -20,25 +20,13 @@ using namespace llvm;
 #define GET_SUBTARGETINFO_CTOR
 #include "C65GenSubtargetInfo.inc"
 
-static const char *DescriptionString6502 =
-  "e-p:16:8-i16:8-i32:8-i64:8-n8:16:32:64-S8";
-static const char *DescriptionString65816 =
-  "e-p:16:8-p1:32:8-i16:8-i32:8-i64:8-n8:16:32:64-S8";
-
 // Pin the vtable to this file.
 void C65Subtarget::anchor() {}
 
-static std::string computeDataLayout(const C65Subtarget &ST) {
-  if (ST.has65816())
-    return DescriptionString65816;
-  else
-    return DescriptionString6502;
-}
-
-C65Subtarget &
+void
 C65Subtarget::initializeSubtargetDependencies(StringRef CPU, StringRef FS) {
   std::string CPUName = CPU;
-  if (CPUName.empty()) {
+  if (CPUName.empty() || CPUName == "generic") {
     CPUName = "65816";
   }
   // Parse features string.
@@ -54,14 +42,14 @@ C65Subtarget::initializeSubtargetDependencies(StringRef CPU, StringRef FS) {
     ToggleFeature(C65::ModeIx8Bit);
   if (InIx16Mode)
     ToggleFeature(C65::ModeIx16Bit);
-
-  return *this;
 }
 
-C65Subtarget::C65Subtarget(const std::string &TT,
-                           const std::string &CPU,
-                           const std::string &FS,
-                           TargetMachine &TM)
+C65Subtarget::C65Subtarget(const std::string &TT, const std::string &CPU,
+                           const std::string &FS, TargetMachine &TM)
   : C65GenSubtargetInfo(TT, CPU, FS),
-    DL(computeDataLayout(initializeSubtargetDependencies(CPU, FS))),
-    InstrInfo(*this), TLInfo(TM), TSInfo(DL), FrameLowering(*this) {}
+    InstrInfo(*this),
+    TLInfo(TM, *this),
+    TSInfo(*TM.getDataLayout()),
+    FrameLowering() {
+  initializeSubtargetDependencies(CPU, FS);
+}

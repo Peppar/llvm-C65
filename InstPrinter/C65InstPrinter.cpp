@@ -75,7 +75,7 @@ void C65InstPrinter::printComments(const MCInst *MI, raw_ostream &OS) {
 }
 
 void C65InstPrinter::printInst(const MCInst *MI, raw_ostream &OS,
-                               StringRef Annot) {
+                               StringRef Annot, const MCSubtargetInfo &STI) {
   if (!printAliasInstr(MI, OS))
     printInstruction(MI, OS);
 

@@ -55,8 +55,8 @@ FunctionPass *llvm::createC65ZInstrExpanderPass() {
 /// Z instructions
 bool ZInstrExpander::runOnMachineFunction(MachineFunction &MF) {
   bool Changed = false;
-  const C65Subtarget &ST = MF.getTarget().getSubtarget<C65Subtarget>();
-  const C65TargetLowering *TL = ST.getTargetLowering();
+  const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
+  const C65TargetLowering &TL = *STI.getTargetLowering();
 
   // Iterate through each instruction in the function, looking for pseudos.
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
@@ -69,7 +69,7 @@ bool ZInstrExpander::runOnMachineFunction(MachineFunction &MF) {
       if (MI->getDesc().TSFlags & C65II::ZRInstr) {
         Changed = true;
         MachineBasicBlock *NewMBB =
-          TL->EmitZInstr(MI, MBB);
+          TL.EmitZInstr(MI, MBB);
         // The expansion may involve new basic blocks.
         if (NewMBB != MBB) {
           MBB = NewMBB;

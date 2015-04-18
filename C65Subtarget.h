@@ -20,7 +20,6 @@
 #include "C65Subtarget.h"
 #include "C65SelectionDAGInfo.h"
 #include "llvm/ADT/Triple.h"
-#include "llvm/IR/DataLayout.h"
 #include "llvm/Target/TargetSubtargetInfo.h"
 #include <string>
 
@@ -41,10 +40,9 @@ protected:
   bool Has65C02;
   bool Has65802;
   bool Has65816;
-  C65Subtarget &initializeSubtargetDependencies(StringRef CPU, StringRef FS);
+  void initializeSubtargetDependencies(StringRef CPU, StringRef FS);
 private:
   Triple TargetTriple;
-  const DataLayout DL;
   C65InstrInfo InstrInfo;
   C65TargetLowering TLInfo;
   C65SelectionDAGInfo TSInfo;
@@ -54,7 +52,7 @@ public:
   C65Subtarget(const std::string &TT, const std::string &CPU,
                const std::string &FS, TargetMachine &TM);
 
-  const TargetFrameLowering *getFrameLowering() const override {
+  const C65FrameLowering *getFrameLowering() const override {
     return &FrameLowering;
   }
   const C65InstrInfo *getInstrInfo() const override {
@@ -65,9 +63,6 @@ public:
   }
   const C65TargetLowering *getTargetLowering() const override {
     return &TLInfo;
-  }
-  const DataLayout *getDataLayout() const override {
-    return &DL;
   }
   const C65SelectionDAGInfo *getSelectionDAGInfo() const override {
     return &TSInfo;

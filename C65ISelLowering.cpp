@@ -39,15 +39,24 @@ using namespace llvm;
 // TargetLowering implementation
 //===----------------------------------------------------------------------===//
 
-C65TargetLowering::C65TargetLowering(TargetMachine &TM)
-    : TargetLowering(TM, new TargetLoweringObjectFileELF()) {
-  Subtarget = &TM.getSubtarget<C65Subtarget>();
+C65TargetLowering::C65TargetLowering(const TargetMachine &TM,
+                                     const C65Subtarget &STI)
+  : TargetLowering(TM), Subtarget(&STI) {
 
   // Zero-page registers
   addRegisterClass(MVT::i8, &C65::ZRC8RegClass);
   addRegisterClass(MVT::i16, &C65::ZRC16RegClass);
   addRegisterClass(MVT::i32, &C65::ZRC32RegClass);
   addRegisterClass(MVT::i64, &C65::ZRC64RegClass);
+
+  computeRegisterProperties(Subtarget->getRegisterInfo());
+
+  // Division and select is very expensive
+  setIntDivIsCheap(false);
+  setSelectIsExpensive(true);
+
+  // Jump is cheap
+  setJumpIsExpensive(false);
 
   // Set up the register classes.
   // addRegisterClass(MVT::i16, &C65::ACC16RegClass);
@@ -59,11 +68,10 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
   // addRegisterClass(MVT::i8, &C65::CCRRegClass);
 
   // Compute derived properties from the register classes
-  computeRegisterProperties();
+  //computeRegisterProperties(Subtarget->getRegisterInfo());
 
   // Copied from SystemZ
-  setSchedulingPreference(Sched::RegPressure);
-
+  //setSchedulingPreference(Sched::RegPressure);
 
   // Handle operations that are handled in a similar way for all types.
   for (unsigned I = MVT::FIRST_INTEGER_VALUETYPE;
@@ -133,12 +141,14 @@ C65TargetLowering::C65TargetLowering(TargetMachine &TM)
 
   // Expand BRCOND into a BR_CC (see above).
   setOperationAction(ISD::BRCOND, MVT::Other, Expand);
-  setOperationAction(ISD::BRIND, MVT::Other, Expand);
-  setOperationAction(ISD::BR_JT, MVT::Other, Expand);
+  setOperationAction(ISD::BRIND,  MVT::Other, Expand);
+  setOperationAction(ISD::BR_JT,  MVT::Other, Expand);
 
-  setLoadExtAction(ISD::EXTLOAD,  MVT::i1,  Promote);
-  setLoadExtAction(ISD::SEXTLOAD, MVT::i1,  Promote);
-  setLoadExtAction(ISD::ZEXTLOAD, MVT::i1,  Promote);
+  for (MVT VT : MVT::integer_valuetypes()) {
+    setLoadExtAction(ISD::EXTLOAD,  VT, MVT::i1, Promote);
+    setLoadExtAction(ISD::SEXTLOAD, VT, MVT::i1, Promote);
+    setLoadExtAction(ISD::ZEXTLOAD, VT, MVT::i1, Promote);
+  }
 
   setOperationAction(ISD::STACKSAVE,      MVT::Other, Expand);
   setOperationAction(ISD::STACKRESTORE,   MVT::Other, Expand);
@@ -2156,8 +2166,8 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   // Add a register mask operand representing the call-preserved
   // registers.
   const TargetRegisterInfo *TRI =
-    getTargetMachine().getSubtargetImpl()->getRegisterInfo();
-  const uint32_t *Mask = TRI->getCallPreservedMask(CallConv);
+    Subtarget->getRegisterInfo();
+  const uint32_t *Mask = TRI->getCallPreservedMask(MF, CallConv);
   assert(Mask && "Missing call preserved mask for calling convention");
   Ops.push_back(DAG.getRegisterMask(Mask));
 
@@ -2262,7 +2272,7 @@ void C65TargetLowering::ReplaceNodeResults(SDNode *N,
                                            SmallVectorImpl<SDValue>& Results,
                                            SelectionDAG &DAG) const {
 
-  DEBUG(errs() << "Legalize operation " << N->getOpcode());
+  //  DEBUG(errs() << "Legalize operation " << N->getOpcode());
 
   switch (N->getOpcode()) {
   default:

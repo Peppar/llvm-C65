@@ -36,16 +36,7 @@ using namespace llvm;
 #include "C65GenRegisterInfo.inc"
 
 C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
-  : C65GenRegisterInfo(C65::PC), Subtarget(ST) {
-
-  if (ST.has65802()) {
-    StackPtr = C65::S;
-    FramePtr = C65::X;
-  } else {
-    StackPtr = C65::SL;
-    FramePtr = C65::XL;
-  }
-}
+  : C65GenRegisterInfo(C65::PC), Subtarget(ST) {};
 
 const MCPhysReg*
 C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
@@ -57,7 +48,8 @@ C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
 }
 
 const uint32_t*
-C65RegisterInfo::getCallPreservedMask(CallingConv::ID CC) const {
+C65RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
+                                      CallingConv::ID CC) const {
   switch (CC) {
   case CallingConv::PreserveAll:
     return CSR_C65_AllRegs_RegMask;
@@ -123,11 +115,11 @@ unsigned
 C65RegisterInfo::getZRAddress(unsigned RegNo) const {
   switch(RegNo) {
   default: {
-    DEBUG(errs() << "Not a zero-page register: " << RegNo
-          << C65::ZR0 << " "
-          << C65::ZR0D << " "
-          << C65::ZR0W << " "
-          << C65::ZR0Q);
+    //DEBUG(errs() << "Not a zero-page register: " << RegNo
+    //      << C65::ZR0 << " "
+    //      << C65::ZR0D << " "
+    //      << C65::ZR0W << " "
+    //      << C65::ZR0Q);
     llvm_unreachable("Not a zero-page register!");
   }
   case C65::ZR0Q:
@@ -228,7 +220,11 @@ C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
 }
 
 unsigned C65RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
-  const TargetFrameLowering *TFI = MF.getSubtarget().getFrameLowering();
-
-  return TFI->hasFP(MF) ? FramePtr : StackPtr;
+  const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
+  const C65FrameLowering &TFI = *STI.getFrameLowering();
+  if (STI.has65802()) {
+    return TFI.hasFP(MF) ? C65::X : C65::S;
+  } else {
+    return TFI.hasFP(MF) ? C65::XL : C65::SL;
+  }
 }

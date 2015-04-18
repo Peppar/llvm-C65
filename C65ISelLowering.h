@@ -51,7 +51,8 @@ namespace llvm {
   class C65TargetLowering : public TargetLowering {
     const C65Subtarget *Subtarget;
   public:
-    C65TargetLowering(TargetMachine &TM);
+    C65TargetLowering(const TargetMachine &TM,
+                      const C65Subtarget &STI);
 
     /// computeKnownBitsForTargetNode - Determine which of the bits specified
     /// in Mask are known to be either zero or one and return them in the

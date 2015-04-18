@@ -13,6 +13,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "C65.h"
+#include "C65AsmPrinter.h"
 #include "C65InstrInfo.h"
 #include "C65TargetMachine.h"
 #include "InstPrinter/C65InstPrinter.h"
@@ -34,41 +35,6 @@
 using namespace llvm;
 
 #define DEBUG_TYPE "c65-asm-printer"
-
-namespace {
-  class C65AsmPrinter : public AsmPrinter {
-  public:
-    explicit C65AsmPrinter(TargetMachine &TM, MCStreamer &Streamer)
-      : AsmPrinter(TM, Streamer) {}
-
-    const char *getPassName() const override {
-      return "C65 Assembly Printer";
-    }
-
-    void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
-
-    MCOperand LowerSymbolOperand(const MachineOperand &MO);
-
-    MCOperand LowerOperand(const MachineOperand &MO);
-
-    void LowerC65MachineInstrToMCInst(const MachineInstr *MI,
-                                      MCInst &OutMI);
-
-    static const char *getRegisterName(unsigned RegNo) {
-      return C65InstPrinter::getRegisterName(RegNo);
-    }
-
-    virtual void EmitInstruction(const MachineInstr *) override;
-
-    bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
-                         unsigned AsmVariant, const char *ExtraCode,
-                         raw_ostream &O) override;
-
-    bool PrintAsmMemoryOperand(const MachineInstr *MI, unsigned OpNo,
-                               unsigned AsmVariant, const char *ExtraCode,
-                               raw_ostream &O) override;
-  };
-} // end of anonymous namespace
 
 MCOperand C65AsmPrinter::LowerSymbolOperand(const MachineOperand &MO) {
   const MCSymbol *Symbol = nullptr;
@@ -188,9 +154,13 @@ void C65AsmPrinter::EmitInstruction(const MachineInstr *MI) {
   }
 }
 
+static const char *getRegisterName(unsigned RegNo) {
+  return C65InstPrinter::getRegisterName(RegNo);
+}
+
 void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
                                  raw_ostream &O) {
-  const DataLayout *DL = TM.getSubtargetImpl()->getDataLayout();
+  const DataLayout *DL = TM.getDataLayout();
   const MachineOperand &MO = MI->getOperand(opNum);
 
   switch (MO.getType()) {
