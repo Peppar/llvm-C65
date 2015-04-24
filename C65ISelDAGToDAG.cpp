@@ -219,13 +219,16 @@ bool C65DAGToDAGISel::SelectAddrRR(SDValue Addr, SDValue &R1,
   } else if (Addr.getOpcode() == ISD::ADD) {
     SDValue N0 = Addr.getOperand(0);
     SDValue N1 = Addr.getOperand(1);
-    if (N0.getOpcode() == ISD::FrameIndex) {
+    ConstantSDNode *CN = nullptr;
+    if (N0.getOpcode() == ISD::FrameIndex &&
+        (CN = dyn_cast<ConstantSDNode>(N1)) &&
+        isUInt<8>(CN->getZExtValue())) {
       // Let stack addressing mode capture this.
     } else if (N1.getOpcode() == ISD::Constant) {
       // Constant offset, let reg16 + imm16 capture this.
     } else {
-      R1 = Addr.getOperand(0);
-      R2 = Addr.getOperand(1);
+      R1 = N0;
+      R2 = N1;
       return true;
     }
   }
