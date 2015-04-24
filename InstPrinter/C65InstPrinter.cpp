@@ -34,44 +34,41 @@ void C65InstPrinter::printRegName(raw_ostream &OS, unsigned RegNo) const {
 }
 
 void C65InstPrinter::printComments(const MCInst *MI, raw_ostream &OS) {
-  if (MI->getNumOperands() == 2) {
-    // MVN, MVP instructions are the only ones with more than one operand
-    // FIXME: $ is not actually recognized as a hex prefix..!
-    OS << '$';
-    OS.write_hex(MI->getOperand(0).getImm());
-    OS << ",$";
-    OS.write_hex(MI->getOperand(1).getImm());
-    OS << '\n';
-  } else if (MI->getNumOperands() == 1) {
-    bool HasComment = false;
-    unsigned Opcode = MI->getOpcode();
-    const MCInstrDesc &Desc = MII.get(Opcode);
-    unsigned AccSize = C65II::getAccSize(Desc.TSFlags);
-    unsigned IxSize = C65II::getIxSize(Desc.TSFlags);
-    if (MI->getOperand(0).isImm()) {
-      OS << "$";
-      OS.write_hex(MI->getOperand(0).getImm());
-      HasComment = true;
-    }
-    if (AccSize || IxSize) {
-      OS << '(';
-      if (AccSize == C65II::Acc8Bit)
-        OS << "Acc:8";
-      else if (AccSize == C65II::Acc16Bit)
-        OS << "Acc:16";
-      if (AccSize && IxSize)
+  bool HasComment = false;
+  unsigned Opcode = MI->getOpcode();
+  const MCInstrDesc &Desc = MII.get(Opcode);
+  unsigned AccSize = C65II::getAccSize(Desc.TSFlags);
+  unsigned IxSize = C65II::getIxSize(Desc.TSFlags);
+  bool FirstImm = true;
+  for (unsigned I = 0; I < MI->getNumOperands(); ++I) {
+    const MCOperandInfo &OpInfo = Desc.OpInfo[I];
+    if (MI->getOperand(I).isImm()) {
+      if (FirstImm)
+        FirstImm = false;
+      else
         OS << ',';
-      if (IxSize == C65II::Ix8Bit)
-        OS << "Ix:8";
-      else if (IxSize == C65II::Ix16Bit)
-        OS << "Ix:16";
-      OS << ')';
+      OS << '$';
+      OS.write_hex(MI->getOperand(I).getImm());
       HasComment = true;
     }
-    if (HasComment)
-      OS << '\n';
-  } else
-    assert(MI->getNumOperands() == 0);
+  }
+  if (AccSize || IxSize) {
+    OS << '(';
+    if (AccSize == C65II::Acc8Bit)
+      OS << "Acc:8";
+    else if (AccSize == C65II::Acc16Bit)
+      OS << "Acc:16";
+    if (AccSize && IxSize)
+      OS << ',';
+    if (IxSize == C65II::Ix8Bit)
+      OS << "Ix:8";
+    else if (IxSize == C65II::Ix16Bit)
+      OS << "Ix:16";
+    OS << ')';
+    HasComment = true;
+  }
+  if (HasComment)
+    OS << '\n';
 }
 
 void C65InstPrinter::printInst(const MCInst *MI, raw_ostream &OS,

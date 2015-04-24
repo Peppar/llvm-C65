@@ -77,7 +77,20 @@ EncodeInstruction(const MCInst &MI, raw_ostream &OS,
   //  assert (MCII.get(MI.getOpcode()).getSize() == 1);
   OS << uint8_t(C65Opcode);
 
-  unsigned NumOps = MI.getNumOperands();
+  unsigned NumOps;
+
+  // JSR/JSL has call arguments as MI arguments; skip these.
+  switch (Opcode) {
+  default:
+    NumOps = MI.getNumOperands();
+    break;
+  case C65::JSRabs:
+  case C65::JSLabsl:
+  case C65::JSRabspreix8:
+  case C65::JSRabspreix16:
+    NumOps = 1;
+    break;
+  }
   for (unsigned I = 0; I < NumOps; ++I) {
     const MCOperand &MO = MI.getOperand(I);
     unsigned Value;
