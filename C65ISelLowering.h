@@ -33,6 +33,7 @@ namespace llvm {
       RET,
       PUSH,
       PULL,
+      FRAME_ADDR,
       Wrapper,
       FarWrapper
     };
@@ -125,6 +126,10 @@ namespace llvm {
     SDValue LowerShift(SDValue Op, SelectionDAG &DAG) const;
 
     SDValue LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const;
+
+    SDValue LowerVASTART(SDValue Op, SelectionDAG &DAG) const;
+
+    SDValue LowerVAARG(SDValue Op, SelectionDAG &DAG) const;
 
     // ConstantPool, JumpTable, GlobalAddress, and ExternalSymbol are
     // lowered as their target countpart wrapped in the

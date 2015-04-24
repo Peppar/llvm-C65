@@ -95,6 +95,8 @@ class Pseudo<dag outs, dag ins, string asmstr, list<dag> pattern>
 
 def SDTC65CMP         : SDTypeProfile<0, 2,  [SDTCisInt<0>,
                                               SDTCisSameAs<0, 1>]>;
+def SDTC65FRAME_ADDR  : SDTypeProfile<1, 1,  [SDTCisPtrTy<0>,
+                                              SDTCisVT<1, i8>]>;
 def SDTC65BR_CC       : SDTypeProfile<0, 4,  [SDTCisVT<0, i32>,
                                               SDTCisSameAs<1, 2>,
                                               SDTCisVT<3, OtherVT>]>;
@@ -110,6 +112,7 @@ def SDTC65Wrapper     : SDTypeProfile<1, 1,  [SDTCisSameAs<0, 1>,
 
 def C65CMP             : SDNode<"C65ISD::CMP", SDTC65CMP,
                                 [SDNPOutGlue]>;
+def C65FRAME_ADDR      : SDNode<"C65ISD::FRAME_ADDR", SDTC65FRAME_ADDR>;
 def C65BR_CC           : SDNode<"C65ISD::BR_CC", SDTC65BR_CC,
                                 [SDNPHasChain, SDNPInGlue]>;
 def C65SELECT_CC       : SDNode<"C65ISD::SELECT_CC", SDTC65SELECT_CC,
@@ -1032,15 +1035,19 @@ let isBranch = 1, isTerminator = 1, isBarrier = 1 in {
 }
 
 let isCall = 1 in {
-  def JSRabs        : FF<0x20, (outs), (ins mem_abs:$addr), "jsr $addr",
+  def JSRabs        : FF<0x20, (outs), (ins mem_abs:$addr, variable_ops),
+                         "jsr $addr",
                          [(C65CALL addr_abs:$addr)]>, OpSize16;
-  def JSLabsl       : FF<0x22, (outs), (ins mem_absl:$addr), "jsl $addr",
+  def JSLabsl       : FF<0x22, (outs), (ins mem_absl:$addr, variable_ops),
+                         "jsl $addr",
                          [(C65CALL addr_absl:$addr)]>, OpSize24,
                         Requires<[Has65816]>;
-  def JSRabspreix8  : FF<0xfc, (outs), (ins mem_abspreix:$addr), "jsr $addr",
+  def JSRabspreix8  : FF<0xfc, (outs), (ins mem_abspreix:$addr, variable_ops),
+                         "jsr $addr",
                          [(C65CALL addr_abs:$addr)]>, Ix8Bit, OpSize16,
                         Requires<[Has65802, IsIx8Bit]>;
-  def JSRabspreix16 : FF<0xfc, (outs), (ins mem_abspreix:$addr), "jsr $addr",
+  def JSRabspreix16 : FF<0xfc, (outs), (ins mem_abspreix:$addr, variable_ops),
+                         "jsr $addr",
                          [(C65CALL addr_abs:$addr)]>, Ix16Bit, OpSize16,
                         Requires<[Has65802, IsIx16Bit]>;
 }
@@ -1523,6 +1530,8 @@ def srl_su : PatFrag<(ops node:$lhs, node:$rhs),
 def : Pat<(i8 (trunc (srl_su ZRC16:$src, (i8 8)))),
           (EXTRACT_SUBREG ZRC16:$src, sub_8bit_hi)>;
 
+def : Pat<(i16 (C65FRAME_ADDR imm:$imm)), (ZLEA16s imm:$imm, 0)>;
+
 // def : Pat<(i8 (trunc (srl_su ZRC32:$src, (i8 8)))),
 //           (EXTRACT_SUBREG
 //             (EXTRACT_SUBREG ZRC32:$src, sub_16bit), sub_8bit_hi)>;
@@ -1553,7 +1562,6 @@ def : Pat<(i32 (C65FarWrapper tjumptable:$dst)), (ZLD32imm tjumptable:$dst)>;
 def : Pat<(i32 (C65FarWrapper tglobaladdr:$dst)), (ZLD32imm tglobaladdr:$dst)>;
 def : Pat<(i32 (C65FarWrapper texternalsym:$dst)), (ZLD32imm texternalsym:$dst)>;
 def : Pat<(i32 (C65FarWrapper tblockaddress:$dst)), (ZLD32imm tblockaddress:$dst)>;
-
 // def : Pat<(i32 (C65Wrapper tconstpool:$dst)), (ZLD32imm tconstpool:$dst)>;
 // def : Pat<(i32 (C65Wrapper tjumptable:$dst)), (ZLD32imm tjumptable:$dst)>;
 // def : Pat<(i32 (C65Wrapper tglobaladdr:$dst)), (ZLD32imm tglobaladdr:$dst)>;

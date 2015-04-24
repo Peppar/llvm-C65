@@ -26,6 +26,9 @@ namespace llvm {
 class C65MachineFunctionInfo : public MachineFunctionInfo {
   virtual void anchor();
 
+  /// VarArgsFrameOffset - Frame offset to start of varargs area.
+  int VarArgsFrameOffset;
+
   /// BytesToPopOnReturn - Number of bytes function pops on return (in
   /// addition to the space used by the return address).
   unsigned BytesToPopOnReturn;
@@ -48,6 +51,9 @@ public:
 
   unsigned getBytesToPopOnReturn() const { return BytesToPopOnReturn; }
   void setBytesToPopOnReturn (unsigned bytes) { BytesToPopOnReturn = bytes; }
+
+  int getVarArgsFrameOffset() const { return VarArgsFrameOffset; }
+  void setVarArgsFrameOffset(int Offset) { VarArgsFrameOffset = Offset; }
 
   int getRAIndex() const { return ReturnAddrIndex; }
   void setRAIndex(int Index) { ReturnAddrIndex = Index; }

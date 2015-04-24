@@ -150,6 +150,12 @@ C65TargetLowering::C65TargetLowering(const TargetMachine &TM,
     setLoadExtAction(ISD::ZEXTLOAD, VT, MVT::i1, Promote);
   }
 
+  setOperationAction(ISD::VASTART,        MVT::Other, Custom);
+  setOperationAction(ISD::VAARG,          MVT::Other, Custom);
+
+  // Use the default implementation.
+  setOperationAction(ISD::VACOPY,         MVT::Other, Expand);
+  setOperationAction(ISD::VAEND,          MVT::Other, Expand);
   setOperationAction(ISD::STACKSAVE,      MVT::Other, Expand);
   setOperationAction(ISD::STACKRESTORE,   MVT::Other, Expand);
 
@@ -213,6 +219,7 @@ const char *C65TargetLowering::getTargetNodeName(unsigned Opcode) const {
   case C65ISD::RET:        return "C65ISD::RET";
   case C65ISD::PUSH:       return "C65ISD::PUSH";
   case C65ISD::PULL:       return "C65ISD::PULL";
+  case C65ISD::FRAME_ADDR: return "C65ISD::FRAME_ADDR";
   case C65ISD::Wrapper:    return "C65ISD::Wrapper";
   case C65ISD::FarWrapper: return "C65ISD::FarWrapper";
   }
@@ -255,6 +262,8 @@ LowerOperation(SDValue Op, SelectionDAG &DAG) const {
   case ISD::BR_CC:          return LowerBR_CC(Op, DAG);
   case ISD::SELECT_CC:      return LowerSELECT_CC(Op, DAG);
   case ISD::FRAMEADDR:      return LowerFRAMEADDR(Op, DAG);
+  case ISD::VASTART:        return LowerVASTART(Op, DAG);
+  case ISD::VAARG:          return LowerVAARG(Op, DAG);
   case ISD::ConstantPool:   return LowerConstantPool(Op, DAG);
   case ISD::GlobalAddress:  return LowerGlobalAddress(Op, DAG);
   case ISD::ExternalSymbol: return LowerExternalSymbol(Op, DAG);
@@ -341,6 +350,49 @@ SDValue C65TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
   } else {
     llvm_unreachable("Unable to expand shift/rotate.");
   }
+}
+
+SDValue
+C65TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
+  MachineFunction &MF = DAG.getMachineFunction();
+  MachineFrameInfo &MFI = *MF.getFrameInfo();
+  C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
+
+  // Need frame address to find the address of VarArgsFrameIndex.
+  //TODO: Find out if this is necessary
+  MFI.setFrameAddressIsTaken(true);
+
+  // vastart just stores the address of the VarArgsFrameIndex slot
+  // into the memory location argument.
+  SDLoc DL(Op);
+  SDValue Offset =
+    DAG.getNode(C65ISD::FRAME_ADDR, DL, MVT::i16,
+                DAG.getIntPtrConstant(FuncInfo->getVarArgsFrameOffset() + 1));
+  const Value *SV = cast<SrcValueSDNode>(Op.getOperand(2))->getValue();
+  return DAG.getStore(Op.getOperand(0), DL, Offset, Op.getOperand(1),
+                      MachinePointerInfo(SV), false, false, 0);
+}
+
+SDValue
+C65TargetLowering::LowerVAARG(SDValue Op, SelectionDAG &DAG) const {
+  SDNode *Node = Op.getNode();
+  EVT VT = Node->getValueType(0);
+  SDValue InChain = Node->getOperand(0);
+  SDValue VAListPtr = Node->getOperand(1);
+  EVT PtrVT = VAListPtr.getValueType();
+  const Value *SV = cast<SrcValueSDNode>(Node->getOperand(2))->getValue();
+  SDLoc DL(Node);
+  SDValue VAList = DAG.getLoad(PtrVT, DL, InChain, VAListPtr,
+                               MachinePointerInfo(SV), false, false, false, 0);
+  // Increment the pointer, VAList, to the next vaarg.
+  SDValue NextPtr = DAG.getNode(ISD::ADD, DL, PtrVT, VAList,
+                                DAG.getIntPtrConstant(VT.getSizeInBits()/8));
+  // Store the incremented VAList to the legalized pointer.
+  InChain = DAG.getStore(VAList.getValue(1), DL, NextPtr,
+                         VAListPtr, MachinePointerInfo(SV), false, false, 0);
+  // Load the actual argument out of the pointer VAList.
+  return DAG.getLoad(VT, DL, InChain, VAList, MachinePointerInfo(),
+                     false, false, false, 1);
 }
 
 SDValue
@@ -1087,14 +1139,28 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
     MI->eraseFromParent();
     return MBB;
   } else if (Signed) {
+    // thisMBB:
+    //   bmi sextMBB
+    // zextMBB:
+    //   stz %zr+N
+    //   stz %zr+N+2
+    //   ...
+    //   bra/jmp sinkMBB
+    // sextMBB:
+    //   lda #$FFFF
+    //   sta %zr+N
+    //   sta %zr+N+2
+    // sinkMBB:
     MachineFunction *MF = MBB->getParent();
     const BasicBlock *BB = MBB->getBasicBlock();
     MachineFunction::iterator MFI = MBB;
     ++MFI;
 
     MachineBasicBlock *thisMBB = MBB;
+    MachineBasicBlock *zextMBB = MF->CreateMachineBasicBlock(BB);
     MachineBasicBlock *sextMBB = MF->CreateMachineBasicBlock(BB);
     MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
+    MF->insert(MFI, zextMBB);
     MF->insert(MFI, sextMBB);
     MF->insert(MFI, sinkMBB);
 
@@ -1109,10 +1175,10 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
 
     // Extend with zeroes and then jump to sinkMBB
     for (unsigned I = ExtendBegin; I < NumBytes; I += AccSize) {
-      BuildMI(thisMBB, DL, TII->get(STZInstr))
+      BuildMI(zextMBB, DL, TII->get(STZInstr))
         .addImm(RI->getZRAddress(Dest->getReg()) + I);
     }
-    BuildMI(thisMBB, DL, TII->get(Subtarget->has65C02() ?
+    BuildMI(zextMBB, DL, TII->get(Subtarget->has65C02() ?
                                   C65::BRA : C65::JMPabs))
       .addMBB(sinkMBB);
 
@@ -1125,6 +1191,8 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
     }
 
     thisMBB->addSuccessor(sextMBB);
+    thisMBB->addSuccessor(zextMBB);
+    zextMBB->addSuccessor(sinkMBB);
     sextMBB->addSuccessor(sinkMBB);
 
     MI->eraseFromParent();
@@ -1278,14 +1346,28 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
     MI->eraseFromParent();
     return MBB;
   } else if (Signed) {
+    // thisMBB:
+    //   bmi sextMBB
+    // zextMBB:
+    //   stz %zr+N
+    //   stz %zr+N+2
+    //   ...
+    //   bra/jmp sinkMBB
+    // sextMBB:
+    //   lda #$FFFF
+    //   sta %zr+N
+    //   sta %zr+N+2
+    // sinkMBB:
     MachineFunction *MF = MBB->getParent();
     const BasicBlock *BB = MBB->getBasicBlock();
     MachineFunction::iterator MFI = MBB;
     ++MFI;
 
     MachineBasicBlock *thisMBB = MBB;
+    MachineBasicBlock *zextMBB = MF->CreateMachineBasicBlock(BB);
     MachineBasicBlock *sextMBB = MF->CreateMachineBasicBlock(BB);
     MachineBasicBlock *sinkMBB = MF->CreateMachineBasicBlock(BB);
+    MF->insert(MFI, zextMBB);
     MF->insert(MFI, sextMBB);
     MF->insert(MFI, sinkMBB);
 
@@ -1300,10 +1382,10 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
 
     // Extend with zeroes and then jump to sinkMBB
     for (unsigned I = ExtendBegin; I < NumBytes; I += AccSize) {
-      BuildMI(thisMBB, DL, TII->get(STZInstr))
+      BuildMI(zextMBB, DL, TII->get(STZInstr))
         .addImm(RI->getZRAddress(Dest->getReg()) + I);
     }
-    BuildMI(thisMBB, DL, TII->get(Subtarget->has65C02() ?
+    BuildMI(zextMBB, DL, TII->get(Subtarget->has65C02() ?
                                   C65::BRA : C65::JMPabs))
       .addMBB(sinkMBB);
 
@@ -1316,6 +1398,8 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
     }
 
     thisMBB->addSuccessor(sextMBB);
+    thisMBB->addSuccessor(zextMBB);
+    zextMBB->addSuccessor(sinkMBB);
     sextMBB->addSuccessor(sinkMBB);
 
     MI->eraseFromParent();
@@ -1937,7 +2021,6 @@ C65TargetLowering::LowerReturn(SDValue Chain,
                                const SmallVectorImpl<ISD::OutputArg> &Outs,
                                const SmallVectorImpl<SDValue> &OutVals,
                                SDLoc DL, SelectionDAG &DAG) const {
-
   SmallVector<CCValAssign, 16> RVLocs;
   SmallVector<SDValue, 4> RetOps(1, Chain);
   SDValue Glue;
@@ -1948,7 +2031,6 @@ C65TargetLowering::LowerReturn(SDValue Chain,
   // Analyze return values.
   CCInfo.AnalyzeReturn(Outs, RetCC_C65);
 
-  assert(!IsVarArg && "Var args not supported.");
   for (unsigned I = 0, E = RVLocs.size(); I != E; ++I) {
     CCValAssign &VA = RVLocs[I];
     SDValue RetValue = OutVals[I];
@@ -2046,7 +2128,8 @@ LowerFormalArguments(SDValue Chain,
     InVals.push_back(ArgValue);
   }
 
-  // FuncInfo->setBytesToPopOnReturn(CCInfo.getNextStackOffset());
+  if (IsVarArg)
+    FuncInfo->setVarArgsFrameOffset(CCInfo.getNextStackOffset());
 
   return Chain;
 }
@@ -2076,8 +2159,6 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   MachineFrameInfo *MFI = MF.getFrameInfo();
   MachineRegisterInfo &MRI = MF.getRegInfo();
   EVT PtrVT = getPointerTy();
-
-  assert(!IsVarArg && "Var args not supported.");
 
   // Analyze the operands of the call, assigning locations to each
   // operand.

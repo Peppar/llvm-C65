@@ -1,6 +1,27 @@
 //===-- C65CallingConv.td - Calling Conventions for C65 --*- tablegen -*-===//
 
+/// Taken from MipsCallingConv.td
+///
+/// Match if this specific argument is a vararg.  This is slightly
+/// different fro CCIfIsVarArg which matches if any argument is a
+/// vararg.
+//class CCIfArgIsVarArg<CCAction A>
+//    : CCIf<"!static_cast<MipsCCState *>(&State)->IsCallOperandFixed(ValNo)", A>;
+
+def CC_C65_Stack : CallingConv<[
+  // Stack arguments are not aligned.
+  CCIfType<[i8],  CCAssignToStack<1, 1>>,
+  CCIfType<[i16], CCAssignToStack<2, 1>>,
+  CCIfType<[i32], CCAssignToStack<4, 1>>,
+  CCIfType<[i64], CCAssignToStack<8, 1>>
+]>;
+
 def CC_C65 : CallingConv<[
+  // TODO:Assign all vararg arguments to the stack.  Currently all
+  // arguments are passed to the stack if the function is variadic.
+  CCIfVarArg<CCDelegateTo<CC_C65_Stack>>,
+
+  // Non-vararg arguments go on zero registers by default.
   CCIfType<[i8],  CCAssignToReg<[ZR0, ZR1, ZR2, ZR3,
                                  ZR4, ZR5, ZR6, ZR7,
                                  ZR8, ZR9, ZR10, ZR11,
@@ -11,13 +32,8 @@ def CC_C65 : CallingConv<[
   CCIfType<[i64], CCAssignToReg<[ZR0Q, ZR8Q]>>,
 
   // Assign to stack if we run out of zero page registers.
-  // Set align to 1 (Do not align)
-  CCIfType<[i8],  CCAssignToStack<1, 1>>,
-  CCIfType<[i16], CCAssignToStack<2, 1>>,
-  CCIfType<[i32], CCAssignToStack<4, 1>>,
-  CCIfType<[i64], CCAssignToStack<8, 1>>
+  CCDelegateTo<CC_C65_Stack>
 ]>;
-
 
 def RetCC_C65 : CallingConv<[
   CCIfType<[i8],  CCAssignToReg<[ZR0, ZR1, ZR2, ZR3,
