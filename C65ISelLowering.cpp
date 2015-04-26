@@ -203,6 +203,11 @@ C65TargetLowering::C65TargetLowering(const TargetMachine &TM,
   setLibcallName(RTLIB::UDIVREM_I32, "c65_udivrem32");
   setLibcallName(RTLIB::UDIVREM_I64, "c65_udivrem64");
 
+  // Set all libcalls to preserve all registers.
+  for (unsigned I = 0; I < RTLIB::UNKNOWN_LIBCALL; ++I) {
+    setLibcallCallingConv((RTLIB::Libcall)I, CallingConv::PreserveAll);
+  }
+
   setStackPointerRegisterToSaveRestore(C65::S);
 }
 
