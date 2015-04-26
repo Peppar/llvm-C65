@@ -252,6 +252,11 @@ bool C65DAGToDAGISel::SelectAddrRIF(SDValue Addr, SDValue &Base,
         Base = N0;
         Offset = CurDAG->getTargetConstant(Val, MVT::i16);
         return true;
+      } else {
+        // Constant is 32-bit
+        Base = Addr;
+        Offset = CurDAG->getTargetConstant(0, MVT::i16);
+        return true;
       }
     } else if (N0.getOpcode() != ISD::ZERO_EXTEND &&
                N0.getOpcode() != ISD::SIGN_EXTEND &&
