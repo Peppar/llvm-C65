@@ -33,12 +33,14 @@ namespace C65II {
     // Accumulator register size.
     AccSize = (3 << 0),
     AccSizeShift = 0,
+    AccUnknown = 1, // Used in C65RegSizeInsert to mark unknown size.
     Acc8Bit = 2,
     Acc16Bit = 3,
 
     // Index register size.
     IxSize = (3 << 2),
     IxSizeShift = 2,
+    IxUnknown = 1, // Used in C65RegSizeInsert to mark unknown size.
     Ix8Bit = 2,
     Ix16Bit = 3,
 

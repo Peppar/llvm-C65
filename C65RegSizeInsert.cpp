@@ -19,9 +19,6 @@
 #include "C65InstrInfo.h"
 #include "C65Subtarget.h"
 #include "MCTargetDesc/C65BaseInfo.h"
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallSet.h"
-#include "llvm/ADT/SmallVector.h"
 #include "llvm/CodeGen/MachineFunctionPass.h"
 #include "llvm/CodeGen/MachineInstrBuilder.h"
 #include "llvm/CodeGen/MachineRegisterInfo.h"
@@ -29,6 +26,9 @@
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
 #include "llvm/Target/TargetInstrInfo.h"
+#include <list>
+#include <map>
+#include <set>
 using namespace llvm;
 
 #define DEBUG_TYPE "c65-reg-size-insert"
@@ -41,7 +41,7 @@ namespace {
 
     RegSizeInsert() : MachineFunctionPass(ID) {}
     const char *getPassName() const override {
-      return "C65 Z instruction expander";
+      return "C65 Register size insert";
     }
 
   private:
@@ -70,33 +70,45 @@ static bool insertDefaultSizes(MachineFunction &MF) {
   return true;
 }
 
-// TODO: Convert outgoing branch dict-list {MBB_Source: [(MBB_Target,
-// Status)]} to incoming branch dict-list {MBB_Target: [(MBB_Source,
-// Status)]} Then eliminate incoming nodes with null status (0) by
-// replacing these with the incoming nodes of the source MBB.
-// However, the source MBB must first have any null-autoreferences
-// removed.  This indicates a loop and will otherwise hang the
-// algorithm.
-//
-
-// TODO: Test this.
+// This structure represents either an outgoing branch or an incoming
+// branch, with the CPU having the specified status when branching. A
+// status of 0 signifies a null branch.
 struct Branch {
   MachineBasicBlock *MBB;
   unsigned Status;
 };
-
-static bool operator==(const Branch& LHS, const Branch& RHS) {
-  return LHS.MBB == RHS.MBB && LHS.Status == RHS.Status;
+static bool operator<(const Branch& LHS, const Branch& RHS) {
+  std::less<MachineBasicBlock *> orderMBBPtr;
+  if (LHS.MBB == RHS.MBB)
+    return LHS.Status < RHS.Status;
+  else
+    return orderMBBPtr(LHS.MBB, RHS.MBB);
 }
 
-typedef SmallVector<Branch, 4> BranchVector;
-typedef DenseMap<MachineBasicBlock *, BranchVector> BranchMap;
-typedef SmallSet<MachineBasicBlock *, 32> MBBSet;
-typedef DenseMap<MachineBasicBlock *,
+typedef std::set<Branch> BranchSet;
+typedef std::map<MachineBasicBlock *, BranchSet> BranchMap;
+typedef std::set<MachineBasicBlock *> MBBSet;
+typedef std::map<MachineBasicBlock *,
                  std::pair<unsigned, unsigned> > StatusMap;
 
+#if !defined(NDEBUG)
+std::string getMBBName(MachineBasicBlock *MBB) {
+  return MBB ? ("BB" + Twine(MBB->getNumber())).str() : "(call)";
+}
+static void dumpBranches(BranchSet &Branches) {
+  bool First = true;
+  for (auto I = Branches.begin(); I != Branches.end(); ++I) {
+    if (First)
+      First = false;
+    else
+      dbgs() << ',';
+    dbgs() << getMBBName(I->MBB) << ':' << I->Status;
+  }
+}
+#endif
+
 static unsigned
-resolveStatusBit(SmallVectorImpl<Branch> &IncomingBr) {
+resolveStatusBit(BranchSet &IncomingBr) {
   auto I = IncomingBr.begin();
   if (I == IncomingBr.end())
     return 0;
@@ -108,62 +120,40 @@ resolveStatusBit(SmallVectorImpl<Branch> &IncomingBr) {
   return Status;
 }
 
-// static void
-// nullMBBRemoveAutoreferences(MachineBasicBlock BranchVector &NullMBBBranches) {
-//   BranchVector &NullMBBBranches = IncomingBr[NullMBB];
-//   NullMBBBranches.erase(NullBranch);
-// }
-
 static void
-removeNullBranches(BranchMap &IncomingBr, MBBSet &NullBr) {
+eliminateNullBranches(BranchMap &IncomingBr, MBBSet &NullBr) {
   for (auto I = NullBr.begin(), E = NullBr.end(); I != E; ++I) {
     MachineBasicBlock *NullMBB = *I;
     Branch NullBranch = { NullMBB, 0 };
-    BranchVector &NullMBBBranches = IncomingBr[NullMBB];
-    std::remove(NullMBBBranches.begin(), NullMBBBranches.end(), NullBranch);
-    // {
-    //   auto N = std::find(NullMBBBranches.begin(), NullMBBBranches.end(),
-    //                      NullBranch);
-    //   if (N != NullMBBBranches.end())
-    //     NullMBBBranches.erase(N);
-    // }
-    // NullMBBBranches.erase(NullBranch);
+    BranchSet &NullMBBBranches = IncomingBr[NullMBB];
+    // Remove null self-references.
+    NullMBBBranches.erase(NullBranch);
     for (auto J = IncomingBr.begin(), F = IncomingBr.end();
          J != F; ++J) {
-      //      MachineBasicBlock *InMBB = J->first;
-      SmallVectorImpl<Branch> &InBranches = J->second;
-      auto N = std::find(InBranches.begin(), InBranches.end(), NullBranch);
-      if (N != InBranches.end()) {
-        InBranches.erase(N);
-        InBranches.append(NullMBBBranches.begin(), NullMBBBranches.end());
-      }
+      BranchSet &InBranches = J->second;
+      if (InBranches.erase(NullBranch))
+        InBranches.insert(NullMBBBranches.begin(), NullMBBBranches.end());
+      assert(!InBranches.count(NullBranch));
     }
   }
-}
-
-static void
-insertBranchInversion(MachineBasicBlock *MBB,
-                      SmallVectorImpl<Branch> &OutBr,
-                      BranchMap &InBr,
-                      MBBSet &NullBr) {
-  for (auto I = OutBr.begin(), E = OutBr.end(); I != E; ++I) {
-    if (!InBr.count(I->MBB))
-      InBr[I->MBB] = BranchVector();
-    InBr[I->MBB].push_back({ MBB, I->Status });
-    if (!I->Status)
-      NullBr.insert(MBB);
+#if !defined(NDEBUG)
+  // Make sure that all null branches were eliminated.
+  for (auto I = IncomingBr.begin(), E = IncomingBr.end(); I != E; ++I) {
+    BranchSet &InBranches = I->second;
+    for (auto J = InBranches.begin(), F = InBranches.end(); J != F; ++J)
+      assert (J->Status);
   }
+#endif
 }
 
 static void
 getOutBranches(MachineBasicBlock *MBB,
-               SmallVectorImpl<Branch> &IxBr,
-               SmallVectorImpl<Branch> &AccBr) {
-  //  const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
-  //  const C65InstrInfo &TII = *STI.getInstrInfo();
-
+               BranchSet &IxBr,
+               BranchSet &AccBr,
+               StatusMap &FallthroughStatus) {
   unsigned AccSize = 0;
   unsigned IxSize = 0;
+  bool HasExited = false;
 
   for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
        MBBI != MBBE; ++MBBI) {
@@ -173,7 +163,7 @@ getOutBranches(MachineBasicBlock *MBB,
 
     // Derive the processor status at the end of this instruction.
     if (MI->getDesc().isCall()) {
-      // For now, JSR/JSL must branch with 16/16.
+      // For now, JSR/JSL branches and returns with 16/16.
       // This would have to change to enable use of JSRabspreix8.
       assert(C65II::getAccSize(MI->getDesc().TSFlags) != C65II::Acc8Bit
              && C65II::getIxSize(MI->getDesc().TSFlags) != C65II::Ix8Bit);
@@ -204,8 +194,9 @@ getOutBranches(MachineBasicBlock *MBB,
       break;
     case C65::RTS:
     case C65::RTI:
-      // No instructions are executed after these instructions.
-      return;
+      // No instructions are executed after returns.
+      HasExited = true;
+      break;
     case C65::BRA:
     case C65::BRL:
     case C65::JMPabs:
@@ -214,11 +205,14 @@ getOutBranches(MachineBasicBlock *MBB,
     case C65::JMPabspreix16:
     case C65::JMLabsindl:
     case C65::JMLabsl:
-      AccBr.push_back({ MI->getOperand(0).getMBB(), AccSize });
-      IxBr.push_back({ MI->getOperand(0).getMBB(), IxSize });
-      // No instructions are accounted for after an unconditional
-      // jump.
-      return;
+      if (!HasExited) {
+        AccBr.insert({ MI->getOperand(0).getMBB(), AccSize });
+        IxBr.insert({ MI->getOperand(0).getMBB(), IxSize });
+        // No instructions are accounted for after an unconditional
+        // jump.
+        HasExited = true;
+      }
+      break;
     case C65::BPL:
     case C65::BMI:
     case C65::BVC:
@@ -227,48 +221,150 @@ getOutBranches(MachineBasicBlock *MBB,
     case C65::BCS:
     case C65::BNE:
     case C65::BEQ:
-      AccBr.push_back({ MI->getOperand(0).getMBB(), AccSize });
-      IxBr.push_back({ MI->getOperand(0).getMBB(), IxSize });
+      if (!HasExited) {
+        AccBr.insert({ MI->getOperand(0).getMBB(), AccSize });
+        IxBr.insert({ MI->getOperand(0).getMBB(), IxSize });
+      }
       break;
     }
   }
 
-  // Fall-through to the next MBB.
   MachineBasicBlock *NMBB = std::next(MachineFunction::iterator(MBB));
-  AccBr.push_back({ NMBB, AccSize });
-  IxBr.push_back({ NMBB, IxSize });
+  if (!HasExited) {
+    // Fall-through to the next MBB.
+    AccBr.insert({ NMBB, AccSize });
+    IxBr.insert({ NMBB, IxSize });
+  }
+  FallthroughStatus[NMBB] = std::make_pair(IxSize, AccSize);
 }
 
-// For each MBB, this function derives the accumulator and index word
-// size status bits; if they can be assumed to have a certain value or
-// if their values differ depending on the incoming code path.
+// Convert outgoing branches to incoming branches, and mark MBB's with
+// outgoing null branches as the same time.
 static void
-computeInStatus(MachineFunction &MF, StatusMap &InStatus) {
-  //  const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
-  //  const C65InstrInfo &TII = *STI.getInstrInfo();
+insertBranchInversion(MachineBasicBlock *MBB,
+                      BranchSet &OutBr,
+                      BranchMap &InBr,
+                      MBBSet &NullBr) {
+  for (auto I = OutBr.begin(), E = OutBr.end(); I != E; ++I) {
+    if (!InBr.count(I->MBB))
+      InBr[I->MBB] = BranchSet();
+    InBr[I->MBB].insert({ MBB, I->Status });
+    if (!I->Status)
+      NullBr.insert(MBB);
+  }
+}
 
+// When the fallthrough statuses are 0, we need to fill it out with
+// the statuses of its predecessors.
+static void
+fillFallthroughStatus(MachineFunction &MF, StatusMap &FallthroughStatus) {
+  unsigned CurStatusIx = C65II::Ix16Bit;
+  unsigned CurStatusAcc = C65II::Acc16Bit;
+  for (auto I = MF.begin(), E = MF.end(); I != E; ++I) {
+    MachineBasicBlock *MBB = I;
+    if (FallthroughStatus.count(MBB)) {
+      unsigned StatusIx = FallthroughStatus[MBB].first;
+      unsigned StatusAcc = FallthroughStatus[MBB].second;
+      if (StatusIx)
+        CurStatusIx = StatusIx;
+      if (StatusAcc)
+        CurStatusAcc = StatusAcc;
+    }
+    FallthroughStatus[MBB] =
+      std::make_pair(CurStatusIx, CurStatusAcc);
+  }
+}
+
+// This function derives three things from any given MachineFunction:
+//
+// InBrIx/InBrAcc
+//   For each MBB: all known incoming code paths with their respective
+//   machine word sizes for index and accumulator.
+//
+// FallthroughStatus
+//   For each MBB: machine word size at the end of the predecessor MBB.
+//
+// NullBrIx/NullBrAcc
+//   The list of MBBs that has outgoing null branches
+//   for index and accumulator.
+static void
+getInBranches(MachineFunction &MF,
+              BranchMap &InBrIx, BranchMap &InBrAcc,
+              MBBSet &NullBrIx, MBBSet &NullBrAcc,
+              StatusMap &FallthroughStatus) {
+  // Derive incoming branches for all MBB's.
+  for (auto I = MF.begin(), E = MF.end(); I != E; ++I) {
+    MachineBasicBlock *MBB = I;
+    BranchSet OutBrIx;
+    BranchSet OutBrAcc;
+    getOutBranches(MBB, OutBrIx, OutBrAcc, FallthroughStatus);
+
+    DEBUG(dbgs() << getMBBName(MBB) << "(Ix)->";
+          dumpBranches(OutBrIx);
+          dbgs() << '\n');
+    DEBUG(dbgs() << getMBBName(MBB) << "(Acc)->";
+          dumpBranches(OutBrAcc);
+          dbgs() << '\n');
+
+    insertBranchInversion(MBB, OutBrIx, InBrIx, NullBrIx);
+    insertBranchInversion(MBB, OutBrAcc, InBrAcc, NullBrAcc);
+  }
+  // The first MBB in the MachineFunction is assumed to enter with
+  // 16/16 Ix/Acc.
+  InBrIx[MF.begin()].insert({ nullptr, C65II::Ix16Bit });
+  InBrAcc[MF.begin()].insert({ nullptr, C65II::Acc16Bit });
+  fillFallthroughStatus(MF, FallthroughStatus);
+}
+
+// This function derives two things from any given MachineFunction:
+//
+// InStatus
+//   For each MBB: the known index/accumulator register sizes at the
+//   entry of the MBB. A status of 0 means that the specified register
+//   size cannot be determined for some reason, and must be assumed to
+//   be undefined.
+//
+// FallthroughStatus
+//   For each MBB: machine word size at the end of the predecessor MBB.
+static void
+computeInStatus(MachineFunction &MF, StatusMap &InStatus,
+                StatusMap &FallthroughStatus) {
   BranchMap InBrIx;
   BranchMap InBrAcc;
   MBBSet NullBrIx;
   MBBSet NullBrAcc;
 
-  // Derive incoming branches for all MBB's.
-  for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
-    MachineBasicBlock *MBB = I;
-    SmallVector<Branch, 4> OutBrIx;
-    SmallVector<Branch, 4> OutBrAcc;
-    getOutBranches(MBB, OutBrIx, OutBrAcc);
-    insertBranchInversion(MBB, OutBrIx, InBrIx, NullBrIx);
-    insertBranchInversion(MBB, OutBrAcc, InBrAcc, NullBrAcc);
-  }
+  DEBUG(dbgs() << "=== RegSizeInsert computeInStatus for "
+        << MF.getName() << " ===\n");
 
-  // Functions are assumed to begin with 16/16 Ix/Acc
-  InBrIx[MF.begin()].push_back({ nullptr, C65II::Ix16Bit });
-  InBrAcc[MF.begin()].push_back({ nullptr, C65II::Acc16Bit });
+  getInBranches(MF, InBrIx, InBrAcc, NullBrIx, NullBrAcc,
+                FallthroughStatus);
 
-  // Remove all null branches.
-  removeNullBranches(InBrIx, NullBrIx);
-  removeNullBranches(InBrAcc, NullBrAcc);
+  DEBUG(dbgs() << "Incoming branches:\n");
+  DEBUG(for (auto I = MF.begin(); I != MF.end(); ++I) {
+      MachineBasicBlock *MBB = I;
+      dbgs() << getMBBName(MBB) << "(Ix)<-";
+      dumpBranches(InBrIx[MBB]);
+      dbgs() << '\n';
+      dbgs() << getMBBName(MBB) << "(Acc)<-";
+      dumpBranches(InBrAcc[MBB]);
+      dbgs() << '\n';
+    });
+
+  // Eliminate all null branches.
+  eliminateNullBranches(InBrIx, NullBrIx);
+  eliminateNullBranches(InBrAcc, NullBrAcc);
+
+  DEBUG(dbgs() << "Incoming branches after null elimination:\n");
+  DEBUG(for (auto I = MF.begin(); I != MF.end(); ++I) {
+      MachineBasicBlock *MBB = I;
+      dbgs() << getMBBName(MBB) << "(Ix)<-";
+      dumpBranches(InBrIx[MBB]);
+      dbgs() << '\n';
+      dbgs() << getMBBName(MBB) << "(Acc)<-";
+      dumpBranches(InBrAcc[MBB]);
+      dbgs() << '\n';
+    });
 
   // Calculte the status bits.
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
@@ -277,6 +373,15 @@ computeInStatus(MachineFunction &MF, StatusMap &InStatus) {
     unsigned AccStatus = resolveStatusBit(InBrAcc[MBB]);
     InStatus[MBB] = { IxStatus, AccStatus };
   }
+
+  DEBUG(dbgs() << "Status resolution:\n");
+  DEBUG(for (auto I = MF.begin(); I != MF.end(); ++I) {
+      MachineBasicBlock *MBB = I;
+      dbgs() << getMBBName(MBB) << " Ix:"
+             << InStatus[MBB].first << '\n';
+      dbgs() << getMBBName(MBB) << " Acc:"
+             << InStatus[MBB].second << '\n';
+    });
 }
 
 bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
@@ -284,19 +389,24 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
   const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
   const C65InstrInfo &TII = *STI.getInstrInfo();
   StatusMap InStatus;
+  StatusMap FallthroughStatus;
 
-  computeInStatus(MF, InStatus);
+  computeInStatus(MF, InStatus, FallthroughStatus);
 
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
     MachineBasicBlock *MBB = I;
-    unsigned CurIxSize = InStatus[MBB].first;
-    unsigned CurAccSize = InStatus[MBB].second;
-    for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
-         MBBI != MBBE; ++MBBI) {
+    unsigned InIxSize = InStatus[MBB].first;
+    unsigned InAccSize = InStatus[MBB].second;
+    unsigned CurIxSize = InIxSize;
+    unsigned CurAccSize = InAccSize;
+
+    // First pass: Insert REP/SEP when the machine word size changes.
+    for (auto MBBI = MBB->begin(), MBBE = MBB->end(); MBBI != MBBE; ++MBBI) {
       MachineInstr *MI = MBBI;
       unsigned AccSize = 0;
       unsigned IxSize = 0;
 
+      // Account for already existing REP/SEP instructions.
       if (MI->getOpcode() == C65::REP) {
         // Explicit status bit reset
         unsigned Reset = MI->getOperand(0).getImm();
@@ -311,7 +421,7 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
         continue;
       }
 
-      // Derive the processor status at the end of this instruction.
+      // Derive the machine word sizes at the end of this instruction.
       if (MI->getDesc().isCall() || MI->getDesc().isReturn()) {
         AccSize = C65II::Acc16Bit;
         IxSize = C65II::Ix16Bit;
@@ -320,6 +430,8 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
         IxSize = C65II::getIxSize(MI->getDesc().TSFlags);
       }
 
+      // Insert REP/SEP when the expected machine word sizes does not
+      // match that of incoming code paths.
       if ((AccSize && AccSize != CurAccSize) ||
           (IxSize && IxSize != CurIxSize)) {
         unsigned ResetBits =
@@ -344,20 +456,42 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
       }
     }
 
-    // Second pass: insert LONGA/LONGI _ ON/OFF declarations.
-    for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
-         MBBI != MBBE; ) {
-      MachineInstr *MI = MBBI++;
+    // Second pass: insert LONGA/LONGI declarations.
+
+    // If the status as seen by an assembler differs to the status
+    // from incoming branches then we need to insert LONGI/LONGA to
+    // make sure that the code can be assembled correctly.
+    if (InIxSize != FallthroughStatus[MBB].first) {
+      if (InIxSize == C65II::Ix8Bit) {
+        BuildMI(*MBB, MBB->begin(), DebugLoc(), TII.get(C65::LONGI_OFF));
+        Changed = true;
+      } else if (InIxSize == C65II::Ix16Bit) {
+        BuildMI(*MBB, MBB->begin(), DebugLoc(), TII.get(C65::LONGI_ON));
+        Changed = true;
+      }
+    }
+    if (InAccSize != FallthroughStatus[MBB].second) {
+      if (InAccSize == C65II::Acc8Bit) {
+        BuildMI(*MBB, MBB->begin(), DebugLoc(), TII.get(C65::LONGA_OFF));
+        Changed = true;
+      } else if (InAccSize == C65II::Acc16Bit) {
+        BuildMI(*MBB, MBB->begin(), DebugLoc(), TII.get(C65::LONGA_ON));
+        Changed = true;
+      }
+    }
+    // Insert LONGI/LONGA after REP/SEP instructions.
+    for (auto MBBI = MBB->begin(), MBBE = MBB->end(); MBBI != MBBE; ++MBBI) {
+      MachineInstr *MI = MBBI;
       DebugLoc DL = MI->getDebugLoc();
       if (MI->getOpcode() == C65::REP) {
         if (MI->getOperand(0).isImm()) {
           unsigned Reset = MI->getOperand(0).getImm();
           if (Reset & 0x20) {
-            BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGA_ON));
+            BuildMI(*MBB, std::next(MBBI), DL, TII.get(C65::LONGA_ON));
             Changed = true;
           }
           if (Reset & 0x10) {
-            BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGI_ON));
+            BuildMI(*MBB, std::next(MBBI), DL, TII.get(C65::LONGI_ON));
             Changed = true;
           }
         }
@@ -365,11 +499,11 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
         if (MI->getOperand(0).isImm()) {
           unsigned Set = MI->getOperand(0).getImm();
           if (Set & 0x20) {
-            BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGA_OFF));
+            BuildMI(*MBB, std::next(MBBI), DL, TII.get(C65::LONGA_OFF));
             Changed = true;
           }
           if (Set & 0x10) {
-            BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGI_OFF));
+            BuildMI(*MBB, std::next(MBBI), DL, TII.get(C65::LONGI_OFF));
             Changed = true;
           }
         }
@@ -382,95 +516,3 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
 
   return Changed;
 }
-
-// bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
-//   bool Changed = false;
-//   const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
-//   const C65InstrInfo &TII = *STI.getInstrInfo();
-
-//   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
-//     MachineBasicBlock *MBB = I;
-//     unsigned CurAccSize = C65II::Acc16Bit;
-//     unsigned CurIxSize = C65II::Ix16Bit;
-//     for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
-//          MBBI != MBBE; ++MBBI) {
-//       MachineInstr *MI = MBBI;
-//       unsigned AccSize = 0;
-//       unsigned IxSize = 0;
-
-//       if (MI->getDesc().isBranch() || MI->getDesc().isBarrier() ||
-//           MI->getDesc().isCall()) {
-//         AccSize = C65II::Acc16Bit;
-//         IxSize = C65II::Ix16Bit;
-//       } else {
-//         AccSize = C65II::getAccSize(MI->getDesc().TSFlags);
-//         IxSize = C65II::getIxSize(MI->getDesc().TSFlags);
-//       }
-
-//       if ((AccSize && AccSize != CurAccSize) ||
-//           (IxSize && IxSize != CurIxSize)) {
-//         unsigned ResetBits =
-//           ((AccSize != CurAccSize && AccSize == C65II::Acc16Bit) ? 0x20 : 0) |
-//           ((IxSize != CurIxSize && IxSize  == C65II::Ix16Bit)  ? 0x10 : 0);
-//         unsigned SetBits =
-//           ((AccSize != CurAccSize && AccSize == C65II::Acc8Bit) ? 0x20 : 0) |
-//           ((IxSize != CurIxSize && IxSize  == C65II::Ix8Bit)  ? 0x10 : 0);
-
-//         DebugLoc DL = MI->getDebugLoc();
-//         if (ResetBits) {
-//           BuildMI(*MBB, MBBI, DL, TII.get(C65::REP))
-//             .addImm(ResetBits);
-//         }
-//         if (SetBits) {
-//           BuildMI(*MBB, MBBI, DL, TII.get(C65::SEP))
-//             .addImm(SetBits);
-//         }
-//         if (AccSize) CurAccSize = AccSize;
-//         if (IxSize) CurIxSize = IxSize;
-//         Changed = true;
-//       }
-//     }
-//     if (CurAccSize != C65II::Acc16Bit || CurIxSize != C65II::Ix16Bit) {
-//       DebugLoc DL;
-//       unsigned ResetBits =
-//         ((CurAccSize != C65II::Acc16Bit) ? 0x20 : 0) |
-//         ((CurIxSize != C65II::Ix16Bit)  ? 0x10 : 0);
-//       BuildMI(MBB, DL, TII.get(C65::REP))
-//         .addImm(ResetBits);
-//     }
-//     for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
-//          MBBI != MBBE; ) {
-//       MachineInstr *MI = MBBI++;
-//       DebugLoc DL = MI->getDebugLoc();
-//       if (MI->getOpcode() == C65::REP) {
-//         if (MI->getOperand(0).isImm()) {
-//           unsigned Reset = MI->getOperand(0).getImm();
-//           if (Reset & 0x20) {
-//             BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGA_ON));
-//             Changed = true;
-//           }
-//           if (Reset & 0x10) {
-//             BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGI_ON));
-//             Changed = true;
-//           }
-//         }
-//       } else if (MI->getOpcode() == C65::SEP) {
-//         if (MI->getOperand(0).isImm()) {
-//           unsigned Set = MI->getOperand(0).getImm();
-//           if (Set & 0x20) {
-//             BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGA_OFF));
-//             Changed = true;
-//           }
-//           if (Set & 0x10) {
-//             BuildMI(*MBB, MBBI, DL, TII.get(C65::LONGI_OFF));
-//             Changed = true;
-//           }
-//         }
-//       }
-//     }
-//   }
-
-//   Changed = insertDefaultSizes(MF) || Changed;
-
-//   return Changed;
-// }
