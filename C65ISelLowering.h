@@ -110,12 +110,15 @@ namespace llvm {
 
     bool isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const override;
 
-    MVT getScalarShiftAmountTy(EVT LHSTy) const override { return MVT::i8; }
+    MVT getScalarShiftAmountTy(const DataLayout &DL, EVT LHSTy) const override {
+      return MVT::i8;
+    }
 
     EVT getTypeForExtArgOrReturn(LLVMContext &Context, EVT VT,
                                  ISD::NodeType ExtendKind) const override;
 
-    EVT getSetCCResultType(LLVMContext &Context, EVT VT) const override;
+    EVT getSetCCResultType(const DataLayout &DL, LLVMContext &Context,
+                           EVT VT) const override;
 
     SDValue LowerOperation(SDValue Op, SelectionDAG &DAG) const override;
 

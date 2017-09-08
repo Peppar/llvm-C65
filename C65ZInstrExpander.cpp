@@ -60,10 +60,10 @@ bool ZInstrExpander::runOnMachineFunction(MachineFunction &MF) {
 
   // Iterate through each instruction in the function, looking for pseudos.
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
-    MachineBasicBlock *MBB = I;
+    MachineBasicBlock *MBB = &(*I);
     for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
          MBBI != MBBE; ) {
-      MachineInstr *MI = MBBI++;
+      MachineInstr *MI = &(*(MBBI++));
 
       // If MI is a Z instruction, expand it.
       if (MI->getDesc().TSFlags & C65II::ZRInstr) {
@@ -73,7 +73,7 @@ bool ZInstrExpander::runOnMachineFunction(MachineFunction &MF) {
         // The expansion may involve new basic blocks.
         if (NewMBB != MBB) {
           MBB = NewMBB;
-          I = NewMBB;
+          I = MachineFunction::iterator(NewMBB);
           MBBI = NewMBB->begin();
           MBBE = NewMBB->end();
         }

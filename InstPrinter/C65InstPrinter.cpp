@@ -41,7 +41,7 @@ void C65InstPrinter::printComments(const MCInst *MI, raw_ostream &OS) {
   unsigned IxSize = C65II::getIxSize(Desc.TSFlags);
   bool FirstImm = true;
   for (unsigned I = 0; I < MI->getNumOperands(); ++I) {
-    const MCOperandInfo &OpInfo = Desc.OpInfo[I];
+    //const MCOperandInfo &OpInfo = Desc.OpInfo[I];
     if (MI->getOperand(I).isImm()) {
       if (FirstImm)
         FirstImm = false;
@@ -96,7 +96,7 @@ void C65InstPrinter::printOperand(const MCInst *MI, int OpNum,
     OS << (int)MO.getImm();
   } else {
     assert(MO.isExpr() && "Unknown operand kind in printOperand");
-    MO.getExpr()->print(OS);
+    OS << MO.getExpr();
   }
 }
 
@@ -108,7 +108,7 @@ void C65InstPrinter::printImmOperand(const MCInst *MI, int OpNum,
     OS << (int)MO.getImm();
   else {
     assert(MO.isExpr() && "Unknown operand kind in printImmOperand");
-    MO.getExpr()->print(OS);
+    OS << MO.getExpr();
   }
 }
 void
@@ -131,7 +131,7 @@ C65InstPrinter::printAddress(const MCInst *MI, int OpNum, unsigned Indirection,
     OS << (int)MO.getImm();
   else {
     assert(MO.isExpr() && "Unknown operand kind in printAddress");
-    MO.getExpr()->print(OS);
+    OS << MO.getExpr();
   }
   if (PreIndexReg)
     OS << ',' << PreIndexReg;

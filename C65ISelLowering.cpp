@@ -52,7 +52,7 @@ C65TargetLowering::C65TargetLowering(const TargetMachine &TM,
   computeRegisterProperties(Subtarget->getRegisterInfo());
 
   // Division and select is very expensive
-  setIntDivIsCheap(false);
+  //setIntDivIsCheap(false);
   setSelectIsExpensive(true);
 
   // Jump is cheap
@@ -236,7 +236,8 @@ const char *C65TargetLowering::getTargetNodeName(unsigned Opcode) const {
 /// passed is MVT::Other since there are no other operands to get a
 /// type hint from.
 ///
-EVT C65TargetLowering::getSetCCResultType(LLVMContext &, EVT VT) const {
+EVT C65TargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
+                                          EVT VT) const {
   if (!VT.isVector())
     return MVT::i8;
   return VT.changeVectorElementTypeToInteger();
@@ -286,7 +287,7 @@ SDValue C65TargetLowering::LowerBR_CC(SDValue Op, SelectionDAG &DAG) const {
   SDValue Dest     = Op.getOperand(4);
 
   return DAG.getNode(C65ISD::BR_CC, DL, Op.getValueType(),
-                     Chain, DAG.getConstant(CC, MVT::i32),
+                     Chain, DAG.getConstant(CC, SDLoc(Op), MVT::i32),
                      CmpLHS, CmpRHS, Dest);
 }
 
@@ -300,14 +301,14 @@ SDValue C65TargetLowering::LowerSELECT_CC(SDValue Op, SelectionDAG &DAG) const {
 
   return DAG.getNode(C65ISD::SELECT_CC, DL, Op.getValueType(),
                      CmpLHS, CmpRHS, TrueVal, FalseVal,
-                     DAG.getConstant(CC, MVT::i32));
+                     DAG.getConstant(CC, SDLoc(Op), MVT::i32));
 }
 
 SDValue C65TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
   EVT VT = Op.getValueType();
   SDLoc DL(Op);
   //  SDValue Chain = DAG.getEntryNode();
-  Type *RetTy = VT.getTypeForEVT(*DAG.getContext());
+  //Type *RetTy = VT.getTypeForEVT(*DAG.getContext());
 
   // Emit a libcall.
   const char *LCName = 0;
@@ -372,7 +373,8 @@ C65TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
   SDLoc DL(Op);
   SDValue Offset =
     DAG.getNode(C65ISD::FRAME_ADDR, DL, MVT::i16,
-                DAG.getIntPtrConstant(FuncInfo->getVarArgsFrameOffset() + 1));
+                DAG.getIntPtrConstant(FuncInfo->getVarArgsFrameOffset() + 1,
+                                      DL));
   const Value *SV = cast<SrcValueSDNode>(Op.getOperand(2))->getValue();
   return DAG.getStore(Op.getOperand(0), DL, Offset, Op.getOperand(1),
                       MachinePointerInfo(SV), false, false, 0);
@@ -391,7 +393,8 @@ C65TargetLowering::LowerVAARG(SDValue Op, SelectionDAG &DAG) const {
                                MachinePointerInfo(SV), false, false, false, 0);
   // Increment the pointer, VAList, to the next vaarg.
   SDValue NextPtr = DAG.getNode(ISD::ADD, DL, PtrVT, VAList,
-                                DAG.getIntPtrConstant(VT.getSizeInBits()/8));
+                                DAG.getIntPtrConstant(VT.getSizeInBits()/8,
+                                                      DL));
   // Store the incremented VAList to the legalized pointer.
   InChain = DAG.getStore(VAList.getValue(1), DL, NextPtr,
                          VAListPtr, MachinePointerInfo(SV), false, false, 0);
@@ -421,10 +424,12 @@ SDValue
 C65TargetLowering::LowerConstantPool(SDValue Op, SelectionDAG &DAG) const {
   ConstantPoolSDNode *CP = cast<ConstantPoolSDNode>(Op);
   SDLoc DL(CP);
-  SDValue Result = DAG.getTargetConstantPool(CP->getConstVal(), getPointerTy(),
+  SDValue Result = DAG.getTargetConstantPool(CP->getConstVal(),
+                                             getPointerTy(DAG.getDataLayout()),
                                              CP->getAlignment(),
                                              CP->getOffset());
-  Result = DAG.getNode(C65ISD::Wrapper, DL, getPointerTy(), Result);
+  Result = DAG.getNode(C65ISD::Wrapper, DL, getPointerTy(DAG.getDataLayout()),
+                       Result);
   return Result;
 }
 
@@ -440,12 +445,14 @@ C65TargetLowering::LowerConstantPool(SDValue Op, SelectionDAG &DAG) const {
 
 SDValue
 C65TargetLowering::LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const {
+  SDLoc DL(Op);
   GlobalAddressSDNode *G = cast<GlobalAddressSDNode>(Op);
   const GlobalValue *GV = G->getGlobal();
   int64_t Offset = G->getOffset();
-  SDLoc DL(Op);
 
-  SDValue Result = DAG.getTargetGlobalAddress(GV, DL, getPointerTy(), Offset);
+  SDValue Result = DAG.getTargetGlobalAddress(GV, DL,
+                                              getPointerTy(DAG.getDataLayout()),
+                                              Offset);
   if (G->getAddressSpace() == C65AS::NEAR_ADDRESS) {
     assert(Op.getValueType() == MVT::i16);
     Result = DAG.getNode(C65ISD::Wrapper, DL, MVT::i16, Result);
@@ -459,9 +466,10 @@ C65TargetLowering::LowerGlobalAddress(SDValue Op, SelectionDAG &DAG) const {
 
 SDValue
 C65TargetLowering::LowerExternalSymbol(SDValue Op, SelectionDAG &DAG) const {
-  const char *Sym = cast<ExternalSymbolSDNode>(Op)->getSymbol();
-  SDValue Result = DAG.getTargetExternalSymbol(Sym, getPointerTy());
   SDLoc DL(Op);
+  const char *Sym = cast<ExternalSymbolSDNode>(Op)->getSymbol();
+  SDValue Result = DAG.getTargetExternalSymbol(Sym,
+                                             getPointerTy(DAG.getDataLayout()));
   if (Op.getValueType() == MVT::i16)
     Result = DAG.getNode(C65ISD::Wrapper, DL, MVT::i16, Result);
   else if (Op.getValueType() == MVT::i32)
@@ -476,7 +484,9 @@ C65TargetLowering::LowerBlockAddress(SDValue Op, SelectionDAG &DAG) const {
   const BlockAddress *BA = cast<BlockAddressSDNode>(Op)->getBlockAddress();
   int64_t Offset = cast<BlockAddressSDNode>(Op)->getOffset();
   SDLoc DL(Op);
-  SDValue Result = DAG.getTargetBlockAddress(BA, getPointerTy(), Offset);
+  SDValue Result = DAG.getTargetBlockAddress(BA,
+                                             getPointerTy(DAG.getDataLayout()),
+                                             Offset);
   if (Op.getValueType() == MVT::i16)
     Result = DAG.getNode(C65ISD::Wrapper, DL, MVT::i16, Result);
   else if (Op.getValueType() == MVT::i32)
@@ -489,8 +499,9 @@ C65TargetLowering::LowerBlockAddress(SDValue Op, SelectionDAG &DAG) const {
 SDValue
 C65TargetLowering::LowerJumpTable(SDValue Op, SelectionDAG &DAG) const {
   JumpTableSDNode *JT = cast<JumpTableSDNode>(Op);
-  SDValue Result = DAG.getTargetJumpTable(JT->getIndex(), getPointerTy());
   SDLoc DL(JT);
+  SDValue Result = DAG.getTargetJumpTable(JT->getIndex(),
+                                          getPointerTy(DAG.getDataLayout()));
   if (Op.getValueType() == MVT::i16)
     Result = DAG.getNode(C65ISD::Wrapper, DL, MVT::i16, Result);
   else if (Op.getValueType() == MVT::i32)
@@ -552,7 +563,7 @@ C65TargetLowering::EmitZBR_CC(MachineInstr *MI,
   //  MachineRegisterInfo &MRI = MF->getRegInfo();
 
   const BasicBlock *BB = MBB->getBasicBlock();
-  MachineFunction::iterator MFI = MBB;
+  MachineFunction::iterator MFI = MBB->getIterator();
   ++MFI;
 
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
@@ -765,7 +776,7 @@ C65TargetLowering::EmitZSELECT_CC(MachineInstr *MI,
   MachineFunction *MF = MBB->getParent();
 
   const BasicBlock *BB = MBB->getBasicBlock();
-  MachineFunction::iterator MFI = MBB;
+  MachineFunction::iterator MFI = MBB->getIterator();
   ++MFI;
 
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
@@ -811,7 +822,7 @@ C65TargetLowering::EmitZSELECT_CC(MachineInstr *MI,
   MF->insert(MFI, trueMBB);
   MF->insert(MFI, falseMBB);
   MF->insert(MFI, sinkMBB);
-  MFI = trueMBB;
+  MFI = trueMBB->getIterator();
 
   // Transfer the remainder of the MBB and its successor edges to sinkMBB.
   sinkMBB->splice(sinkMBB->begin(), MBB,
@@ -1158,7 +1169,7 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
     // sinkMBB:
     MachineFunction *MF = MBB->getParent();
     const BasicBlock *BB = MBB->getBasicBlock();
-    MachineFunction::iterator MFI = MBB;
+    MachineFunction::iterator MFI = MBB->getIterator();
     ++MFI;
 
     MachineBasicBlock *thisMBB = MBB;
@@ -1320,7 +1331,7 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
   unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
   unsigned STAInstr = Use8Bit ? C65::STA8zp : C65::STA16zp;
   unsigned STZInstr = Use8Bit ? C65::STZ8zp : C65::STZ16zp;
-  unsigned NumOperands = TII->get(MI->getOpcode()).getNumOperands();
+  //unsigned NumOperands = TII->get(MI->getOpcode()).getNumOperands();
 
   DebugLoc DL = MI->getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
@@ -1365,7 +1376,7 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
     // sinkMBB:
     MachineFunction *MF = MBB->getParent();
     const BasicBlock *BB = MBB->getBasicBlock();
-    MachineFunction::iterator MFI = MBB;
+    MachineFunction::iterator MFI = MBB->getIterator();
     ++MFI;
 
     MachineBasicBlock *thisMBB = MBB;
@@ -1489,7 +1500,7 @@ C65TargetLowering::EmitZPUSHimm(MachineInstr *MI,
   const MachineOperand *Op = &MI->getOperand(0);
 
   const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  //const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
 
   DebugLoc DL = MI->getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
@@ -2072,7 +2083,7 @@ LowerFormalArguments(SDValue Chain,
                      SmallVectorImpl<SDValue> &InVals) const {
   MachineFunction &MF = DAG.getMachineFunction();
   MachineFrameInfo *MFI = MF.getFrameInfo();
-  MachineRegisterInfo &MRI = MF.getRegInfo();
+  //MachineRegisterInfo &MRI = MF.getRegInfo();
   C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
 
   // Assign locations to all of the incoming arguments.
@@ -2125,10 +2136,10 @@ LowerFormalArguments(SDValue Chain,
 
       // Create the SelectionDAG nodes corresponding to a load from
       // this parameter
-      SDValue FIN = DAG.getFrameIndex(FI, getPointerTy());
+      SDValue FIN = DAG.getFrameIndex(FI, getPointerTy(DAG.getDataLayout()));
+      MachinePointerInfo MPI = MachinePointerInfo::getFixedStack(MF, FI);
       ArgValue = DAG.getLoad(ValVT, DL, Chain, FIN,
-                             MachinePointerInfo::getFixedStack(FI),
-                             false, false, false, 0);
+                             MPI, false, false, false, 0);
     }
     InVals.push_back(ArgValue);
   }
@@ -2161,9 +2172,9 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   bool IsVarArg = CLI.IsVarArg;
 
   MachineFunction &MF = DAG.getMachineFunction();
-  MachineFrameInfo *MFI = MF.getFrameInfo();
-  MachineRegisterInfo &MRI = MF.getRegInfo();
-  EVT PtrVT = getPointerTy();
+  //MachineFrameInfo *MFI = MF.getFrameInfo();
+  //MachineRegisterInfo &MRI = MF.getRegInfo();
+  EVT PtrVT = getPointerTy(DAG.getDataLayout());
 
   // Analyze the operands of the call, assigning locations to each
   // operand.
@@ -2180,7 +2191,7 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   unsigned NumBytes = CCInfo.getNextStackOffset();
 
   // Mark the start of the call.
-  Chain = DAG.getCALLSEQ_START(Chain, DAG.getIntPtrConstant(0, true), DL);
+  Chain = DAG.getCALLSEQ_START(Chain, DAG.getIntPtrConstant(0, DL, true), DL);
 
   // Copy argument values to their designated locations.
   SmallVector<std::pair<unsigned, SDValue>, 3> RegsToPass;
@@ -2195,9 +2206,9 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
       // Store the argument in a stack slot and pass its address.
       SDValue SpillSlot = DAG.CreateStackTemporary(VA.getValVT());
       int FI = cast<FrameIndexSDNode>(SpillSlot)->getIndex();
+      MachinePointerInfo MPI = MachinePointerInfo::getFixedStack(MF, FI);
       MemOpChains.push_back(DAG.getStore(Chain, DL, ArgValue, SpillSlot,
-                                         MachinePointerInfo::getFixedStack(FI),
-                                         false, false, 0));
+                                         MPI, false, false, 0));
       ArgValue = SpillSlot;
     }
 
@@ -2277,8 +2288,8 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
   // Mark the end of the call, which is glued to the call itself.
   Chain = DAG.getCALLSEQ_END(Chain,
-                             DAG.getIntPtrConstant(NumBytes, true),
-                             DAG.getIntPtrConstant(0, true),
+                             DAG.getIntPtrConstant(NumBytes, DL, true),
+                             DAG.getIntPtrConstant(0, DL, true),
                              Glue, DL);
   Glue = Chain.getValue(1);
 
@@ -2339,7 +2350,8 @@ C65TargetLowering::makeC65LibCall(SelectionDAG &DAG,
     Entry.isZExt = !isSigned;
     Args.push_back(Entry);
   }
-  SDValue Callee = DAG.getExternalSymbol(LCName, getPointerTy());
+  SDValue Callee = DAG.getExternalSymbol(LCName,
+                                         getPointerTy(DAG.getDataLayout()));
 
   Type *RetTy = RetVT.getTypeForEVT(*DAG.getContext());
   TargetLowering::CallLoweringInfo CLI(DAG);

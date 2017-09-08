@@ -26,7 +26,7 @@ static const char *DescriptionString6502 =
 static const char *DescriptionString65816 =
   "e-m:e-p:16:8-p1:32:8-i16:8-i32:8-i64:8-n8:16:32:64-S8";
 
-static std::string computeDataLayout(StringRef TT, StringRef CPU,
+static std::string computeDataLayout(const Triple &TT, StringRef CPU,
                                      const TargetOptions &Options) {
   // TODO: Make the CPU distinctions conform better to the triple
   // system
@@ -39,7 +39,7 @@ static std::string computeDataLayout(StringRef TT, StringRef CPU,
     return DescriptionString6502;
 }
 
-C65TargetMachine::C65TargetMachine(const Target &T, StringRef TT,
+C65TargetMachine::C65TargetMachine(const Target &T, const Triple &TT,
                                    StringRef CPU, StringRef FS,
                                    const TargetOptions &Options,
                                    Reloc::Model RM, CodeModel::Model CM,

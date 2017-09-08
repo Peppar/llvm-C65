@@ -28,7 +28,7 @@ private:
     : ShiftAmt(_ShiftAmt), Expr(_Expr) {}
 
 public:
-  static const C65MCExpr *Create(unsigned ShiftAmt, const MCExpr *Expr,
+  static const C65MCExpr *create(unsigned ShiftAmt, const MCExpr *Expr,
                                  MCContext &Ctx);
 
   /// getOpcode - Get the kind of this expression.
@@ -37,18 +37,18 @@ public:
   /// getSubExpr - Get the child of this expression.
   const MCExpr *getSubExpr() const { return Expr; }
 
-  void PrintImpl(raw_ostream &OS) const override;
+  void printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const override;
 
-  bool EvaluateAsRelocatableImpl(MCValue &Res,
+  bool evaluateAsRelocatableImpl(MCValue &Res,
                                  const MCAsmLayout *Layout,
                                  const MCFixup *Fixup) const override {
-    return getSubExpr()->EvaluateAsRelocatable(Res, Layout, Fixup);
+    return getSubExpr()->evaluateAsRelocatable(Res, Layout, Fixup);
   }
 
   void visitUsedExpr(MCStreamer &Streamer) const override;
 
-  const MCSection *FindAssociatedSection() const override {
-    return getSubExpr()->FindAssociatedSection();
+  MCFragment *findAssociatedFragment() const override {
+    return getSubExpr()->findAssociatedFragment();
   }
 
   void fixELFSymbolsInTLSFixups(MCAssembler &Asm) const override {}

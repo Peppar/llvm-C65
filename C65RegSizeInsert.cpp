@@ -61,12 +61,12 @@ FunctionPass *llvm::createC65RegSizeInsertPass() {
 static bool insertDefaultSizes(MachineFunction &MF) {
   const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
   const C65InstrInfo &TII = *STI.getInstrInfo();
-  MachineBasicBlock *MBB = MF.begin();
+  MachineBasicBlock &MBB = *MF.begin();
   DebugLoc DL; // Empty DebugLoc
   unsigned LONGAOpcode = STI.has65802() ? C65::LONGA_ON : C65::LONGA_OFF;
   unsigned LONGIOpcode = STI.has65802() ? C65::LONGI_ON : C65::LONGI_OFF;
-  BuildMI(*MBB, MBB->begin(), DL, TII.get(LONGIOpcode));
-  BuildMI(*MBB, MBB->begin(), DL, TII.get(LONGAOpcode));
+  BuildMI(MBB, MBB.begin(), DL, TII.get(LONGIOpcode));
+  BuildMI(MBB, MBB.begin(), DL, TII.get(LONGAOpcode));
   return true;
 }
 
@@ -229,7 +229,7 @@ getOutBranches(MachineBasicBlock *MBB,
     }
   }
 
-  MachineBasicBlock *NMBB = std::next(MachineFunction::iterator(MBB));
+  MachineBasicBlock *NMBB = &(*std::next(MachineFunction::iterator(MBB)));
   if (!HasExited) {
     // Fall-through to the next MBB.
     AccBr.insert({ NMBB, AccSize });
@@ -261,7 +261,7 @@ fillFallthroughStatus(MachineFunction &MF, StatusMap &FallthroughStatus) {
   unsigned CurStatusIx = C65II::Ix16Bit;
   unsigned CurStatusAcc = C65II::Acc16Bit;
   for (auto I = MF.begin(), E = MF.end(); I != E; ++I) {
-    MachineBasicBlock *MBB = I;
+    MachineBasicBlock *MBB = &(*I);
     if (FallthroughStatus.count(MBB)) {
       unsigned StatusIx = FallthroughStatus[MBB].first;
       unsigned StatusAcc = FallthroughStatus[MBB].second;
@@ -294,7 +294,7 @@ getInBranches(MachineFunction &MF,
               StatusMap &FallthroughStatus) {
   // Derive incoming branches for all MBB's.
   for (auto I = MF.begin(), E = MF.end(); I != E; ++I) {
-    MachineBasicBlock *MBB = I;
+    MachineBasicBlock *MBB = &(*I);
     BranchSet OutBrIx;
     BranchSet OutBrAcc;
     getOutBranches(MBB, OutBrIx, OutBrAcc, FallthroughStatus);
@@ -309,10 +309,11 @@ getInBranches(MachineFunction &MF,
     insertBranchInversion(MBB, OutBrIx, InBrIx, NullBrIx);
     insertBranchInversion(MBB, OutBrAcc, InBrAcc, NullBrAcc);
   }
+  MachineBasicBlock *FirstMBB = &(*MF.begin());
   // The first MBB in the MachineFunction is assumed to enter with
   // 16/16 Ix/Acc.
-  InBrIx[MF.begin()].insert({ nullptr, C65II::Ix16Bit });
-  InBrAcc[MF.begin()].insert({ nullptr, C65II::Acc16Bit });
+  InBrIx[FirstMBB].insert({ nullptr, C65II::Ix16Bit });
+  InBrAcc[FirstMBB].insert({ nullptr, C65II::Acc16Bit });
   fillFallthroughStatus(MF, FallthroughStatus);
 }
 
@@ -342,7 +343,7 @@ computeInStatus(MachineFunction &MF, StatusMap &InStatus,
 
   DEBUG(dbgs() << "Incoming branches:\n");
   DEBUG(for (auto I = MF.begin(); I != MF.end(); ++I) {
-      MachineBasicBlock *MBB = I;
+      MachineBasicBlock *MBB = &(*I);
       dbgs() << getMBBName(MBB) << "(Ix)<-";
       dumpBranches(InBrIx[MBB]);
       dbgs() << '\n';
@@ -357,7 +358,7 @@ computeInStatus(MachineFunction &MF, StatusMap &InStatus,
 
   DEBUG(dbgs() << "Incoming branches after null elimination:\n");
   DEBUG(for (auto I = MF.begin(); I != MF.end(); ++I) {
-      MachineBasicBlock *MBB = I;
+      MachineBasicBlock *MBB = &(*I);
       dbgs() << getMBBName(MBB) << "(Ix)<-";
       dumpBranches(InBrIx[MBB]);
       dbgs() << '\n';
@@ -368,7 +369,7 @@ computeInStatus(MachineFunction &MF, StatusMap &InStatus,
 
   // Calculte the status bits.
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
-    MachineBasicBlock *MBB = I;
+    MachineBasicBlock *MBB = &(*I);
     unsigned IxStatus = resolveStatusBit(InBrIx[MBB]);
     unsigned AccStatus = resolveStatusBit(InBrAcc[MBB]);
     InStatus[MBB] = { IxStatus, AccStatus };
@@ -376,7 +377,7 @@ computeInStatus(MachineFunction &MF, StatusMap &InStatus,
 
   DEBUG(dbgs() << "Status resolution:\n");
   DEBUG(for (auto I = MF.begin(); I != MF.end(); ++I) {
-      MachineBasicBlock *MBB = I;
+      MachineBasicBlock *MBB = &(*I);
       dbgs() << getMBBName(MBB) << " Ix:"
              << InStatus[MBB].first << '\n';
       dbgs() << getMBBName(MBB) << " Acc:"
@@ -394,7 +395,7 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
   computeInStatus(MF, InStatus, FallthroughStatus);
 
   for (MachineFunction::iterator I = MF.begin(), E = MF.end(); I != E; ++I) {
-    MachineBasicBlock *MBB = I;
+    MachineBasicBlock *MBB = &(*I);
     unsigned InIxSize = InStatus[MBB].first;
     unsigned InAccSize = InStatus[MBB].second;
     unsigned CurIxSize = InIxSize;
@@ -402,7 +403,7 @@ bool RegSizeInsert::runOnMachineFunction(MachineFunction &MF) {
 
     // First pass: Insert REP/SEP when the machine word size changes.
     for (auto MBBI = MBB->begin(), MBBE = MBB->end(); MBBI != MBBE; ++MBBI) {
-      MachineInstr *MI = MBBI;
+      MachineInstr *MI = &(*MBBI);
       unsigned AccSize = 0;
       unsigned IxSize = 0;
 

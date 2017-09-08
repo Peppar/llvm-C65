@@ -31,7 +31,8 @@ using namespace llvm;
 C65FrameLowering::C65FrameLowering()
   : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 1, 0) {}
 
-void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
+void C65FrameLowering::emitPrologue(MachineFunction &MF,
+                                    MachineBasicBlock &MBB) const {
   const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
   const C65RegisterInfo &RegInfo = *STI.getRegisterInfo();
   const C65InstrInfo &TII = *STI.getInstrInfo();
@@ -40,7 +41,6 @@ void C65FrameLowering::emitPrologue(MachineFunction &MF) const {
 
   bool HasFP = hasFP(MF);
 
-  MachineBasicBlock &MBB = MF.front();
   MachineBasicBlock::iterator MBBI = MBB.begin();
   DebugLoc DL = MBBI->getDebugLoc();
   int Size = (int)MFI.getStackSize();

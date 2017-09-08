@@ -37,8 +37,8 @@ using namespace llvm;
 namespace llvm {
   class C65MCAsmInfo : public MCAsmInfo {
   public:
-    explicit C65MCAsmInfo(StringRef TT) {
-      // TODO: Make use of TT (triple string)
+    explicit C65MCAsmInfo(const Triple &TT) {
+      // TODO: Make use of TT
       PointerSize = 2;
       CalleeSaveStackSlotSize = 1;
       IsLittleEndian = true;
@@ -60,12 +60,12 @@ namespace llvm {
 }
 
 static MCAsmInfo *createC65MCAsmInfo(const MCRegisterInfo &MRI,
-                                     StringRef TT) {
+                                     const Triple &TT) {
   // TODO: Add initial frame state information
   return new C65MCAsmInfo(TT);
 }
 
-static MCCodeGenInfo *createC65MCCodeGenInfo(StringRef TT, Reloc::Model RM,
+static MCCodeGenInfo *createC65MCCodeGenInfo(const Triple &TT, Reloc::Model RM,
                                              CodeModel::Model CM,
                                              CodeGenOpt::Level OL) {
   MCCodeGenInfo *X = new MCCodeGenInfo();
@@ -78,7 +78,7 @@ static MCCodeGenInfo *createC65MCCodeGenInfo(StringRef TT, Reloc::Model RM,
   if (CM == CodeModel::Default)
     CM = CodeModel::Small;
 
-  X->InitMCCodeGenInfo(RM, CM, OL);
+  X->initMCCodeGenInfo(RM, CM, OL);
   return X;
 }
 
@@ -88,18 +88,24 @@ static MCInstrInfo *createC65MCInstrInfo() {
   return X;
 }
 
-static MCRegisterInfo *createC65MCRegisterInfo(StringRef TT) {
+static MCRegisterInfo *createC65MCRegisterInfo(const Triple &TT) {
   MCRegisterInfo *X = new MCRegisterInfo();
   InitC65MCRegisterInfo(X, C65::S);
   return X;
 }
 
-static MCSubtargetInfo *createC65MCSubtargetInfo(StringRef TT, StringRef CPU,
-                                                 StringRef FS) {
-  MCSubtargetInfo *X = new MCSubtargetInfo();
-  InitC65MCSubtargetInfo(X, TT, CPU, FS);
-  return X;
+static MCSubtargetInfo *
+createC65MCSubtargetInfo(const Triple &TT, StringRef CPU, StringRef FS) {
+  return createC65MCSubtargetInfoImpl(TT, CPU, FS);
 }
+
+// static MCSubtargetInfo *createC65MCSubtargetInfo(const Triple &TT,
+//                                                  StringRef CPU,
+//                                                  StringRef FS) {
+//   MCSubtargetInfo *X = new MCSubtargetInfo();
+//   InitC65MCSubtargetInfo(X, TT, CPU, FS);
+//   return X;
+// }
 
 static MCInstPrinter *createC65MCInstPrinter(const Triple &T,
                                              unsigned SyntaxVariant,
@@ -109,10 +115,10 @@ static MCInstPrinter *createC65MCInstPrinter(const Triple &T,
   return new C65InstPrinter(MAI, MII, MRI);
 }
 
-static MCStreamer *createC65MCObjectStreamer(const Triple &T,
+static MCStreamer *createC65MCObjectStreamer(const Triple &TT,
                                              MCContext &Ctx,
                                              MCAsmBackend &MAB,
-                                             raw_ostream &OS,
+                                             raw_pwrite_stream &OS,
                                              MCCodeEmitter *Emitter,
                                              bool RelaxAll) {
   return createELFStreamer(Ctx, MAB, OS, Emitter, RelaxAll);

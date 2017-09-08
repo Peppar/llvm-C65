@@ -395,7 +395,7 @@ unsigned C65InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
 unsigned
 C65InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                            MachineBasicBlock *FBB,
-                           const SmallVectorImpl<MachineOperand> &Cond,
+                           ArrayRef<MachineOperand> Cond,
                            DebugLoc DL) const {
   assert(TBB && "InsertBranch must not be told to insert a fallthrough");
   assert((Cond.size() == 4 || Cond.size() == 0) &&

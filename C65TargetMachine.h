@@ -27,7 +27,7 @@ class C65TargetMachine : public LLVMTargetMachine {
 
 public:
 
-  C65TargetMachine(const Target &T, StringRef TT, StringRef CPU,
+  C65TargetMachine(const Target &T, const Triple &TT, StringRef CPU,
                    StringRef FS, const TargetOptions &Options,
                    Reloc::Model RM, CodeModel::Model CM,
                    CodeGenOpt::Level OL);

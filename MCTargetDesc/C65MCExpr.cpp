@@ -25,14 +25,12 @@ using namespace llvm;
 #define DEBUG_TYPE "c65-mc-expr"
 
 const C65MCExpr*
-C65MCExpr::Create(unsigned ShiftAmt, const MCExpr *Expr, MCContext &Ctx) {
+C65MCExpr::create(unsigned ShiftAmt, const MCExpr *Expr, MCContext &Ctx) {
   return new (Ctx) C65MCExpr(ShiftAmt, Expr);
 }
 
-void C65MCExpr::PrintImpl(raw_ostream &OS) const {
-  OS << "((";
-  getSubExpr()->print(OS);
-  OS << ") >> " << ShiftAmt << ')';
+void C65MCExpr::printImpl(raw_ostream &OS, const MCAsmInfo *MAI) const {
+  OS << "((" << getSubExpr() << ") >> " << ShiftAmt << ')';
 }
 
 void C65MCExpr::visitUsedExpr(MCStreamer &Streamer) const {

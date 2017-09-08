@@ -56,7 +56,7 @@ public:
     llvm_unreachable("C65 does do not have assembler relaxation");
   }
   bool writeNopData(uint64_t Count, MCObjectWriter *OW) const override;
-  MCObjectWriter *createObjectWriter(raw_ostream &OS) const override {
+  MCObjectWriter *createObjectWriter(raw_pwrite_stream &OS) const override {
     return createC65WLAKObjectWriter(OS, OSABI);
   }
 };
@@ -109,13 +109,13 @@ void C65MCAsmBackend::applyFixup(const MCFixup &Fixup, char *Data,
 bool C65MCAsmBackend::writeNopData(uint64_t Count,
                                    MCObjectWriter *OW) const {
   for (uint64_t I = 0; I != Count; ++I)
-    OW->Write8(0xea);
+    OW->write8(0xea);
   return true;
 }
 
 MCAsmBackend *llvm::createC65MCAsmBackend(const Target &T,
                                           const MCRegisterInfo &MRI,
-                                          StringRef TT, StringRef CPU) {
-  uint8_t OSABI = MCELFObjectTargetWriter::getOSABI(Triple(TT).getOS());
+                                          const Triple &TT, StringRef CPU) {
+  uint8_t OSABI = MCELFObjectTargetWriter::getOSABI(TT.getOS());
   return new C65MCAsmBackend(OSABI);
 }

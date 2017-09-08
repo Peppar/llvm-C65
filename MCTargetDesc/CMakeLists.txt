@@ -1,6 +1,7 @@
-add_llvm_library(LLVMC65Info
+add_llvm_library(LLVMC65Desc
   C65MCAsmBackend.cpp
   C65MCCodeEmitter.cpp
+  C65MCExpr.cpp
   C65MCObjectWriter.cpp
   C65MCTargetDesc.cpp
   )

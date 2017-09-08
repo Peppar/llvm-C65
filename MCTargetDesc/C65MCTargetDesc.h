@@ -11,8 +11,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TARGET_C65MCTARGETDESC_H
-#define LLVM_TARGET_C65MCTARGETDESC_H
+#ifndef LLVM_TARGET_C65_MCTARGETDESC_C65MCTARGETDESC_H
+#define LLVM_TARGET_C65_MCTARGETDESC_C65MCTARGETDESC_H
 
 #include "llvm/Support/DataTypes.h"
 
@@ -26,8 +26,9 @@ class MCObjectWriter;
 class MCRegisterInfo;
 class MCSubtargetInfo;
 class Target;
+class Triple;
 class StringRef;
-class raw_ostream;
+class raw_pwrite_stream;
 
 extern Target The65C816Target;
 
@@ -36,9 +37,9 @@ extern Target The65C816Target;
                                         MCContext &Ctx);
   MCAsmBackend *createC65MCAsmBackend(const Target &T,
                                       const MCRegisterInfo &MRI,
-                                      StringRef TT,
+                                      const Triple &TT,
                                       StringRef CPU);
-  MCObjectWriter *createC65WLAKObjectWriter(raw_ostream &OS,
+  MCObjectWriter *createC65WLAKObjectWriter(raw_pwrite_stream &OS,
                                             uint8_t OSABI);
 
 } // End llvm namespace

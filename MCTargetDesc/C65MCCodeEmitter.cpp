@@ -35,7 +35,7 @@ public:
 
   ~C65MCCodeEmitter() {}
 
-  void EncodeInstruction(const MCInst &MI, raw_ostream &OS,
+  void encodeInstruction(const MCInst &MI, raw_ostream &OS,
                          SmallVectorImpl<MCFixup> &Fixups,
                          const MCSubtargetInfo &STI) const override;
 
@@ -62,7 +62,7 @@ MCCodeEmitter *llvm::createC65MCCodeEmitter(const MCInstrInfo &MCII,
 }
 
 void C65MCCodeEmitter::
-EncodeInstruction(const MCInst &MI, raw_ostream &OS,
+encodeInstruction(const MCInst &MI, raw_ostream &OS,
                   SmallVectorImpl<MCFixup> &Fixups,
                   const MCSubtargetInfo &STI) const {
   unsigned Opcode = MI.getOpcode();
@@ -123,7 +123,7 @@ C65MCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
   // converted to a corresponding fixup handled by the object writer.
   if (OpSize == 1 || OpSize == 2) {
     if (const MCBinaryExpr *BE = dyn_cast<MCBinaryExpr>(Expr)) {
-      if (BE->getOpcode() == MCBinaryExpr::Shr) {
+      if (BE->getOpcode() == MCBinaryExpr::LShr) {
         if (const MCConstantExpr *CE = dyn_cast<MCConstantExpr>(BE->getRHS())) {
           ShiftAmt = CE->getValue();
           Expr = BE->getLHS();
@@ -145,7 +145,7 @@ C65MCCodeEmitter::getMachineOpValue(const MCInst &MI, const MCOperand &MO,
   } else
     llvm_unreachable("Instruction expected to be without operands.");
 
-  Fixups.push_back(MCFixup::Create(1, MO.getExpr(), FixupKind));
+  Fixups.push_back(MCFixup::create(1, MO.getExpr(), FixupKind));
   return 0;
 }
 
@@ -161,9 +161,9 @@ C65MCCodeEmitter::getPCRelOpValue(const MCInst &MI, const MCOperand &MO,
 
   // The operand value is relative to the start of the next MI,
   // but the fixup is relative to the operand.
-  const MCExpr *OffsetExpr = MCConstantExpr::Create(InstrSize - 1, Ctx);
-  const MCExpr *Expr = MCBinaryExpr::CreateSub(MO.getExpr(), OffsetExpr, Ctx);
+  const MCExpr *OffsetExpr = MCConstantExpr::create(InstrSize - 1, Ctx);
+  const MCExpr *Expr = MCBinaryExpr::createSub(MO.getExpr(), OffsetExpr, Ctx);
 
-  Fixups.push_back(MCFixup::Create(1, Expr, FK_PCRel_1));
+  Fixups.push_back(MCFixup::create(1, Expr, FK_PCRel_1));
   return 0;
 }

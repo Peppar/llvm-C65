@@ -44,12 +44,10 @@ C65Subtarget::initializeSubtargetDependencies(StringRef CPU, StringRef FS) {
     ToggleFeature(C65::ModeIx16Bit);
 }
 
-C65Subtarget::C65Subtarget(const std::string &TT, const std::string &CPU,
+C65Subtarget::C65Subtarget(const Triple &TT, const std::string &CPU,
                            const std::string &FS, TargetMachine &TM)
   : C65GenSubtargetInfo(TT, CPU, FS),
     InstrInfo(*this),
-    TLInfo(TM, *this),
-    TSInfo(*TM.getDataLayout()),
-    FrameLowering() {
+    TLInfo(TM, *this), TSInfo(), FrameLowering() {
   initializeSubtargetDependencies(CPU, FS);
 }

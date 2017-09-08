@@ -83,7 +83,7 @@ public:
     OP_LOW_BYTE    = 13,
     OP_HIGH_BYTE   = 14
   };
-  void Write(MCAssembler &Asm, WLAKObjectWriter &Writer) const;
+  void write(MCAssembler &Asm, WLAKObjectWriter &Writer) const;
 };
 
 class WLAKRelocationEntry {
@@ -132,7 +132,7 @@ public:
     Stack.push_back(WLAKCalcStackEntry::createSymb(Symbol));
   }
 
-  void Write(MCAssembler &Asm, WLAKObjectWriter &Writer, unsigned ID) const;
+  void write(MCAssembler &Asm, WLAKObjectWriter &Writer, unsigned ID) const;
 };
 
 class WLAKSimpleRelocationEntry : public WLAKRelocationEntry {
@@ -146,7 +146,7 @@ public:
     : WLAKRelocationEntry(Section, Type, FileID, LineNumber, Offset),
       Symbol(&Symbol) {};
 
-  void Write(MCAssembler &Asm, WLAKObjectWriter &Writer) const;
+  void write(MCAssembler &Asm, WLAKObjectWriter &Writer) const;
 };
 
 class WLAKObjectWriter : public MCObjectWriter {
@@ -179,14 +179,14 @@ protected:
   SmallDenseMap<unsigned, const char*> SourceFilenameMap;
 
   std::pair<unsigned, unsigned>
-  GetFileAndLine(const MCAssembler &Asm, const MCFixup &Fixup);
+  getFileAndLine(const MCAssembler &Asm, const MCFixup &Fixup);
 
-  void GetSections(MCAssembler &Asm, std::vector<const MCSection*> &Sections);
+  void getSections(MCAssembler &Asm, std::vector<const MCSection*> &Sections);
 
-  void EnumerateSections(MCAssembler &Asm, const MCAsmLayout &Layout);
+  void enumerateSections(MCAssembler &Asm, const MCAsmLayout &Layout);
 
 public:
-  WLAKObjectWriter(raw_ostream &_OS)
+  WLAKObjectWriter(raw_pwrite_stream &_OS)
     : MCObjectWriter(_OS, false), UnknownFileID(0), NextSourceID(0) {};
 
   virtual ~WLAKObjectWriter() {}
@@ -210,15 +210,13 @@ public:
  //       !SymbolInfoMap.lookup(&Symb).External);
   }
 
-  raw_ostream &getStream() { return OS; }
-
   /// \brief Record a relocation entry.
   ///
   /// This routine is called by the assembler after layout and relaxation, and
   /// post layout binding. The implementation is responsible for storing
   /// information about the relocation so that it can be emitted during
   /// WriteObject().
-  void RecordRelocation(MCAssembler &Asm, const MCAsmLayout &Layout,
+  void recordRelocation(MCAssembler &Asm, const MCAsmLayout &Layout,
                         const MCFragment *Fragment,
                         const MCFixup &Fixup, MCValue Target,
                         bool &IsPCRel, uint64_t &FixedValue) override;
@@ -228,95 +226,95 @@ public:
   ///
   /// This routine is called by the assembler after layout and relaxation is
   /// complete.
-  virtual void ExecutePostLayoutBinding(MCAssembler &Asm,
+  virtual void executePostLayoutBinding(MCAssembler &Asm,
                                         const MCAsmLayout &Layout) override;
-  void WriteSection(MCAssembler &Asm,
+  void writeSection(MCAssembler &Asm,
                     const MCAsmLayout &Layout,
                     const MCSection &Section);
 
-  void WriteSymbolName(MCAssembler &Asm,
+  void writeSymbolName(MCAssembler &Asm,
                        const MCSymbol &Symbol);
 
-  void WriteSymbol(MCAssembler &Asm,
+  void writeSymbol(MCAssembler &Asm,
                    const MCAsmLayout &Layout,
                    const MCSymbol &Symbol);
 
-  void WriteSymbolTable(MCAssembler &Asm,
+  void writeSymbolTable(MCAssembler &Asm,
                         const MCAsmLayout &Layout);
 
-  void WriteSourceFiles(MCAssembler &Asm, const MCAsmLayout &Layout);
+  void writeSourceFiles(MCAssembler &Asm, const MCAsmLayout &Layout);
 
-  virtual void WriteObject(MCAssembler &Asm,
+  virtual void writeObject(MCAssembler &Asm,
                            const MCAsmLayout &Layout) override;
 };
 } // end anonymous namespace
 
 // WLAKCalcStackEntry Impl
 
-void WLAKCalcStackEntry::Write(MCAssembler &Asm,
+void WLAKCalcStackEntry::write(MCAssembler &Asm,
                                WLAKObjectWriter &Writer) const {
-  Writer.Write8(Type);
-  Writer.Write8(Sign);
+  Writer.write8(Type);
+  Writer.write8(Sign);
   if (Type == VALUE || Type == OPERATOR) {
     const uint64_t *X = (const uint64_t *)(&Value);
-    Writer.WriteBE64(*X);
+    Writer.writeBE64(*X);
   } else {
-    Writer.WriteSymbolName(Asm, *Symbol);
-    Writer.Write8(0);
+    Writer.writeSymbolName(Asm, *Symbol);
+    Writer.write8(0);
   }
 }
 
 // WLAKComplexRelocationEntry Impl
 
-void WLAKComplexRelocationEntry::Write(MCAssembler &Asm,
+void WLAKComplexRelocationEntry::write(MCAssembler &Asm,
                                        WLAKObjectWriter &Writer,
                                        unsigned ID) const {
-  Writer.WriteBE32(ID);
+  Writer.writeBE32(ID);
   if (Type == WLAKRelocationEntry::DIRECT_8BIT)
-    Writer.Write8(0x0);
+    Writer.write8(0x0);
   else if (Type == WLAKRelocationEntry::DIRECT_16BIT)
-    Writer.Write8(0x1);
+    Writer.write8(0x1);
   else if (Type == WLAKRelocationEntry::DIRECT_24BIT)
-    Writer.Write8(0x2);
+    Writer.write8(0x2);
   else if (Type == WLAKRelocationEntry::RELATIVE_8BIT)
-    Writer.Write8(0x80);
+    Writer.write8(0x80);
   else /* Type == WLAKRelocationEntry::RELATIVE_16BIT */
-    Writer.Write8(0x81);
-  Writer.Write8(Writer.getSectionID(*Section));
-  Writer.Write8(FileID);
-  Writer.Write8(Stack.size());
-  Writer.Write8(0);
-  Writer.WriteBE32(Offset);
-  Writer.WriteBE32(LineNumber);
+    Writer.write8(0x81);
+  Writer.write8(Writer.getSectionID(*Section));
+  Writer.write8(FileID);
+  Writer.write8(Stack.size());
+  Writer.write8(0);
+  Writer.writeBE32(Offset);
+  Writer.writeBE32(LineNumber);
   for (const WLAKCalcStackEntry &E : Stack)
-    E.Write(Asm, Writer);
+    E.write(Asm, Writer);
 }
 
 // WLAKSimpleRelocationEntry Impl
 
-void WLAKSimpleRelocationEntry::Write(MCAssembler &Asm,
+void WLAKSimpleRelocationEntry::write(MCAssembler &Asm,
                                       WLAKObjectWriter &Writer) const {
-  Writer.WriteSymbolName(Asm, *Symbol);
-  Writer.Write8(0);
+  Writer.writeSymbolName(Asm, *Symbol);
+  Writer.write8(0);
   if (Type == WLAKRelocationEntry::DIRECT_8BIT)
-    Writer.Write8(0x2);
+    Writer.write8(0x2);
   else if (Type == WLAKRelocationEntry::DIRECT_16BIT)
-    Writer.Write8(0x0);
+    Writer.write8(0x0);
   else if (Type == WLAKRelocationEntry::DIRECT_24BIT)
-    Writer.Write8(0x3);
+    Writer.write8(0x3);
   else if (Type == WLAKRelocationEntry::RELATIVE_8BIT)
-    Writer.Write8(0x1);
+    Writer.write8(0x1);
   else /* Type == WLAKRelocationEntry::RELATIVE_16BIT */
-    Writer.Write8(0x4);
-  Writer.Write8(Writer.getSectionID(*Section));
-  Writer.Write8(FileID);
-  Writer.WriteBE32(LineNumber);
-  Writer.WriteBE32(Offset);
+    Writer.write8(0x4);
+  Writer.write8(Writer.getSectionID(*Section));
+  Writer.write8(FileID);
+  Writer.writeBE32(LineNumber);
+  Writer.writeBE32(Offset);
 }
 
 // WLAKObjectWriter Impl
 
-static unsigned GetRelocType(const MCFixup &Fixup) {
+static unsigned getRelocType(const MCFixup &Fixup) {
   switch((unsigned)Fixup.getKind()) {
   default:
     llvm_unreachable("Unimplemented fixup -> relocation");
@@ -346,7 +344,7 @@ static unsigned GetRelocType(const MCFixup &Fixup) {
   }
 }
 
-static unsigned GetFixupShiftAmt(const MCFixup &Fixup) {
+static unsigned getFixupShiftAmt(const MCFixup &Fixup) {
   int Kind = Fixup.getKind();
   if (C65::isFixup8Bit(Kind))
     return C65::get8BitFixupShiftAmt(Kind);
@@ -357,7 +355,7 @@ static unsigned GetFixupShiftAmt(const MCFixup &Fixup) {
 }
 
 std::pair<unsigned, unsigned>
-WLAKObjectWriter::GetFileAndLine(const MCAssembler &Asm,
+WLAKObjectWriter::getFileAndLine(const MCAssembler &Asm,
                                  const MCFixup &Fixup) {
   MCContext &Ctx = Asm.getContext();
   const SourceMgr *SrcMgr = Ctx.getSourceManager();
@@ -389,34 +387,31 @@ WLAKObjectWriter::GetFileAndLine(const MCAssembler &Asm,
   return std::make_pair(SourceID, LineNumber);
 }
 
-void WLAKObjectWriter::RecordRelocation(MCAssembler &Asm,
+void WLAKObjectWriter::recordRelocation(MCAssembler &Asm,
                                         const MCAsmLayout &Layout,
                                         const MCFragment *Fragment,
                                         const MCFixup &Fixup,
                                         MCValue Target,
                                         bool &IsPCRel,
                                         uint64_t &FixedValue) {
-  const MCSectionData *FixupSection = Fragment->getParent();
-  std::pair<unsigned, unsigned> FileAndLine = GetFileAndLine(Asm, Fixup);
+  const MCSection *Section = Fragment->getParent();
+  std::pair<unsigned, unsigned> FileAndLine = getFileAndLine(Asm, Fixup);
   unsigned FileID = FileAndLine.first;
   unsigned LineNumber = FileAndLine.second;
 
   unsigned C = Target.getConstant();
   unsigned Offset = Layout.getFragmentOffset(Fragment) + Fixup.getOffset();
-  unsigned Type = GetRelocType(Fixup);
-  unsigned ShiftAmt = GetFixupShiftAmt(Fixup);
+  unsigned Type = getRelocType(Fixup);
+  unsigned ShiftAmt = getFixupShiftAmt(Fixup);
 
   const MCSymbolRefExpr *RefA = Target.getSymA();
   const MCSymbolRefExpr *RefB = Target.getSymB();
   const MCSymbol &SymA = RefA->getSymbol();
 
-  const MCSection &Section = FixupSection->getSection();
-  //  assert(SymA.isInSection());
-
   if (ShiftAmt || RefB || C) {
     // WLAK supports arbitrary calculations for relocations using a
     // stack-based language.
-    WLAKComplexRelocationEntry Rel(Section, Type, FileID, LineNumber, Offset);
+    WLAKComplexRelocationEntry Rel(*Section, Type, FileID, LineNumber, Offset);
     Rel.addSymb(SymA);
     if (RefB) {
       assert(RefB->getKind() == MCSymbolRefExpr::VK_None &&
@@ -438,65 +433,64 @@ void WLAKObjectWriter::RecordRelocation(MCAssembler &Asm,
     }
     ComplexRelocations.push_back(Rel);
   } else {
-    WLAKSimpleRelocationEntry Rel(Section, Type, FileID, LineNumber,
+    WLAKSimpleRelocationEntry Rel(*Section, Type, FileID, LineNumber,
                                   Offset, SymA);
     SimpleRelocations.push_back(Rel);
   }
 }
 
-void WLAKObjectWriter::ExecutePostLayoutBinding(MCAssembler &Asm,
+void WLAKObjectWriter::executePostLayoutBinding(MCAssembler &Asm,
                                                 const MCAsmLayout &Layout) {
-  for (const MCSymbolData &SD : Asm.symbols()) {
-    const MCSymbol &Symbol = SD.getSymbol();
+  for (const MCSymbol &SD : Asm.symbols()) {
     SymbolInfo SI;
-    SI.Exported = Symbol.isInSection();
-    SI.Private = Symbol.isDefined() && !SD.isExternal();
-    SymbolInfoMap[&Symbol] = SI;
+    SI.Exported = SD.isInSection();
+    SI.Private = SD.isDefined() && !SD.isExternal();
+    SymbolInfoMap[&SD] = SI;
   }
 }
 
-void WLAKObjectWriter::WriteSection(MCAssembler &Asm,
+void WLAKObjectWriter::writeSection(MCAssembler &Asm,
                                     const MCAsmLayout &Layout,
                                     const MCSection &Section) {
-  const MCSectionData &SD = Asm.getOrCreateSectionData(Section);
-  unsigned Size = Layout.getSectionFileSize(&SD);
+  unsigned Size = Layout.getSectionFileSize(&Section);
   StringRef SectionName;
   SectionKind Kind = Section.getKind();
 
   if (Kind.isText())
     SectionName = StringRef("TEXT");
-  else if (Kind.isDataRel())
+  else if (Kind.isData())
     SectionName = StringRef("DATA_REL");
-  else if (Kind.isDataRelLocal())
-    SectionName = StringRef("DATA_REL_LOCAL");
-  else if (Kind.isDataNoRel())
-    SectionName = StringRef("DATA_NOREL");
+  // else if (Kind.isDataRelLocal())
+  //   SectionName = StringRef("DATA_REL_LOCAL");
+  // else if (Kind.isDataNoRel())
+  //   SectionName = StringRef("DATA_NOREL");
   else
     SectionName = StringRef("UNKNOWN");
   getStream() << SectionName;
   // String terminator decides section constraint
-  Write8(0); // 0 - FREE, 7 - SUPERFREE
-  Write8(getSectionID(Section)); // Section ID
-  Write8(1); // FileID
-  WriteBE32(Size);
-  WriteBE32(1); // Alignment
-  Asm.writeSectionData(&SD, Layout);
-  Write8(0); // List file information, 0 - not present
+  write8(0); // 0 - FREE, 7 - SUPERFREE
+  write8(getSectionID(Section)); // Section ID
+  write8(1); // FileID
+  writeBE32(Size);
+  writeBE32(1); // Alignment
+  Asm.writeSectionData(&Section, Layout);
+  write8(0); // List file information, 0 - not present
 }
 
 // For the WLAK file type, we need to add underscores to names that
 // are not external and not guaranteed to be unique across all object
 // files. This function serves this purpose.
 //
-void WLAKObjectWriter::WriteSymbolName(MCAssembler &Asm,
+void WLAKObjectWriter::writeSymbolName(MCAssembler &Asm,
                                        const MCSymbol &Symbol) {
-  raw_ostream &OS = getStream();
+  raw_pwrite_stream &OS = getStream();
   // Append the file name to private symbols. We can't use underscores
   // here, since they are section-private and does not resolve across
   // sections.
   if (isSymbolPrivate(Symbol)) {
-    if (Asm.file_names_begin() != Asm.file_names_end()) {
-      auto Name = *Asm.file_names_begin();
+    ArrayRef<std::string> FileNames = Asm.getFileNames();
+    if (FileNames.begin() != FileNames.end()) {
+      std::string Name = *FileNames.begin();
       for (auto I = Name.begin(), E = Name.end(); I != E; ++I) {
         if (*I == '_')
           OS << '~';
@@ -512,20 +506,24 @@ void WLAKObjectWriter::WriteSymbolName(MCAssembler &Asm,
   getStream() << Symbol.getName();
 }
 
-void WLAKObjectWriter::WriteSymbol(MCAssembler &Asm,
+void WLAKObjectWriter::writeSymbol(MCAssembler &Asm,
                                    const MCAsmLayout &Layout,
                                    const MCSymbol &Symbol) {
-  const MCSymbolData &SymbolData = Asm.getSymbolData(Symbol);
-  WriteSymbolName(Asm, Symbol);
+  writeSymbolName(Asm, Symbol);
   // String terminator decides type
-  Write8(0); // 0 - label, 1 - symbol, 2 - breakpoint
-  Write8(getSectionID(Symbol.getSection())); // Section ID
-  Write8(1); // File ID
-  WriteBE32(0); // Line number
-  WriteBE32(Layout.getSymbolOffset(&SymbolData));
+  write8(0); // 0 - label, 1 - symbol, 2 - breakpoint
+  write8(getSectionID(Symbol.getSection())); // Section ID
+  write8(1); // File ID
+  writeBE32(0); // Line number
+
+  // Write symbol offset
+  uint64_t Val;
+  if (!Layout.getSymbolOffset(Symbol, Val))
+    report_fatal_error("expected absolute expression");
+  writeBE32(Val);
 }
 
-void WLAKObjectWriter::WriteSymbolTable(MCAssembler &Asm,
+void WLAKObjectWriter::writeSymbolTable(MCAssembler &Asm,
                                         const MCAsmLayout &Layout) {
   unsigned NumExportedSymbols = 0;
 
@@ -534,11 +532,11 @@ void WLAKObjectWriter::WriteSymbolTable(MCAssembler &Asm,
       ++NumExportedSymbols;
   }
 
-  WriteBE32(NumExportedSymbols);
+  writeBE32(NumExportedSymbols);
 
   for (auto I : SymbolInfoMap) {
     if (I.second.Exported)
-      WriteSymbol(Asm, Layout, *I.first);
+      writeSymbol(Asm, Layout, *I.first);
   }
 
   // for (const MCSymbolData &SD : Asm.symbols()) {
@@ -572,14 +570,14 @@ void WLAKObjectWriter::WriteSymbolTable(MCAssembler &Asm,
 
 }
 
-void WLAKObjectWriter::EnumerateSections(MCAssembler &Asm,
+void WLAKObjectWriter::enumerateSections(MCAssembler &Asm,
                                          const MCAsmLayout &Layout) {
   unsigned NextID = 1;
-  for (const MCSectionData &SD : Asm.getSectionList())
-    SectionIDMap[&SD.getSection()] = NextID++;
+  for (const MCSection &Section : Asm)
+    SectionIDMap[&Section] = NextID++;
 }
 
-void WLAKObjectWriter::WriteSourceFiles(MCAssembler &Asm,
+void WLAKObjectWriter::writeSourceFiles(MCAssembler &Asm,
                                         const MCAsmLayout &Layout) {
   // If there is no buffer information, try to use the file names
   // supplied in Asm.
@@ -590,12 +588,13 @@ void WLAKObjectWriter::WriteSourceFiles(MCAssembler &Asm,
       UnknownFileID = NextSourceID++;
 
     //    unsigned SourceFileCount = 0;
-    if (Asm.file_names_begin() != Asm.file_names_end() &&
-        Asm.file_names_begin() + 1 == Asm.file_names_end()) {
+    ArrayRef<std::string> FileNames = Asm.getFileNames();
+    if (FileNames.begin() != FileNames.end() &&
+        FileNames.begin() + 1 == FileNames.end()) {
       // There is only one file name, use it as the "unknown file".
-      WriteBE32(1);
-      OS << *Asm.file_names_begin() << '\0';
-      Write8(UnknownFileID);
+      writeBE32(1);
+      getStream() << *FileNames.begin() << '\0';
+      write8(UnknownFileID);
       return;
     }
   }
@@ -604,7 +603,7 @@ void WLAKObjectWriter::WriteSourceFiles(MCAssembler &Asm,
   // for (auto I = Asm.file_names_begin(), E = Asm.file_names_end();
   //      I != E; ++I)
   //   ++SourceFileCount;
-  // WriteBE32(SourceFileCount);
+  // writeBE32(SourceFileCount);
   // assert(SourceFileCount == (Asm.file_names_end() - Asm.file_names_begin()));
   // assert(SourceFileCount < 255);
 
@@ -613,9 +612,9 @@ void WLAKObjectWriter::WriteSourceFiles(MCAssembler &Asm,
   MCContext &Ctx = Asm.getContext();
   const SourceMgr *SrcMgr = Ctx.getSourceManager();
   if (UnknownFileID)
-    WriteBE32(BufferIDMap.size() + 1);
+    writeBE32(BufferIDMap.size() + 1);
   else
-    WriteBE32(BufferIDMap.size());
+    writeBE32(BufferIDMap.size());
 
   for (auto I = BufferIDMap.begin(), E = BufferIDMap.end(); I != E; ++I) {
     unsigned BufferID = I->first;
@@ -626,15 +625,15 @@ void WLAKObjectWriter::WriteSourceFiles(MCAssembler &Asm,
         Identifier = MemBuff->getBufferIdentifier();
     }
     if (Identifier)
-      OS << Identifier;
+      getStream() << Identifier;
     else
-      OS << "anonymous file " << BufferID;
-    OS << '\0';
-    Write8(I->second);
+      getStream() << "anonymous file " << BufferID;
+    getStream() << '\0';
+    write8(I->second);
   }
   if (UnknownFileID) {
-    OS << "unknown file" << '\0';
-    Write8(UnknownFileID);
+    getStream() << "unknown file" << '\0';
+    write8(UnknownFileID);
   }
 
   //  SourceMgr::SrcBuffer Buff = SourceMgr->getBufferInfo(BufferID);
@@ -646,59 +645,57 @@ void WLAKObjectWriter::WriteSourceFiles(MCAssembler &Asm,
   // }
 }
 
-void WLAKObjectWriter::WriteObject(MCAssembler &Asm,
+void WLAKObjectWriter::writeObject(MCAssembler &Asm,
                                    const MCAsmLayout &Layout) {
-  EnumerateSections(Asm, Layout);
+  enumerateSections(Asm, Layout);
 
   // Header
-  Write8('W');
-  Write8('L');
-  Write8('A');
-  Write8('V'); // 'WLAV'
+  write8('W');
+  write8('L');
+  write8('A');
+  write8('V'); // 'WLAV'
 
   // Write the name of the source files, if available.
-  WriteSourceFiles(Asm, Layout);
+  writeSourceFiles(Asm, Layout);
 
   // Write exported definitions
-  WriteBE32(0);
+  writeBE32(0);
 
   // Write labels, symbols and breakpoints. Also creates a table
   // outlining which symbols are marked as private.
-  WriteSymbolTable(Asm, Layout);
+  writeSymbolTable(Asm, Layout);
 
   // Write "Outside references"
-  WriteBE32(SimpleRelocations.size());
+  writeBE32(SimpleRelocations.size());
   for (const WLAKSimpleRelocationEntry &Rel : SimpleRelocations) {
-    Rel.Write(Asm, *this);
+    Rel.write(Asm, *this);
   }
 
   // Write "Pending calculations"
-  WriteBE32(ComplexRelocations.size());
+  writeBE32(ComplexRelocations.size());
   unsigned CalcID = 1;
   for (const WLAKComplexRelocationEntry &Rel : ComplexRelocations) {
-    Rel.Write(Asm, *this, CalcID++);
+    Rel.write(Asm, *this, CalcID++);
   }
 
   // Write data sections
   std::vector<const MCSection*> Sections;
-  GetSections(Asm, Sections);
+  getSections(Asm, Sections);
   for (const MCSection *Section : Sections) {
-    WriteSection(Asm, Layout, *Section);
+    writeSection(Asm, Layout, *Section);
   }
 }
 
 void
-WLAKObjectWriter::GetSections(MCAssembler &Asm,
+WLAKObjectWriter::getSections(MCAssembler &Asm,
                               std::vector<const MCSection*> &Sections) {
   for (MCAssembler::iterator IT = Asm.begin(),
          IE = Asm.end(); IT != IE; ++IT) {
-    Sections.push_back(&IT->getSection());
+    Sections.push_back(&(*IT));
   }
 }
 
-MCObjectWriter *llvm::createC65WLAKObjectWriter(raw_ostream &OS,
+MCObjectWriter *llvm::createC65WLAKObjectWriter(raw_pwrite_stream &OS,
                                                 uint8_t OSABI) {
   return new WLAKObjectWriter(OS);
 }
-
-

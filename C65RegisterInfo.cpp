@@ -36,7 +36,7 @@ using namespace llvm;
 #include "C65GenRegisterInfo.inc"
 
 C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
-  : C65GenRegisterInfo(C65::PC), Subtarget(ST) {};
+  : C65GenRegisterInfo(C65::PC), Subtarget(ST) {}
 
 const MCPhysReg*
 C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
@@ -200,7 +200,7 @@ C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   int FrameIndex = MI.getOperand(FIOperandNum).getIndex();
   unsigned FrameRegister = getFrameRegister(MF);
 
-  unsigned Opc = MI.getOpcode();
+  //unsigned Opc = MI.getOpcode();
   int64_t FIOffset;
 
   if (FrameRegister == C65::X || FrameRegister == C65::XL) {

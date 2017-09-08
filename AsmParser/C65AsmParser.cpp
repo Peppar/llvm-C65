@@ -80,11 +80,11 @@ private:
   void addExpr(MCInst &Inst, const MCExpr *Expr) const {
     // Add as immediates when possible.  Null MCExpr = 0.
     if (!Expr)
-      Inst.addOperand(MCOperand::CreateImm(0));
+      Inst.addOperand(MCOperand::createImm(0));
     else if (auto *CE = dyn_cast<MCConstantExpr>(Expr))
-      Inst.addOperand(MCOperand::CreateImm(CE->getValue()));
+      Inst.addOperand(MCOperand::createImm(CE->getValue()));
     else
-      Inst.addOperand(MCOperand::CreateExpr(Expr));
+      Inst.addOperand(MCOperand::createExpr(Expr));
   }
 
 public:
@@ -198,7 +198,6 @@ class C65AsmParser : public MCTargetAsmParser {
 #include "C65GenAsmMatcher.inc"
 
 private:
-  MCSubtargetInfo &STI;
   MCAsmParser &Parser;
 
   // This structure is used to parse all possible addresses once,
@@ -230,14 +229,14 @@ private:
   bool parseOperand(OperandVector &Operands, StringRef Mnemonic);
 
 public:
-  C65AsmParser(MCSubtargetInfo &sti, MCAsmParser &parser,
+  C65AsmParser(const MCSubtargetInfo &sti, MCAsmParser &parser,
                const MCInstrInfo &MII,
                const MCTargetOptions &Options)
-      : MCTargetAsmParser(), STI(sti), Parser(parser) {
+      : MCTargetAsmParser(Options, sti), Parser(parser) {
     MCAsmParserExtension::Initialize(Parser);
 
     // Initialize the set of available features.
-    setAvailableFeatures(ComputeAvailableFeatures(STI.getFeatureBits()));
+    setAvailableFeatures(ComputeAvailableFeatures(getSTI().getFeatureBits()));
   }
 
   bool ParseDirective(AsmToken DirectiveID) override;
@@ -263,13 +262,13 @@ public:
     } else if (getLexer().is(AsmToken::Greater)) {
       // Get higher byte of operand (shift right 8 bits)
       Parser.Lex();
-      const MCExpr *ShiftAmt = MCConstantExpr::Create(8, Parser.getContext());
-      Imm = MCBinaryExpr::CreateShr(Imm, ShiftAmt, Parser.getContext());
+      const MCExpr *ShiftAmt = MCConstantExpr::create(8, Parser.getContext());
+      Imm = MCBinaryExpr::createLShr(Imm, ShiftAmt, Parser.getContext());
     } else if (getLexer().is(AsmToken::Colon)) {
       // Get bank byte of operand (shift right 16 bits)
       Parser.Lex();
-      const MCExpr *ShiftAmt = MCConstantExpr::Create(16, Parser.getContext());
-      Imm = MCBinaryExpr::CreateShr(Imm, ShiftAmt, Parser.getContext());
+      const MCExpr *ShiftAmt = MCConstantExpr::create(16, Parser.getContext());
+      Imm = MCBinaryExpr::createLShr(Imm, ShiftAmt, Parser.getContext());
     }
     if (getParser().parseExpression(Imm))
       return MatchOperand_ParseFail;
@@ -347,32 +346,47 @@ public:
   }
 
   bool isAcc8Bit() const {
-    return (STI.getFeatureBits() & C65::ModeAcc8Bit) != 0;
+    return getSTI().getFeatureBits()[C65::ModeAcc8Bit];
   }
   bool isAcc16Bit() const {
-    return (STI.getFeatureBits() & C65::ModeAcc16Bit) != 0;
+    return getSTI().getFeatureBits()[C65::ModeAcc16Bit];
   }
   bool isIx8Bit() const {
-    return (STI.getFeatureBits() & C65::ModeIx8Bit) != 0;
+    return getSTI().getFeatureBits()[C65::ModeIx8Bit];
   }
   bool isIx16Bit() const {
-    return (STI.getFeatureBits() & C65::ModeIx16Bit) != 0;
+    return getSTI().getFeatureBits()[C65::ModeIx16Bit];
   }
-  void SwitchAccMode(uint64_t mode) {
-    uint64_t oldMode = STI.getFeatureBits() &
-      (C65::ModeAcc8Bit | C65::ModeAcc16Bit);
-    unsigned FB = ComputeAvailableFeatures(STI.ToggleFeature(oldMode | mode));
+  void SwitchAccMode(unsigned mode) {
+    // uint64_t oldMode = getSTI().getFeatureBits() &
+    //   (C65::ModeAcc8Bit | C65::ModeAcc16Bit);
+    // unsigned FB = ComputeAvailableFeatures(getSTI().ToggleFeature(oldMode | mode));
+    // setAvailableFeatures(FB);
+    // assert(mode == (getSTI().getFeatureBits() &
+    //                 (C65::ModeAcc8Bit | C65::ModeAcc16Bit)));
+    // MCSubtargetInfo &getSTI() = copySTI();
+    MCSubtargetInfo &STI = copySTI();
+    FeatureBitset AllModes({C65::ModeAcc8Bit, C65::ModeAcc16Bit});
+    FeatureBitset OldMode = STI.getFeatureBits() & AllModes;
+    unsigned FB = ComputeAvailableFeatures(
+      STI.ToggleFeature(OldMode.flip(mode)));
     setAvailableFeatures(FB);
-    assert(mode == (STI.getFeatureBits() &
-                    (C65::ModeAcc8Bit | C65::ModeAcc16Bit)));
+    assert(FeatureBitset({mode}) == (STI.getFeatureBits() & AllModes));
   }
-  void SwitchIxMode(uint64_t mode) {
-    uint64_t oldMode = STI.getFeatureBits() &
-      (C65::ModeIx8Bit | C65::ModeIx16Bit);
-    unsigned FB = ComputeAvailableFeatures(STI.ToggleFeature(oldMode | mode));
+  void SwitchIxMode(unsigned mode) {
+    // uint64_t oldMode = STI.getFeatureBits() &
+    //   (C65::ModeIx8Bit | C65::ModeIx16Bit);
+    // unsigned FB = ComputeAvailableFeatures(STI.ToggleFeature(oldMode | mode));
+    // setAvailableFeatures(FB);
+    // assert(mode == (STI.getFeatureBits() &
+    //                 (C65::ModeIx8Bit | C65::ModeIx16Bit)));
+    MCSubtargetInfo &STI = copySTI();
+    FeatureBitset AllModes({C65::ModeIx8Bit, C65::ModeIx16Bit});
+    FeatureBitset OldMode = STI.getFeatureBits() & AllModes;
+    unsigned FB = ComputeAvailableFeatures(
+      STI.ToggleFeature(OldMode.flip(mode)));
     setAvailableFeatures(FB);
-    assert(mode == (STI.getFeatureBits() &
-                    (C65::ModeIx8Bit | C65::ModeIx16Bit)));
+    assert(FeatureBitset({mode}) == (STI.getFeatureBits() & AllModes));
   }
 };
 } // end anonymous namespace
@@ -409,12 +423,9 @@ void C65Operand::print(raw_ostream &OS) const {
     case MemZZ:        OS << "ZZ";        break;
     default: llvm_unreachable("Unexpected memory kind.");
     }
-    OS << "(";
-    getMemAddr()->print(OS);
-    OS << ")";
+    OS << "(" << getMemAddr() << ")";
   } else if (isImm()) {
-    OS << '#';
-    getImm()->print(OS);
+    OS << '#' << getImm();
   } else if (isToken()) {
     OS << getToken();
   } else {
@@ -548,7 +559,7 @@ C65AsmParser::parseAddress(OperandVector &Operands, MemoryKind MemKind,
   if (AddressMatch.LengthConstraint) {
     if (AddressMatch.LengthConstraint != Length)
       return MatchOperand_NoMatch;
-  } else if (AddressMatch.Addr->EvaluateAsAbsolute(Address) && Address >= 0) {
+  } else if (AddressMatch.Addr->evaluateAsAbsolute(Address) && Address >= 0) {
     if (Address >= (1 << Length))
       return MatchOperand_NoMatch;
     if (!AllowZExt && !(Address >> (Length - 8)))
@@ -681,7 +692,7 @@ bool C65AsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
   default: break;
   case Match_Success:
     Inst.setLoc(IDLoc);
-    Out.EmitInstruction(Inst, STI);
+    Out.EmitInstruction(Inst, getSTI());
     // Accumulator and index register size selection directives for
     // 65802 and 65816
     if (Inst.getOpcode() == C65::LONGA_ON) {

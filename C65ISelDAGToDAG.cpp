@@ -85,7 +85,7 @@ bool C65DAGToDAGISel::SelectAddrS(SDValue Addr, SDValue &Index,
   FrameIndexSDNode *FIN = nullptr;
   if ((FIN = dyn_cast<FrameIndexSDNode>(Addr))) {
     Index = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i16);
-    Offset = CurDAG->getTargetConstant(0, MVT::i8);
+    Offset = CurDAG->getTargetConstant(0, SDLoc(Addr), MVT::i8);
     return true;
   }
   if (Addr.getOpcode() == ISD::ADD) {
@@ -95,7 +95,8 @@ bool C65DAGToDAGISel::SelectAddrS(SDValue Addr, SDValue &Index,
         (isUInt<8>(CN->getZExtValue()))) {
       // Constant positive word offset from frame index
       Index = CurDAG->getTargetFrameIndex(FIN->getIndex(), MVT::i16);
-      Offset = CurDAG->getTargetConstant(CN->getZExtValue(), MVT::i8);
+      Offset = CurDAG->getTargetConstant(CN->getZExtValue(), SDLoc(Addr),
+                                         MVT::i8);
       return true;
     }
   }
@@ -114,7 +115,7 @@ bool C65DAGToDAGISel::SelectAddrZP(SDValue Addr, SDValue &Offset) {
     if (!isUInt<8>(Val)) {
       // Let 16-bit or 24-bit addressing capture this.
     } else {
-      Offset = CurDAG->getTargetConstant(Val, MVT::i16);
+      Offset = CurDAG->getTargetConstant(Val, SDLoc(Addr), MVT::i16);
       return true;
     }
   }
@@ -131,7 +132,7 @@ bool C65DAGToDAGISel::SelectAddrAbs(SDValue Addr, SDValue &Offset) {
     } else if (!isUInt<16>(Val)) {
       // Address does not fit.
     } else {
-      Offset = CurDAG->getTargetConstant(Val, MVT::i16);
+      Offset = CurDAG->getTargetConstant(Val, SDLoc(Addr), MVT::i16);
       return true;
     }
   } else if (Addr.getOpcode() == C65ISD::Wrapper) {
@@ -159,7 +160,7 @@ bool C65DAGToDAGISel::SelectAddrAbsL(SDValue Addr, SDValue &Offset) {
     } else if (!isUInt<24>(Val)) {
       // Address does not fit.
     } else {
-      Offset = CurDAG->getTargetConstant(Val, MVT::i32);
+      Offset = CurDAG->getTargetConstant(Val, SDLoc(Addr), MVT::i32);
       return true;
     }
   } else if (Addr.getOpcode() == C65ISD::FarWrapper) {
@@ -191,7 +192,7 @@ bool C65DAGToDAGISel::SelectAddrRI(SDValue Addr, SDValue &Base,
     } else if (N1.getOpcode() == ISD::Constant) {
       uint64_t Val = cast<ConstantSDNode>(N1)->getZExtValue();
       if (isUInt<16>(Val)) {
-        Offset = CurDAG->getTargetConstant(Val, MVT::i16);
+        Offset = CurDAG->getTargetConstant(Val, SDLoc(Addr), MVT::i16);
         Base = N0;
         return true;
       }
@@ -204,7 +205,7 @@ bool C65DAGToDAGISel::SelectAddrRI(SDValue Addr, SDValue &Base,
     // There is currently no single-register addressing mode without
     // an offset, so handle this by having a zero offset.
     Base = Addr;
-    Offset = CurDAG->getTargetConstant(0, MVT::i16);
+    Offset = CurDAG->getTargetConstant(0, SDLoc(Addr), MVT::i16);
     return true;
   }
   return false;
@@ -250,12 +251,12 @@ bool C65DAGToDAGISel::SelectAddrRIF(SDValue Addr, SDValue &Base,
       uint64_t Val = cast<ConstantSDNode>(N1)->getZExtValue();
       if (isUInt<16>(Val)) {
         Base = N0;
-        Offset = CurDAG->getTargetConstant(Val, MVT::i16);
+        Offset = CurDAG->getTargetConstant(Val, SDLoc(Addr), MVT::i16);
         return true;
       } else {
         // Constant is 32-bit
         Base = Addr;
-        Offset = CurDAG->getTargetConstant(0, MVT::i16);
+        Offset = CurDAG->getTargetConstant(0, SDLoc(Addr), MVT::i16);
         return true;
       }
     } else if (N0.getOpcode() != ISD::ZERO_EXTEND &&
@@ -266,7 +267,7 @@ bool C65DAGToDAGISel::SelectAddrRIF(SDValue Addr, SDValue &Base,
       // both operands are 32 bits and selectAddrRRF will fail. Handle
       // this case here.
       Base = Addr;
-      Offset = CurDAG->getTargetConstant(0, MVT::i16);
+      Offset = CurDAG->getTargetConstant(0, SDLoc(Addr), MVT::i16);
       return true;
     }
   } else if (Addr.getOpcode() == ISD::Constant ||
@@ -277,7 +278,7 @@ bool C65DAGToDAGISel::SelectAddrRIF(SDValue Addr, SDValue &Base,
     // There is currently no single-register addressing mode without
     // an offset, so handle this by having a zero offset.
     Base = Addr;
-    Offset = CurDAG->getTargetConstant(0, MVT::i16);
+    Offset = CurDAG->getTargetConstant(0, SDLoc(Addr), MVT::i16);
     return true;
   }
   return false;
@@ -314,7 +315,7 @@ bool C65DAGToDAGISel::SelectAddrRRF(SDValue Addr, SDValue &R1,
 }
 
 SDNode *C65DAGToDAGISel::Select(SDNode *N) {
-  MVT NVT = N->getSimpleValueType(0);
+  //MVT NVT = N->getSimpleValueType(0);
   SDLoc DL(N);
 
   // If we have a custom node, we already have selected!

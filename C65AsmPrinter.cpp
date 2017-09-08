@@ -72,18 +72,18 @@ MCOperand C65AsmPrinter::LowerSymbolOperand(const MachineOperand &MO) {
     break;
   }
 
-  const MCExpr *Expr = MCSymbolRefExpr::Create(Symbol, OutContext);
+  const MCExpr *Expr = MCSymbolRefExpr::create(Symbol, OutContext);
   if (HasOffset) {
     if (int64_t Offset = MO.getOffset()) {
-      const MCExpr *OffsetExpr = MCConstantExpr::Create(Offset, OutContext);
-      Expr = MCBinaryExpr::CreateAdd(Expr, OffsetExpr, OutContext);
+      const MCExpr *OffsetExpr = MCConstantExpr::create(Offset, OutContext);
+      Expr = MCBinaryExpr::createAdd(Expr, OffsetExpr, OutContext);
     }
   }
   if (ShiftAmt) {
-    const MCExpr *ShiftAmtExpr =  MCConstantExpr::Create(ShiftAmt, OutContext);
-    Expr = MCBinaryExpr::CreateShr(Expr, ShiftAmtExpr, OutContext);
+    const MCExpr *ShiftAmtExpr =  MCConstantExpr::create(ShiftAmt, OutContext);
+    Expr = MCBinaryExpr::createLShr(Expr, ShiftAmtExpr, OutContext);
   }
-  return MCOperand::CreateExpr(Expr);
+  return MCOperand::createExpr(Expr);
 }
 
 MCOperand C65AsmPrinter::LowerOperand(const MachineOperand &MO) {
@@ -94,10 +94,10 @@ MCOperand C65AsmPrinter::LowerOperand(const MachineOperand &MO) {
   case MachineOperand::MO_Register:
     if (MO.isImplicit())
       break;
-    return MCOperand::CreateReg(MO.getReg());
+    return MCOperand::createReg(MO.getReg());
 
   case MachineOperand::MO_Immediate:
-    return MCOperand::CreateImm(MO.getImm());
+    return MCOperand::createImm(MO.getImm());
 
   case MachineOperand::MO_MachineBasicBlock:
   case MachineOperand::MO_GlobalAddress:
@@ -135,22 +135,22 @@ void C65AsmPrinter::EmitInstruction(const MachineInstr *MI) {
     // FIXME: Debug Value.
     return;
   } else if (MI->getOpcode() == C65::LONGA_ON) {
-    if (OutStreamer.hasRawTextSupport())
-      OutStreamer.EmitRawText(".accu 16\n");
+    if (OutStreamer->hasRawTextSupport())
+      OutStreamer->EmitRawText(".accu 16\n");
   } else if (MI->getOpcode() == C65::LONGA_OFF) {
-    if (OutStreamer.hasRawTextSupport())
-      OutStreamer.EmitRawText(".accu 8\n");
+    if (OutStreamer->hasRawTextSupport())
+      OutStreamer->EmitRawText(".accu 8\n");
   } else if (MI->getOpcode() == C65::LONGI_ON) {
-    if (OutStreamer.hasRawTextSupport())
-      OutStreamer.EmitRawText(".index 16\n");
+    if (OutStreamer->hasRawTextSupport())
+      OutStreamer->EmitRawText(".index 16\n");
   } else if (MI->getOpcode() == C65::LONGI_OFF) {
-    if (OutStreamer.hasRawTextSupport())
-      OutStreamer.EmitRawText(".index 8\n");
+    if (OutStreamer->hasRawTextSupport())
+      OutStreamer->EmitRawText(".index 8\n");
   } else {
     // Normal instruction, emitted as-is
     MCInst TmpInst;
     LowerC65MachineInstrToMCInst(MI, TmpInst);
-    EmitToStreamer(OutStreamer, TmpInst);
+    EmitToStreamer(*OutStreamer, TmpInst);
   }
 }
 
@@ -160,7 +160,7 @@ static const char *getRegisterName(unsigned RegNo) {
 
 void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
                                  raw_ostream &O) {
-  const DataLayout *DL = TM.getDataLayout();
+  const DataLayout &DL = getDataLayout();
   const MachineOperand &MO = MI->getOperand(opNum);
 
   switch (MO.getType()) {
@@ -183,7 +183,7 @@ void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
     O << MO.getSymbolName();
     break;
   case MachineOperand::MO_ConstantPoolIndex:
-    O << DL->getPrivateGlobalPrefix() << "CPI" << getFunctionNumber() << "_"
+    O << DL.getPrivateGlobalPrefix() << "CPI" << getFunctionNumber() << "_"
       << MO.getIndex();
     break;
   default:
