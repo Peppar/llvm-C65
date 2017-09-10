@@ -41,20 +41,22 @@ C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
 const MCPhysReg*
 C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
   switch (MF->getFunction()->getCallingConv()) {
+  default:
+    return CSR_C65_SaveList;
   case CallingConv::PreserveAll:
     return CSR_C65_AllRegs_SaveList;
   }
-  return CSR_C65_SaveList;
 }
 
 const uint32_t*
 C65RegisterInfo::getCallPreservedMask(const MachineFunction &MF,
                                       CallingConv::ID CC) const {
   switch (CC) {
+  default:
+    return CSR_C65_RegMask;
   case CallingConv::PreserveAll:
     return CSR_C65_AllRegs_RegMask;
   }
-  return CSR_C65_RegMask;
 }
 
 BitVector C65RegisterInfo::getReservedRegs(const MachineFunction &MF) const {

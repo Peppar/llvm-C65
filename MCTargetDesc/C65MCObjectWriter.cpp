@@ -443,7 +443,7 @@ void WLAKObjectWriter::executePostLayoutBinding(MCAssembler &Asm,
                                                 const MCAsmLayout &Layout) {
   for (const MCSymbol &SD : Asm.symbols()) {
     SymbolInfo SI;
-    SI.Exported = SD.isInSection();
+    SI.Exported = SD.isInSection() && !SD.getName().empty();
     SI.Private = SD.isDefined() && !SD.isExternal();
     SymbolInfoMap[&SD] = SI;
   }

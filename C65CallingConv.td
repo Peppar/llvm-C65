@@ -49,12 +49,12 @@ def RetCC_C65 : CallingConv<[
 ]>;
 
 // By default, save half of the ZP registers.
-def CSR_C65 : CalleeSavedRegs<(add ZR16W, ZR18W, ZR20W, ZR22W, ZR24W,
-                                   ZR26W, ZR28W, ZR30W)>;
+//def CSR_C65 : CalleeSavedRegs<(add ZR16W, ZR18W, ZR20W, ZR22W, ZR24W,
+//                                   ZR26W, ZR28W, ZR30W)>;
+def CSR_C65 : CalleeSavedRegs<(add ZR16Q, ZR24Q)>;
 
 // Libcalls are required to save all ZP registers that are touched.
-def CSR_C65_AllRegs : CalleeSavedRegs<(add CSR_C65, ZR0W, ZR2W, ZR4W, ZR8W,
-                                           ZR10W, ZR12W, ZR14W)>;
+def CSR_C65_AllRegs : CalleeSavedRegs<(add CSR_C65, ZR0Q, ZR8Q)>;
 
 /// WDC W65816 C compiler calling convention.
 ///

@@ -19,6 +19,7 @@
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
 #include "llvm/MC/MCSymbol.h"
+#include "llvm/Support/Format.h"
 #include "llvm/Support/raw_ostream.h"
 
 using namespace llvm;
@@ -28,6 +29,17 @@ using namespace llvm;
 #define GET_INSTRUCTION_NAME
 #define PRINT_ALIAS_INSTR
 #include "C65GenAsmWriter.inc"
+
+namespace {
+
+void printImm(int64_t N, raw_ostream &O) {
+  if (N < 0)
+    O << "-$" << format_hex_no_prefix((uint64_t)-N, 6);
+  else
+    O << "$" << format_hex_no_prefix((uint64_t)N, 6);
+}
+
+}
 
 void C65InstPrinter::printRegName(raw_ostream &OS, unsigned RegNo) const {
   OS << StringRef(getRegisterName(RegNo));
@@ -47,8 +59,7 @@ void C65InstPrinter::printComments(const MCInst *MI, raw_ostream &OS) {
         FirstImm = false;
       else
         OS << ',';
-      OS << '$';
-      OS.write_hex(MI->getOperand(I).getImm());
+      printImm(MI->getOperand(I).getImm(), OS);
       HasComment = true;
     }
   }
@@ -96,7 +107,7 @@ void C65InstPrinter::printOperand(const MCInst *MI, int OpNum,
     OS << (int)MO.getImm();
   } else {
     assert(MO.isExpr() && "Unknown operand kind in printOperand");
-    OS << MO.getExpr();
+    MO.getExpr()->print(OS, &MAI);
   }
 }
 
@@ -108,7 +119,7 @@ void C65InstPrinter::printImmOperand(const MCInst *MI, int OpNum,
     OS << (int)MO.getImm();
   else {
     assert(MO.isExpr() && "Unknown operand kind in printImmOperand");
-    OS << MO.getExpr();
+    MO.getExpr()->print(OS, &MAI);
   }
 }
 void
@@ -131,7 +142,7 @@ C65InstPrinter::printAddress(const MCInst *MI, int OpNum, unsigned Indirection,
     OS << (int)MO.getImm();
   else {
     assert(MO.isExpr() && "Unknown operand kind in printAddress");
-    OS << MO.getExpr();
+    MO.getExpr()->print(OS, &MAI);
   }
   if (PreIndexReg)
     OS << ',' << PreIndexReg;

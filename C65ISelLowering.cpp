@@ -2270,8 +2270,7 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
   // Add a register mask operand representing the call-preserved
   // registers.
-  const TargetRegisterInfo *TRI =
-    Subtarget->getRegisterInfo();
+  const TargetRegisterInfo *TRI = Subtarget->getRegisterInfo();
   const uint32_t *Mask = TRI->getCallPreservedMask(MF, CallConv);
   assert(Mask && "Missing call preserved mask for calling convention");
   Ops.push_back(DAG.getRegisterMask(Mask));
