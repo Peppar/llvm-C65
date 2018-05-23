@@ -1647,7 +1647,7 @@ C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
   case C65::ZST64trunc8absl:
   case C65::ZST64trunc8rif:
   case C65::ZST64trunc8rrf:
-    return EmitZST(MI, MBB, false, 1, false);
+    return EmitZST(MI, MBB, false, 1, true);
   case C65::ZST32trunc16s:
   case C65::ZST64trunc16s:
     return EmitZST(MI, MBB, true, 2, false);
