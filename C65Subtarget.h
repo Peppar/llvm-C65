@@ -19,8 +19,8 @@
 #include "C65ISelLowering.h"
 #include "C65Subtarget.h"
 #include "llvm/ADT/Triple.h"
-#include "llvm/Target/TargetSelectionDAGInfo.h"
-#include "llvm/Target/TargetSubtargetInfo.h"
+#include "llvm/CodeGen/SelectionDAGTargetInfo.h"
+#include "llvm/CodeGen/TargetSubtargetInfo.h"
 #include <string>
 
 #define GET_SUBTARGETINFO_HEADER
@@ -45,7 +45,7 @@ private:
   Triple TargetTriple;
   C65InstrInfo InstrInfo;
   C65TargetLowering TLInfo;
-  TargetSelectionDAGInfo TSInfo;
+  SelectionDAGTargetInfo TSInfo;
   C65FrameLowering FrameLowering;
 
 public:
@@ -64,7 +64,7 @@ public:
   const C65TargetLowering *getTargetLowering() const override {
     return &TLInfo;
   }
-  const TargetSelectionDAGInfo *getSelectionDAGInfo() const override {
+  const SelectionDAGTargetInfo *getSelectionDAGInfo() const override {
     return &TSInfo;
   }
 

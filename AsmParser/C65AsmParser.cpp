@@ -13,9 +13,12 @@
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCParser/MCParsedAsmOperand.h"
+#include "llvm/MC/MCParser/MCAsmLexer.h"
+#include "llvm/MC/MCParser/MCAsmParser.h"
+#include "llvm/MC/MCParser/MCParsedAsmOperand.h"
+#include "llvm/MC/MCParser/MCTargetAsmParser.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/MC/MCTargetAsmParser.h"
 #include "llvm/Support/TargetRegistry.h"
 
 using namespace llvm;
@@ -232,7 +235,7 @@ public:
   C65AsmParser(const MCSubtargetInfo &sti, MCAsmParser &parser,
                const MCInstrInfo &MII,
                const MCTargetOptions &Options)
-      : MCTargetAsmParser(Options, sti), Parser(parser) {
+    : MCTargetAsmParser(Options, sti, MII), Parser(parser) {
     MCAsmParserExtension::Initialize(Parser);
 
     // Initialize the set of available features.
@@ -457,7 +460,7 @@ bool C65AsmParser::parseRegister(char &Reg) {
 // indicated with parentheses, while an indirection of 2 implies a
 // 24-bit indirection, indicated with brackets.
 //
-C65AsmParser::OperandMatchResultTy
+OperandMatchResultTy
 C65AsmParser::parseAddress() {
   if (AddressMatch.Valid) {
     if (AddressMatch.Match)
@@ -538,7 +541,7 @@ C65AsmParser::parseAddress() {
 
 // Parse a memory operand and add it to Operands.
 //
-C65AsmParser::OperandMatchResultTy
+OperandMatchResultTy
 C65AsmParser::parseAddress(OperandVector &Operands, MemoryKind MemKind,
                            unsigned Length, bool AllowZExt,
                            unsigned Indirection, char PreIndexReg,

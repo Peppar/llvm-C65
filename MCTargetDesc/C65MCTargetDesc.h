@@ -16,15 +16,18 @@
 
 #include "llvm/Support/DataTypes.h"
 
+#include <memory>
+
 namespace llvm {
 
 class MCAsmBackend;
 class MCCodeEmitter;
 class MCContext;
 class MCInstrInfo;
-class MCObjectWriter;
+class MCObjectTargetWriter;
 class MCRegisterInfo;
 class MCSubtargetInfo;
+class MCTargetOptions;
 class Target;
 class Triple;
 class StringRef;
@@ -32,15 +35,17 @@ class raw_pwrite_stream;
 
 extern Target The65C816Target;
 
-  MCCodeEmitter *createC65MCCodeEmitter(const MCInstrInfo &MCII,
-                                        const MCRegisterInfo &MRI,
-                                        MCContext &Ctx);
-  MCAsmBackend *createC65MCAsmBackend(const Target &T,
+MCCodeEmitter *createC65MCCodeEmitter(const MCInstrInfo &MCII,
                                       const MCRegisterInfo &MRI,
-                                      const Triple &TT,
-                                      StringRef CPU);
-  MCObjectWriter *createC65WLAKObjectWriter(raw_pwrite_stream &OS,
-                                            uint8_t OSABI);
+                                      MCContext &Ctx);
+
+MCAsmBackend *createC65MCAsmBackend(const Target &T,
+                                    const MCSubtargetInfo &STI,
+                                    const MCRegisterInfo &MRI,
+                                    const MCTargetOptions &Options);
+
+std::unique_ptr<MCObjectTargetWriter>
+createC65WLAKObjectTargetWriter(uint8_t OSABI);
 
 } // End llvm namespace
 

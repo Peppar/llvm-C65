@@ -53,7 +53,7 @@ C65TargetLowering::C65TargetLowering(const TargetMachine &TM,
 
   // Division and select is very expensive
   //setIntDivIsCheap(false);
-  setSelectIsExpensive(true);
+  //setSelectIsExpensive(true);
 
   // Jump is cheap
   setJumpIsExpensive(false);
@@ -245,11 +245,11 @@ EVT C65TargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
 
 /// Return the type that should be used to zero or sign extend a
 /// zeroext/signext integer argument or return value.
-EVT C65TargetLowering::
-getTypeForExtArgOrReturn(LLVMContext &Context, EVT VT,
-                         ISD::NodeType ExtendKind) const {
-  return VT;
-}
+//EVT C65TargetLowering::
+//getTypeForExtArgOrReturn(LLVMContext &Context, EVT VT,
+//                         ISD::NodeType ExtendKind) const {
+//  return VT;
+//}
 
 /// This callback is invoked for operations that are unsupported by
 /// the target, which are registered to use 'custom' lowering, and
@@ -361,7 +361,7 @@ SDValue C65TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
 SDValue
 C65TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
   MachineFunction &MF = DAG.getMachineFunction();
-  MachineFrameInfo &MFI = *MF.getFrameInfo();
+  MachineFrameInfo &MFI = MF.getFrameInfo();
   C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
 
   // Need frame address to find the address of VarArgsFrameIndex.
@@ -377,7 +377,7 @@ C65TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
                                       DL));
   const Value *SV = cast<SrcValueSDNode>(Op.getOperand(2))->getValue();
   return DAG.getStore(Op.getOperand(0), DL, Offset, Op.getOperand(1),
-                      MachinePointerInfo(SV), false, false, 0);
+                      MachinePointerInfo(SV));
 }
 
 SDValue
@@ -390,23 +390,22 @@ C65TargetLowering::LowerVAARG(SDValue Op, SelectionDAG &DAG) const {
   const Value *SV = cast<SrcValueSDNode>(Node->getOperand(2))->getValue();
   SDLoc DL(Node);
   SDValue VAList = DAG.getLoad(PtrVT, DL, InChain, VAListPtr,
-                               MachinePointerInfo(SV), false, false, false, 0);
+                               MachinePointerInfo(SV));
   // Increment the pointer, VAList, to the next vaarg.
   SDValue NextPtr = DAG.getNode(ISD::ADD, DL, PtrVT, VAList,
                                 DAG.getIntPtrConstant(VT.getSizeInBits()/8,
                                                       DL));
   // Store the incremented VAList to the legalized pointer.
   InChain = DAG.getStore(VAList.getValue(1), DL, NextPtr,
-                         VAListPtr, MachinePointerInfo(SV), false, false, 0);
+                         VAListPtr, MachinePointerInfo(SV));
   // Load the actual argument out of the pointer VAList.
-  return DAG.getLoad(VT, DL, InChain, VAList, MachinePointerInfo(),
-                     false, false, false, 1);
+  return DAG.getLoad(VT, DL, InChain, VAList, MachinePointerInfo());
 }
 
 SDValue
 C65TargetLowering::LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const {
-  MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
-  MFI->setFrameAddressIsTaken(true);
+  MachineFrameInfo &MFI = DAG.getMachineFunction().getFrameInfo();
+  MFI.setFrameAddressIsTaken(true);
 
   EVT VT = Op.getValueType();
   SDLoc DL(Op);
@@ -1267,7 +1266,7 @@ C65TargetLowering::EmitZLDimm(MachineInstr *MI,
       // and finally to the corresponding VLAK stack calculation
       // (MCObjectWriter).
       MachineInstr *LDAMI = BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
-        .addOperand(*Op1);
+        .add(*Op1);
       LDAMI->getOperand(LDAMI->getNumOperands() - 1).setTargetFlags(ShiftAmt);
       BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
         .addImm(RI->getZRAddress(MI->getOperand(0).getReg()) + I);
@@ -1529,7 +1528,7 @@ C65TargetLowering::EmitZPUSHimm(MachineInstr *MI,
       // then to the corresponding bit shift fixup kind (CodeEmitter),
       // and finally to the corresponding VLAK stack calculation
       // (MCObjectWriter).
-      MIB.addOperand(*Op);
+      MIB.add(*Op);
       MachineInstr *MI2 = MIB;
       MI2->getOperand(MI2->getNumOperands() - 1).setTargetFlags(ShiftAmt);
     }
@@ -1992,7 +1991,7 @@ C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
 /// creating new basic blocks and control flow.
 ///
 MachineBasicBlock *
-C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
+C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
                                                MachineBasicBlock *MBB) const {
   return MBB;
 }
@@ -2013,12 +2012,13 @@ C65TargetLowering::isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const {
 ///
 void C65TargetLowering::
 computeKnownBitsForTargetNode(const SDValue Op,
-                              APInt &KnownZero,
-                              APInt &KnownOne,
+                              KnownBits &Known,
+                              const APInt &DemandedElts,
                               const SelectionDAG &DAG,
                               unsigned Depth) const {
   // TODO
-  KnownZero = KnownOne = APInt(KnownZero.getBitWidth(), 0);
+  Known.resetAll();
+  //KnownZero = KnownOne = APInt(KnownZero.getBitWidth(), 0);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2036,7 +2036,7 @@ C65TargetLowering::LowerReturn(SDValue Chain,
                                CallingConv::ID CallConv, bool IsVarArg,
                                const SmallVectorImpl<ISD::OutputArg> &Outs,
                                const SmallVectorImpl<SDValue> &OutVals,
-                               SDLoc DL, SelectionDAG &DAG) const {
+                               const SDLoc &DL, SelectionDAG &DAG) const {
   SmallVector<CCValAssign, 16> RVLocs;
   SmallVector<SDValue, 4> RetOps(1, Chain);
   SDValue Glue;
@@ -2078,11 +2078,11 @@ LowerFormalArguments(SDValue Chain,
                      CallingConv::ID CallConv,
                      bool IsVarArg,
                      const SmallVectorImpl<ISD::InputArg> &Ins,
-                     SDLoc DL,
+                     const SDLoc &DL,
                      SelectionDAG &DAG,
                      SmallVectorImpl<SDValue> &InVals) const {
   MachineFunction &MF = DAG.getMachineFunction();
-  MachineFrameInfo *MFI = MF.getFrameInfo();
+  MachineFrameInfo &MFI = MF.getFrameInfo();
   //MachineRegisterInfo &MRI = MF.getRegInfo();
   C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
 
@@ -2131,15 +2131,14 @@ LowerFormalArguments(SDValue Chain,
       EVT ValVT = VA.getValVT();
 
       // Create the frame index object for this parameter.
-      int FI = MFI->CreateFixedObject(ValVT.getSizeInBits() / 8,
-                                      VA.getLocMemOffset(), true);
+      int FI = MFI.CreateFixedObject(ValVT.getSizeInBits() / 8,
+                                     VA.getLocMemOffset(), true);
 
       // Create the SelectionDAG nodes corresponding to a load from
       // this parameter
       SDValue FIN = DAG.getFrameIndex(FI, getPointerTy(DAG.getDataLayout()));
       MachinePointerInfo MPI = MachinePointerInfo::getFixedStack(MF, FI);
-      ArgValue = DAG.getLoad(ValVT, DL, Chain, FIN,
-                             MPI, false, false, false, 0);
+      ArgValue = DAG.getLoad(ValVT, DL, Chain, FIN, MPI);
     }
     InVals.push_back(ArgValue);
   }
@@ -2191,7 +2190,8 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   unsigned NumBytes = CCInfo.getNextStackOffset();
 
   // Mark the start of the call.
-  Chain = DAG.getCALLSEQ_START(Chain, DAG.getIntPtrConstant(0, DL, true), DL);
+  Chain = DAG.getCALLSEQ_START(Chain, NumBytes, 0, DL);
+  //Chain = DAG.getCALLSEQ_START(Chain, DAG.getIntPtrConstant(0, DL, true), DL);
 
   // Copy argument values to their designated locations.
   SmallVector<std::pair<unsigned, SDValue>, 3> RegsToPass;
@@ -2207,8 +2207,7 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
       SDValue SpillSlot = DAG.CreateStackTemporary(VA.getValVT());
       int FI = cast<FrameIndexSDNode>(SpillSlot)->getIndex();
       MachinePointerInfo MPI = MachinePointerInfo::getFixedStack(MF, FI);
-      MemOpChains.push_back(DAG.getStore(Chain, DL, ArgValue, SpillSlot,
-                                         MPI, false, false, 0));
+      MemOpChains.push_back(DAG.getStore(Chain, DL, ArgValue, SpillSlot, MPI));
       ArgValue = SpillSlot;
     }
 
@@ -2303,7 +2302,7 @@ SDValue
 C65TargetLowering::LowerCallResult(SDValue Chain, SDValue Glue,
                                    CallingConv::ID CallConv, bool IsVarArg,
                                    const SmallVectorImpl<ISD::InputArg> &Ins,
-                                   SDLoc DL, SelectionDAG &DAG,
+                                   const SDLoc &DL, SelectionDAG &DAG,
                                    SmallVectorImpl<SDValue> &InVals) const {
 
   // Assign locations to each value returned by this call.
@@ -2335,7 +2334,7 @@ std::pair<SDValue, SDValue>
 C65TargetLowering::makeC65LibCall(SelectionDAG &DAG,
                                   const char *LCName, EVT RetVT,
                                   const SDValue *Ops, unsigned NumOps,
-                                  bool isSigned, SDLoc DL,
+                                  bool isSigned, const SDLoc &DL,
                                   bool doesNotReturn,
                                   bool isReturnValueUsed) const {
   TargetLowering::ArgListTy Args;
@@ -2345,8 +2344,8 @@ C65TargetLowering::makeC65LibCall(SelectionDAG &DAG,
   for (unsigned I = 0; I != NumOps; ++I) {
     Entry.Node = Ops[I];
     Entry.Ty = Entry.Node.getValueType().getTypeForEVT(*DAG.getContext());
-    Entry.isSExt = isSigned;
-    Entry.isZExt = !isSigned;
+    Entry.IsSExt = isSigned;
+    Entry.IsZExt = !isSigned;
     Args.push_back(Entry);
   }
   SDValue Callee = DAG.getExternalSymbol(LCName,
@@ -2356,7 +2355,7 @@ C65TargetLowering::makeC65LibCall(SelectionDAG &DAG,
   TargetLowering::CallLoweringInfo CLI(DAG);
   CLI.setDebugLoc(DL).setChain(DAG.getEntryNode())
     .setCallee(CallingConv::PreserveAll, RetTy,
-               Callee, std::move(Args), 0)
+               Callee, std::move(Args))
     .setNoReturn(doesNotReturn).setDiscardResult(!isReturnValueUsed)
     .setSExtResult(isSigned).setZExtResult(!isSigned);
   return LowerCallTo(CLI);

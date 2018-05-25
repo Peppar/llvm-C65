@@ -14,7 +14,7 @@
 #ifndef LLVM_TARGET_C65REGISTERINFO_H
 #define LLVM_TARGET_C65REGISTERINFO_H
 
-#include "llvm/Target/TargetRegisterInfo.h"
+#include "llvm/CodeGen/TargetRegisterInfo.h"
 
 #define GET_REGINFO_HEADER
 #include "C65GenRegisterInfo.inc"

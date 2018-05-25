@@ -33,7 +33,7 @@ namespace {
     static char ID;
 
     ZInstrExpander() : MachineFunctionPass(ID) {}
-    const char *getPassName() const override {
+    StringRef getPassName() const override {
       return "C65 Z instruction expander";
     }
 
@@ -63,13 +63,13 @@ bool ZInstrExpander::runOnMachineFunction(MachineFunction &MF) {
     MachineBasicBlock *MBB = &(*I);
     for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
          MBBI != MBBE; ) {
-      MachineInstr *MI = &(*(MBBI++));
+      MachineInstr &MI = *(MBBI++);
 
       // If MI is a Z instruction, expand it.
-      if (MI->getDesc().TSFlags & C65II::ZRInstr) {
+      if (MI.getDesc().TSFlags & C65II::ZRInstr) {
         Changed = true;
         MachineBasicBlock *NewMBB =
-          TL.EmitZInstr(MI, MBB);
+          TL.EmitZInstr(&MI, MBB);
         // The expansion may involve new basic blocks.
         if (NewMBB != MBB) {
           MBB = NewMBB;

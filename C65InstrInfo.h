@@ -17,7 +17,7 @@
 
 #include "C65.h"
 #include "C65RegisterInfo.h"
-#include "llvm/Target/TargetInstrInfo.h"
+#include "llvm/CodeGen/TargetInstrInfo.h"
 
 #define GET_INSTRINFO_HEADER
 #include "C65GenInstrInfo.inc"
@@ -36,17 +36,17 @@ public:
   explicit C65InstrInfo(C65Subtarget &STI);
 
   // Override TargetInstrInfo
-  unsigned isLoadFromStackSlot(const MachineInstr *MI,
+  unsigned isLoadFromStackSlot(const MachineInstr &MI,
                                int &FrameIndex) const override;
-  unsigned isStoreToStackSlot(const MachineInstr *MI,
+  unsigned isStoreToStackSlot(const MachineInstr &MI,
                               int &FrameIndex) const override;
   void buildPushReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
-                    DebugLoc DL, unsigned Reg) const;
+                    const DebugLoc &DL, unsigned Reg) const;
   void buildPullReg(MachineBasicBlock &MBB, MachineBasicBlock::iterator MI,
-                    DebugLoc DL, unsigned Reg) const;
+                    const DebugLoc &DL, unsigned Reg) const;
   void copyPhysReg(MachineBasicBlock &MBB,
                    MachineBasicBlock::iterator MBBI,
-                   DebugLoc DL, unsigned DestReg, unsigned SrcReg,
+                   const DebugLoc &DL, unsigned DestReg, unsigned SrcReg,
                    bool KillSrc) const override;
   void storeRegToStackSlot(MachineBasicBlock &MBB,
                            MachineBasicBlock::iterator MBBI,
@@ -60,25 +60,27 @@ public:
                             const TargetRegisterInfo *TRI) const override;
   const C65RegisterInfo &getRegisterInfo() const { return RI; }
 
-  bool ExpandBR_CC(MachineInstr *MI,
-                   unsigned NumBytes) const;
+  //bool expandBR_CC(MachineInstr *MI,
+  //                 unsigned NumBytes) const;
 
-  bool expandPostRAPseudo(MachineBasicBlock::iterator MBBI) const override;
+  bool expandPostRAPseudo(MachineInstr &MI) const override;
 
   // Predication support.
-  bool isPredicated(const MachineInstr *MI) const override;
+  bool isPredicated(const MachineInstr &MI) const override;
 
-  bool isUnpredicatedTerminator(const MachineInstr *MI) const override;
+  bool isUnpredicatedTerminator(const MachineInstr &MI) const override;
 
   // Branch analysis.
-  bool AnalyzeBranch(MachineBasicBlock &MBB, MachineBasicBlock *&TBB,
+  bool analyzeBranch(MachineBasicBlock &MBB, MachineBasicBlock *&TBB,
                      MachineBasicBlock *&FBB,
                      SmallVectorImpl<MachineOperand> &Cond,
                      bool AllowModify) const override;
-  unsigned RemoveBranch(MachineBasicBlock &MBB) const override;
-  unsigned InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
+  unsigned removeBranch(MachineBasicBlock &MBB,
+                        int *BytesRemoved = nullptr) const override;
+  unsigned insertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                         MachineBasicBlock *FBB, ArrayRef<MachineOperand> Cond,
-                        DebugLoc DL) const override;
+                        const DebugLoc &DL,
+                        int *BytesRemoved = nullptr) const override;
 };
 } // end namespace llvm
 

@@ -130,7 +130,7 @@ def C65Wrapper         : SDNode<"C65ISD::Wrapper", SDTC65Wrapper>;
 def C65FarWrapper      : SDNode<"C65ISD::FarWrapper", SDTC65Wrapper>;
 
 //  These are target-independent nodes, but have target-specific formats.
-def SDTC65CALLSEQ_START : SDCallSeqStart<[SDTCisVT<0, i32>]>;
+def SDTC65CALLSEQ_START : SDCallSeqStart<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 def SDTC65CALLSEQ_END   : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 
 def C65CALLSEQ_START : SDNode<"ISD::CALLSEQ_START", SDTC65CALLSEQ_START,
@@ -1189,9 +1189,9 @@ let Predicates = [IsAcc16Bit] in {
 
 // ADJCALLSTACKDOWN, ADJCALLSTACKUP are mandatory pseudo-instructions
 let Defs = [S, P], Uses = [S], isCodeGenOnly = 1 in {
-  def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt),
-                                ";!ADJCALLSTACKDOWN $amt",
-                                [(C65CALLSEQ_START timm:$amt)]>;
+  def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt, i32imm:$amt2),
+                                ";!ADJCALLSTACKDOWN $amt,$amt2",
+                                [(C65CALLSEQ_START timm:$amt, timm:$amt2)]>;
   def ADJCALLSTACKUP : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
                               ";!ADJCALLSTACKUP $amt1",
                               [(C65CALLSEQ_END timm:$amt1, timm:$amt2)]>;

@@ -36,7 +36,7 @@ void C65FrameLowering::emitPrologue(MachineFunction &MF,
   const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
   const C65RegisterInfo &RegInfo = *STI.getRegisterInfo();
   const C65InstrInfo &TII = *STI.getInstrInfo();
-  const MachineFrameInfo &MFI = *MF.getFrameInfo();
+  const MachineFrameInfo &MFI = MF.getFrameInfo();
   //C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
 
   bool HasFP = hasFP(MF);
@@ -203,7 +203,7 @@ void C65FrameLowering::emitSAdjustment(MachineFunction &MF,
 // }
 
 
-void C65FrameLowering::
+MachineBasicBlock::iterator C65FrameLowering::
 eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
                               MachineBasicBlock::iterator I) const {
   MachineInstr &MI = *I;
@@ -214,7 +214,7 @@ eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
     else
       emitSAdjustment(MF, MBB, I, Size);
   }
-  MBB.erase(I);
+  return MBB.erase(I);
 }
 
 void C65FrameLowering::emitEpilogue(MachineFunction &MF,
@@ -222,7 +222,7 @@ void C65FrameLowering::emitEpilogue(MachineFunction &MF,
   const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
   const C65RegisterInfo &RegInfo = *STI.getRegisterInfo();
   const TargetInstrInfo &TII = *STI.getInstrInfo();
-  const MachineFrameInfo &MFI = *MF.getFrameInfo();
+  const MachineFrameInfo &MFI = MF.getFrameInfo();
   C65MachineFunctionInfo &FuncInfo = *MF.getInfo<C65MachineFunctionInfo>();
 
   MachineBasicBlock::iterator MBBI = MBB.getLastNonDebugInstr();

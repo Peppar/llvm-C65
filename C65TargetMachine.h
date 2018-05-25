@@ -29,8 +29,8 @@ public:
 
   C65TargetMachine(const Target &T, const Triple &TT, StringRef CPU,
                    StringRef FS, const TargetOptions &Options,
-                   Reloc::Model RM, CodeModel::Model CM,
-                   CodeGenOpt::Level OL);
+                   Optional<Reloc::Model> RM, Optional<CodeModel::Model> CM,
+                   CodeGenOpt::Level OL, bool JIT);
 
   const C65Subtarget *getSubtargetImpl(const Function &F) const override;
 

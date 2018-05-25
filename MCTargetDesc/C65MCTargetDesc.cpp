@@ -14,7 +14,7 @@
 #include "C65MCTargetDesc.h"
 #include "InstPrinter/C65InstPrinter.h"
 #include "llvm/MC/MCAsmInfoELF.h"
-#include "llvm/MC/MCCodeGenInfo.h"
+//#include "llvm/MC/MCCodeGenInfo.h"
 #include "llvm/MC/MCELFStreamer.h"
 #include "llvm/MC/MCInstrInfo.h"
 #include "llvm/MC/MCRegisterInfo.h"
@@ -39,7 +39,7 @@ namespace llvm {
   public:
     explicit C65MCAsmInfo(const Triple &TT) {
       // TODO: Make use of TT
-      PointerSize = 2;
+      CodePointerSize = 2;
       CalleeSaveStackSlotSize = 1;
       IsLittleEndian = true;
       PrivateGlobalPrefix = ".L";
@@ -65,22 +65,22 @@ static MCAsmInfo *createC65MCAsmInfo(const MCRegisterInfo &MRI,
   return new C65MCAsmInfo(TT);
 }
 
-static MCCodeGenInfo *createC65MCCodeGenInfo(const Triple &TT, Reloc::Model RM,
-                                             CodeModel::Model CM,
-                                             CodeGenOpt::Level OL) {
-  MCCodeGenInfo *X = new MCCodeGenInfo();
+// static MCCodeGenInfo *createC65MCCodeGenInfo(const Triple &TT, Reloc::Model RM,
+//                                              CodeModel::Model CM,
+//                                              CodeGenOpt::Level OL) {
+//   MCCodeGenInfo *X = new MCCodeGenInfo();
 
-  // Static code is suitable for use in a dynamic executable; there is no
-  // separate DynamicNoPIC model.
-  if (RM == Reloc::Default || RM == Reloc::DynamicNoPIC)
-    RM = Reloc::Static;
+//   // Static code is suitable for use in a dynamic executable; there is no
+//   // separate DynamicNoPIC model.
+//   if (RM == Reloc::Default || RM == Reloc::DynamicNoPIC)
+//     RM = Reloc::Static;
 
-  if (CM == CodeModel::Default)
-    CM = CodeModel::Small;
+//   if (CM == CodeModel::Default)
+//     CM = CodeModel::Small;
 
-  X->initMCCodeGenInfo(RM, CM, OL);
-  return X;
-}
+//   X->initMCCodeGenInfo(RM, CM, OL);
+//   return X;
+// }
 
 static MCInstrInfo *createC65MCInstrInfo() {
   MCInstrInfo *X = new MCInstrInfo();
@@ -115,14 +115,14 @@ static MCInstPrinter *createC65MCInstPrinter(const Triple &T,
   return new C65InstPrinter(MAI, MII, MRI);
 }
 
-static MCStreamer *createC65MCObjectStreamer(const Triple &TT,
-                                             MCContext &Ctx,
-                                             MCAsmBackend &MAB,
-                                             raw_pwrite_stream &OS,
-                                             MCCodeEmitter *Emitter,
-                                             bool RelaxAll) {
-  return createELFStreamer(Ctx, MAB, OS, Emitter, RelaxAll);
-}
+// static MCStreamer *createC65MCObjectStreamer(const Triple &TT,
+//                                              MCContext &Ctx,
+//                                              MCAsmBackend &MAB,
+//                                              raw_pwrite_stream &OS,
+//                                              MCCodeEmitter *Emitter,
+//                                              bool RelaxAll) {
+//   return createELFStreamer(Ctx, MAB, OS, Emitter, RelaxAll);
+// }
 
 extern "C" void LLVMInitializeC65TargetMC() {
   //
@@ -130,8 +130,8 @@ extern "C" void LLVMInitializeC65TargetMC() {
   TargetRegistry::RegisterMCAsmInfo(The65C816Target,
                                     createC65MCAsmInfo);
 
-  TargetRegistry::RegisterMCCodeGenInfo(The65C816Target,
-                                        createC65MCCodeGenInfo);
+  //TargetRegistry::RegisterMCCodeGenInfo(The65C816Target,
+  //                                      createC65MCCodeGenInfo);
 
   TargetRegistry::RegisterMCCodeEmitter(The65C816Target,
                                         createC65MCCodeEmitter);
@@ -151,6 +151,6 @@ extern "C" void LLVMInitializeC65TargetMC() {
   TargetRegistry::RegisterMCInstPrinter(The65C816Target,
                                         createC65MCInstPrinter);
 
-  TargetRegistry::RegisterELFStreamer(The65C816Target,
-                                      createC65MCObjectStreamer);
+  //TargetRegistry::RegisterELFStreamer(The65C816Target,
+  //                                    createC65MCObjectStreamer);
 }

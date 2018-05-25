@@ -24,9 +24,8 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/Target/TargetFrameLowering.h"
-#include "llvm/Target/TargetInstrInfo.h"
 #include "llvm/Target/TargetMachine.h"
+#include "llvm/Target/TargetOptions.h"
 
 #define DEBUG_TYPE "c65-register-info"
 
@@ -40,7 +39,7 @@ C65RegisterInfo::C65RegisterInfo(C65Subtarget &ST)
 
 const MCPhysReg*
 C65RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
-  switch (MF->getFunction()->getCallingConv()) {
+  switch (MF->getFunction().getCallingConv()) {
   default:
     return CSR_C65_SaveList;
   case CallingConv::PreserveAll:
@@ -206,10 +205,10 @@ C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   int64_t FIOffset;
 
   if (FrameRegister == C65::X || FrameRegister == C65::XL) {
-    FIOffset = MF.getFrameInfo()->getObjectOffset(FrameIndex) + 1;
+    FIOffset = MF.getFrameInfo().getObjectOffset(FrameIndex) + 1;
   } else if (FrameRegister == C65::S) {
-    FIOffset = MF.getFrameInfo()->getObjectOffset(FrameIndex) + 1
-      + MF.getFrameInfo()->getStackSize();
+    FIOffset = MF.getFrameInfo().getObjectOffset(FrameIndex) + 1
+      + MF.getFrameInfo().getStackSize();
   }
 
   if (MI.getOperand(FIOperandNum + 1).isImm()) {
