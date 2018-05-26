@@ -3,7 +3,11 @@
 
 CAVEATS
 
-This is a *very* unstable, alpha version backend.
+This is a *very* unstable, alpha version target.
+
+For now, the target can output only to the library object format used
+by WLA DX (WLAK). The target has been tested only on SFC (SNES)
+emulators and hardware.
 
 The "standard libraries" consist of a set of assembly routines that
 need to be linked externally. See arith.s and shift.s in the SFC
@@ -41,7 +45,7 @@ cmake --build .
 
 TESTING
 
-Using the backend to compile an SFC (SNES) "game":
+Using the target to compile an SFC (SNES) "game":
 
 https://github.com/Peppar/llvm-C65-sfc-example
 
