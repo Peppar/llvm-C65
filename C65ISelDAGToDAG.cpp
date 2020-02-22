@@ -42,7 +42,7 @@ public:
   explicit C65DAGToDAGISel(C65TargetMachine &tm)
     : SelectionDAGISel(tm) {}
 
-  const char *getPassName() const override {
+  StringRef getPassName() const override {
     return "C65 DAG->DAG Instruction Selection";
   }
 
@@ -53,7 +53,7 @@ public:
     return true;
   }
 
-  SDNode *Select(SDNode *N) override;
+  virtual void Select(SDNode *N) override;
 
   // Complex pattern selectors
   bool SelectAddrZP(SDValue N, SDValue &Addr);
@@ -314,15 +314,15 @@ bool C65DAGToDAGISel::SelectAddrRRF(SDValue Addr, SDValue &R1,
   return false;
 }
 
-SDNode *C65DAGToDAGISel::Select(SDNode *N) {
+void C65DAGToDAGISel::Select(SDNode *N) {
   //MVT NVT = N->getSimpleValueType(0);
   SDLoc DL(N);
 
   // If we have a custom node, we already have selected!
   if (N->isMachineOpcode()) {
-    DEBUG(dbgs() << "== ";  N->dump(CurDAG); dbgs() << '\n');
+    LLVM_DEBUG(dbgs() << "== ";  N->dump(CurDAG); dbgs() << '\n');
     N->setNodeId(-1);
-    return nullptr;
+    return;
   }
 
   unsigned OpCode = N->getOpcode();
@@ -330,16 +330,11 @@ SDNode *C65DAGToDAGISel::Select(SDNode *N) {
   default: break;
   }
 
-  SDNode *ResNode = SelectCode(N);
+  SelectCode(N);
 
-  DEBUG(dbgs() << "=> ";
-        if (ResNode == nullptr || ResNode == N)
-          N->dump(CurDAG);
-        else
-          ResNode->dump(CurDAG);
-        dbgs() << '\n');
-
-  return ResNode;
+  LLVM_DEBUG(dbgs() << "=> ";
+    N->dump(CurDAG);
+    dbgs() << '\n');
 }
 
 /// SelectInlineAsmMemoryOperand - Implement addressing mode selection

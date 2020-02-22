@@ -15,7 +15,7 @@
 #define LLVM_LIB_TARGET_C65_C65MACHINEFUNCTIONINFO_H
 
 #include "llvm/CodeGen/MachineFunction.h"
-#include "llvm/CodeGen/MachineValueType.h"
+//#include "llvm/CodeGen/MachineValueType.h"
 #include <vector>
 
 namespace llvm {

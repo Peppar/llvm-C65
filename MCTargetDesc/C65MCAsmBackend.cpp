@@ -1,4 +1,4 @@
-//===-- C65MCAsmBackend.cpp - C65 assembler backend ---------------===//
+//===-- C65MCAsmBackend.cpp - C65 assembler backend -----------------------===//
 //
 //                     The LLVM Compiler Infrastructure
 //
@@ -10,17 +10,19 @@
 #include "MCTargetDesc/C65MCTargetDesc.h"
 #include "MCTargetDesc/C65MCFixups.h"
 #include "llvm/MC/MCAsmBackend.h"
-#include "llvm/MC/MCELFObjectWriter.h"
 #include "llvm/MC/MCFixupKindInfo.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCObjectWriter.h"
+#include "llvm/MC/MCSubtargetInfo.h"
 
 using namespace llvm;
+
+namespace {
 
 // Value is a fully-resolved relocation value: Symbol + Addend [- Pivot].
 // Return the bits that should be installed in a relocation field for
 // fixup kind Kind.
-static uint64_t extractBitsForFixup(MCFixupKind Kind, uint64_t Value) {
+uint64_t extractBitsForFixup(MCFixupKind Kind, uint64_t Value) {
   if (Kind < FirstTargetFixupKind)
     return Value;
   if (C65::isFixup8Bit(Kind))
@@ -30,21 +32,21 @@ static uint64_t extractBitsForFixup(MCFixupKind Kind, uint64_t Value) {
   llvm_unreachable("Unknown fixup kind!");
 }
 
-namespace {
 class C65MCAsmBackend : public MCAsmBackend {
-  uint8_t OSABI;
 public:
-  C65MCAsmBackend(uint8_t osABI)
-    : OSABI(osABI) {}
+  C65MCAsmBackend() : MCAsmBackend(support::little) {}
 
   // Override MCAsmBackend
   unsigned getNumFixupKinds() const override {
     return C65::NumTargetFixupKinds;
   }
   const MCFixupKindInfo &getFixupKindInfo(MCFixupKind Kind) const override;
-  void applyFixup(const MCFixup &Fixup, char *Data, unsigned DataSize,
-                  uint64_t Value, bool IsPCRel) const override;
-  bool mayNeedRelaxation(const MCInst &Inst) const override {
+  void applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
+                  const MCValue &Target, MutableArrayRef<char> Data,
+                  uint64_t Value, bool IsResolved,
+                  const MCSubtargetInfo *STI) const override;
+  bool mayNeedRelaxation(const MCInst &Inst,
+                         const MCSubtargetInfo &STI) const override {
     return false;
   }
   bool fixupNeedsRelaxation(const MCFixup &Fixup, uint64_t Value,
@@ -52,12 +54,13 @@ public:
                             const MCAsmLayout &Layout) const override {
     return false;
   }
-  void relaxInstruction(const MCInst &Inst, MCInst &Res) const override {
+  void relaxInstruction(const MCInst &Inst, const MCSubtargetInfo &STI,
+                        MCInst &Res) const override {
     llvm_unreachable("C65 does do not have assembler relaxation");
   }
-  bool writeNopData(uint64_t Count, MCObjectWriter *OW) const override;
-  MCObjectWriter *createObjectWriter(raw_pwrite_stream &OS) const override {
-    return createC65WLAKObjectWriter(OS, OSABI);
+  bool writeNopData(raw_ostream &OS, uint64_t Count) const override;
+  std::unique_ptr<MCObjectTargetWriter> createObjectTargetWriter() const override {
+    return createC65MCWLAVObjectTargetWriter();
   }
 };
 } // end anonymous namespace
@@ -88,14 +91,15 @@ C65MCAsmBackend::getFixupKindInfo(MCFixupKind Kind) const {
   return Infos[Kind - FirstTargetFixupKind];
 }
 
-void C65MCAsmBackend::applyFixup(const MCFixup &Fixup, char *Data,
-                                 unsigned DataSize, uint64_t Value,
-                                 bool IsPCRel) const {
+void C65MCAsmBackend::applyFixup(const MCAssembler &Asm, const MCFixup &Fixup,
+                                 const MCValue &Target, MutableArrayRef<char> Data,
+                                 uint64_t Value, bool IsResolved,
+                                 const MCSubtargetInfo *STI) const {
   MCFixupKind Kind = Fixup.getKind();
   unsigned Offset = Fixup.getOffset();
   unsigned Size = (getFixupKindInfo(Kind).TargetSize + 7) / 8;
 
-  assert(Offset + Size <= DataSize && "Invalid fixup offset!");
+  assert(Offset + Size <= Data.size() && "Invalid fixup offset!");
 
   // Big-endian insertion of Size bytes.
   Value = extractBitsForFixup(Kind, Value);
@@ -106,16 +110,18 @@ void C65MCAsmBackend::applyFixup(const MCFixup &Fixup, char *Data,
   }
 }
 
-bool C65MCAsmBackend::writeNopData(uint64_t Count,
-                                   MCObjectWriter *OW) const {
+bool C65MCAsmBackend::writeNopData(raw_ostream &OS,
+                                   uint64_t Count) const {
   for (uint64_t I = 0; I != Count; ++I)
-    OW->write8(0xea);
+    OS << '\xea';
   return true;
 }
 
 MCAsmBackend *llvm::createC65MCAsmBackend(const Target &T,
+                                          const MCSubtargetInfo &STI,
                                           const MCRegisterInfo &MRI,
-                                          const Triple &TT, StringRef CPU) {
-  uint8_t OSABI = MCELFObjectTargetWriter::getOSABI(TT.getOS());
-  return new C65MCAsmBackend(OSABI);
+                                          const MCTargetOptions &Options) {
+  //uint8_t OSABI =
+  //    MCELFObjectTargetWriter::getOSABI(STI.getTargetTriple().getOS());
+  return new C65MCAsmBackend();
 }

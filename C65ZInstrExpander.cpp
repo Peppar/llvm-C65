@@ -21,7 +21,6 @@
 #include "llvm/CodeGen/Passes.h"
 #include "llvm/Support/Debug.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Target/TargetInstrInfo.h"
 using namespace llvm;
 
 #define DEBUG_TYPE "c65-z-instr-expander"
@@ -33,7 +32,7 @@ namespace {
     static char ID;
 
     ZInstrExpander() : MachineFunctionPass(ID) {}
-    const char *getPassName() const override {
+    StringRef getPassName() const override {
       return "C65 Z instruction expander";
     }
 
@@ -63,10 +62,10 @@ bool ZInstrExpander::runOnMachineFunction(MachineFunction &MF) {
     MachineBasicBlock *MBB = &(*I);
     for (MachineBasicBlock::iterator MBBI = MBB->begin(), MBBE = MBB->end();
          MBBI != MBBE; ) {
-      MachineInstr *MI = &(*(MBBI++));
+      MachineInstr &MI = *(MBBI++);
 
       // If MI is a Z instruction, expand it.
-      if (MI->getDesc().TSFlags & C65II::ZRInstr) {
+      if (MI.getDesc().TSFlags & C65II::ZRInstr) {
         Changed = true;
         MachineBasicBlock *NewMBB =
           TL.EmitZInstr(MI, MBB);

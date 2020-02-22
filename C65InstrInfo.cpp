@@ -41,7 +41,7 @@ C65InstrInfo::C65InstrInfo(C65Subtarget &ST)
 
 void C65InstrInfo::buildPushReg(MachineBasicBlock &MBB,
                                 MachineBasicBlock::iterator MI,
-                                DebugLoc DL, unsigned Reg) const {
+                                const DebugLoc &DL, unsigned Reg) const {
   // if (Reg == C65::A) {
   //   BuildMI(MBB, MI, DL, get(C65::PHA));
   // } else if (Reg == C65::X) {
@@ -53,14 +53,14 @@ void C65InstrInfo::buildPushReg(MachineBasicBlock &MBB,
   // } else if (Reg == C65::P) {
   //   BuildMI(MBB, MI, DL, get(C65::PHP));
   // } else {
-  //   DEBUG(dbgs() << "Cannot push " << RI.getName(Reg) << '\n');
+  //   LLVM_DEBUG(dbgs() << "Cannot push " << RI.getName(Reg) << '\n');
   //   llvm_unreachable("Impossible reg-to-reg copy push");
   // }
 }
 
 void C65InstrInfo::buildPullReg(MachineBasicBlock &MBB,
                                 MachineBasicBlock::iterator MI,
-                                DebugLoc DL, unsigned Reg) const {
+                                const DebugLoc &DL, unsigned Reg) const {
   // if (Reg == C65::A) {
   //   BuildMI(MBB, MI, DL, get(C65::PLA));
   // } else if (Reg == C65::X) {
@@ -72,14 +72,14 @@ void C65InstrInfo::buildPullReg(MachineBasicBlock &MBB,
   // } else if (Reg == C65::P) {
   //   BuildMI(MBB, MI, DL, get(C65::PLP));
   // } else {
-  //   DEBUG(dbgs() << "Cannot pull " << RI.getName(Reg) << '\n');
+  //   LLVM_DEBUG(dbgs() << "Cannot pull " << RI.getName(Reg) << '\n');
   //   llvm_unreachable("Impossible reg-to-reg copy pull");
   // }
 }
 
 void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator MBBI,
-                               DebugLoc DL,
+                               const DebugLoc &DL,
                                unsigned DestReg, unsigned SrcReg,
                                bool KillSrc) const {
   unsigned ZMOVInstr =
@@ -165,7 +165,7 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   //   llvm_unreachable("Normal reg-to-reg copy not implemented.");
   // }
 
-  DEBUG(dbgs() << "CopyPhysReg from "
+  LLVM_DEBUG(dbgs() << "CopyPhysReg from "
                << RI.getName(DestReg)
                << " to " << RI.getName(SrcReg) << '\n');
   // if (SrcReg == C65::A && DestReg == C65::X) {
@@ -189,21 +189,21 @@ void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
   //   buildPushReg(MBB, MI, DL, DestReg);
   //   buildPullReg(MBB, MI, DL, SrcReg);
   // } else {
-  //   DEBUG(dbgs() << "Cannot copy " << RI.getName(SrcReg)
+  //   LLVM_DEBUG(dbgs() << "Cannot copy " << RI.getName(SrcReg)
   //                << " to " << RI.getName(DestReg) << '\n');
   //   llvm_unreachable("Impossible reg-to-reg copy");
   // }
 }
 
-unsigned C65InstrInfo::isStoreToStackSlot(const MachineInstr *MI,
+unsigned C65InstrInfo::isStoreToStackSlot(const MachineInstr &MI,
                                           int &FrameIndex) const {
-  if (MI->getOpcode() == C65::ZST8s ||
-      MI->getOpcode() == C65::ZST16s ||
-      MI->getOpcode() == C65::ZST32s ||
-      MI->getOpcode() == C65::ZST64s) {
-    if (MI->getOperand(1).isFI()) {
-      FrameIndex = MI->getOperand(1).getIndex();
-      return MI->getOperand(0).getReg();
+  if (MI.getOpcode() == C65::ZST8s ||
+      MI.getOpcode() == C65::ZST16s ||
+      MI.getOpcode() == C65::ZST32s ||
+      MI.getOpcode() == C65::ZST64s) {
+    if (MI.getOperand(1).isFI()) {
+      FrameIndex = MI.getOperand(1).getIndex();
+      return MI.getOperand(0).getReg();
     }
   }
   return 0;
@@ -233,15 +233,15 @@ storeRegToStackSlot(MachineBasicBlock &MBB,
     .addImm(0);
 }
 
-unsigned C65InstrInfo::isLoadFromStackSlot(const MachineInstr *MI,
+unsigned C65InstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
                                            int &FrameIndex) const {
-  if (MI->getOpcode() == C65::ZLD8s ||
-      MI->getOpcode() == C65::ZLD16s ||
-      MI->getOpcode() == C65::ZLD32s ||
-      MI->getOpcode() == C65::ZLD64s) {
-    if (MI->getOperand(1).isFI()) {
-      FrameIndex = MI->getOperand(1).getIndex();
-      return MI->getOperand(0).getReg();
+  if (MI.getOpcode() == C65::ZLD8s ||
+      MI.getOpcode() == C65::ZLD16s ||
+      MI.getOpcode() == C65::ZLD32s ||
+      MI.getOpcode() == C65::ZLD64s) {
+    if (MI.getOperand(1).isFI()) {
+      FrameIndex = MI.getOperand(1).getIndex();
+      return MI.getOperand(0).getReg();
     }
   }
   return 0;
@@ -270,27 +270,27 @@ loadRegFromStackSlot(MachineBasicBlock &MBB,
     .addImm(0);
 }
 
-bool C65InstrInfo::expandPostRAPseudo(MachineBasicBlock::iterator MBBI) const {
+bool C65InstrInfo::expandPostRAPseudo(MachineInstr &MI) const {
   return false;
 }
 
-bool C65InstrInfo::isPredicated(const MachineInstr *MI) const {
+bool C65InstrInfo::isPredicated(const MachineInstr &MI) const {
   return false;
 }
 
-bool C65InstrInfo::isUnpredicatedTerminator(const MachineInstr *MI) const {
-  if (!MI->isTerminator())
+bool C65InstrInfo::isUnpredicatedTerminator(const MachineInstr &MI) const {
+  if (!MI.isTerminator())
     return false;
 
   // Conditional branch is a special case.
-  if (MI->isBranch() && !MI->isBarrier())
+  if (MI.isBranch() && !MI.isBarrier())
     return true;
 
   return !isPredicated(MI);
 }
 
 // Branch analysis.
-bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
+bool C65InstrInfo::analyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
                                  MachineBasicBlock *&FBB,
                                  SmallVectorImpl<MachineOperand> &Cond,
                                  bool AllowModify) const {
@@ -303,7 +303,7 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
       continue;
 
     // Working from the bottom, we see a non-terminator, we are done.
-    if (!isUnpredicatedTerminator(I))
+    if (!isUnpredicatedTerminator(*I))
       break;
 
     // Terminator is not a branch.
@@ -370,7 +370,10 @@ bool C65InstrInfo::AnalyzeBranch(MachineBasicBlock &MBB,MachineBasicBlock *&TBB,
   return false;
 }
 
-unsigned C65InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
+unsigned C65InstrInfo::removeBranch(MachineBasicBlock &MBB,
+                                    int *BytesRemoved) const {
+  assert(!BytesRemoved && "code size not handled");
+
   MachineBasicBlock::iterator I = MBB.end();
   unsigned Count = 0;
   while (I != MBB.begin()) {
@@ -393,10 +396,11 @@ unsigned C65InstrInfo::RemoveBranch(MachineBasicBlock &MBB) const {
 }
 
 unsigned
-C65InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
+C65InstrInfo::insertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
                            MachineBasicBlock *FBB,
                            ArrayRef<MachineOperand> Cond,
-                           DebugLoc DL) const {
+                           const DebugLoc &DL,
+                           int *BytesAdded) const {
   assert(TBB && "InsertBranch must not be told to insert a fallthrough");
   assert((Cond.size() == 4 || Cond.size() == 0) &&
          "C65 branch conditions have four components!");
@@ -422,9 +426,9 @@ C65InstrInfo::InsertBranch(MachineBasicBlock &MBB, MachineBasicBlock *TBB,
   //   llvm_unreachable("Unexpected BRCC operands.");
 
   BuildMI(&MBB, DL, get(Instr))
-    .addOperand(Cond[1])
-    .addOperand(Cond[2])
-    .addOperand(Cond[3])
+    .add(Cond[1])
+    .add(Cond[2])
+    .add(Cond[3])
     .addMBB(TBB);
 
   if (!FBB)

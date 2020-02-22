@@ -12,11 +12,12 @@
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
-#include "llvm/MC/MCParser/MCParsedAsmOperand.h"
 #include "llvm/MC/MCStreamer.h"
 #include "llvm/MC/MCSubtargetInfo.h"
-#include "llvm/MC/MCTargetAsmParser.h"
+#include "llvm/MC/MCParser/MCParsedAsmOperand.h"
+#include "llvm/MC/MCParser/MCTargetAsmParser.h"
 #include "llvm/Support/TargetRegistry.h"
+#include "TargetInfo/C65TargetInfo.h"
 
 using namespace llvm;
 
@@ -232,7 +233,7 @@ public:
   C65AsmParser(const MCSubtargetInfo &sti, MCAsmParser &parser,
                const MCInstrInfo &MII,
                const MCTargetOptions &Options)
-      : MCTargetAsmParser(Options, sti), Parser(parser) {
+      : MCTargetAsmParser(Options, sti, MII), Parser(parser) {
     MCAsmParserExtension::Initialize(Parser);
 
     // Initialize the set of available features.
@@ -368,7 +369,7 @@ public:
     MCSubtargetInfo &STI = copySTI();
     FeatureBitset AllModes({C65::ModeAcc8Bit, C65::ModeAcc16Bit});
     FeatureBitset OldMode = STI.getFeatureBits() & AllModes;
-    unsigned FB = ComputeAvailableFeatures(
+    FeatureBitset FB = ComputeAvailableFeatures(
       STI.ToggleFeature(OldMode.flip(mode)));
     setAvailableFeatures(FB);
     assert(FeatureBitset({mode}) == (STI.getFeatureBits() & AllModes));
@@ -383,7 +384,7 @@ public:
     MCSubtargetInfo &STI = copySTI();
     FeatureBitset AllModes({C65::ModeIx8Bit, C65::ModeIx16Bit});
     FeatureBitset OldMode = STI.getFeatureBits() & AllModes;
-    unsigned FB = ComputeAvailableFeatures(
+    FeatureBitset FB = ComputeAvailableFeatures(
       STI.ToggleFeature(OldMode.flip(mode)));
     setAvailableFeatures(FB);
     assert(FeatureBitset({mode}) == (STI.getFeatureBits() & AllModes));
@@ -457,7 +458,7 @@ bool C65AsmParser::parseRegister(char &Reg) {
 // indicated with parentheses, while an indirection of 2 implies a
 // 24-bit indirection, indicated with brackets.
 //
-C65AsmParser::OperandMatchResultTy
+OperandMatchResultTy
 C65AsmParser::parseAddress() {
   if (AddressMatch.Valid) {
     if (AddressMatch.Match)
@@ -538,7 +539,7 @@ C65AsmParser::parseAddress() {
 
 // Parse a memory operand and add it to Operands.
 //
-C65AsmParser::OperandMatchResultTy
+OperandMatchResultTy
 C65AsmParser::parseAddress(OperandVector &Operands, MemoryKind MemKind,
                            unsigned Length, bool AllowZExt,
                            unsigned Indirection, char PreIndexReg,
@@ -744,5 +745,5 @@ bool C65AsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
 
 // Force static initialization.
 extern "C" void LLVMInitializeC65AsmParser() {
-  RegisterMCAsmParser<C65AsmParser> X(The65C816Target);
+  RegisterMCAsmParser<C65AsmParser> X(getThe65C816Target());
 }

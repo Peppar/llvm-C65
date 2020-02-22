@@ -33,12 +33,17 @@ class InstC65<dag outs, dag ins, string asmstr, list<dag> pattern>
   field bits<8> Inst = 0;
 
   let Namespace = "C65";
-  let Size = 1;
 
   dag OutOperandList = outs;
   dag InOperandList = ins;
-  let AsmString = asmstr;
+  let Size = 1;
   let Pattern = pattern;
+  let AsmString = asmstr;
+
+  let hasSideEffects = 0;
+  let mayLoad = 0;
+  let mayStore = 0;
+  //bit mayRaiseFPException = 0;
 
   let DecoderNamespace = "C65";
 
@@ -130,7 +135,7 @@ def C65Wrapper         : SDNode<"C65ISD::Wrapper", SDTC65Wrapper>;
 def C65FarWrapper      : SDNode<"C65ISD::FarWrapper", SDTC65Wrapper>;
 
 //  These are target-independent nodes, but have target-specific formats.
-def SDTC65CALLSEQ_START : SDCallSeqStart<[SDTCisVT<0, i32>]>;
+def SDTC65CALLSEQ_START : SDCallSeqStart<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 def SDTC65CALLSEQ_END   : SDCallSeqEnd<[SDTCisVT<0, i32>, SDTCisVT<1, i32>]>;
 
 def C65CALLSEQ_START : SDNode<"ISD::CALLSEQ_START", SDTC65CALLSEQ_START,
@@ -1189,11 +1194,11 @@ let Predicates = [IsAcc16Bit] in {
 
 // ADJCALLSTACKDOWN, ADJCALLSTACKUP are mandatory pseudo-instructions
 let Defs = [S, P], Uses = [S], isCodeGenOnly = 1 in {
-  def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt),
-                                ";!ADJCALLSTACKDOWN $amt",
-                                [(C65CALLSEQ_START timm:$amt)]>;
+  def ADJCALLSTACKDOWN : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
+                                ";!ADJCALLSTACKDOWN $amt1 $amt2",
+                                [(C65CALLSEQ_START timm:$amt1, timm:$amt2)]>;
   def ADJCALLSTACKUP : Pseudo<(outs), (ins i32imm:$amt1, i32imm:$amt2),
-                              ";!ADJCALLSTACKUP $amt1",
+                              ";!ADJCALLSTACKUP $amt1 $amt2",
                               [(C65CALLSEQ_END timm:$amt1, timm:$amt2)]>;
 }
 
@@ -1338,37 +1343,37 @@ let mayStore = 1 in {
 
 // Form: (outs R1), (ins R2, R3)
 //   ZADD, ZSUB, ZAND, ZOR, ZXOR, ZSHL, ZLSHR
-class ZRI_R_RR_Sized<string mnemonic, RegisterClass RC, PatFrag frag>
+class ZRI_R_RR_Sized<string mnemonic, RegisterClass RC, SDPatternOperator operator>
   : ZRInstr<(outs RC:$reg1), (ins RC:$reg2, RC:$reg3),
             !strconcat(mnemonic, " $reg1,$reg2,$reg3"),
-            [(frag RC:$reg1, RC:$reg2, RC:$reg3)]>;
+            [(set RC:$reg1, (operator RC:$reg2, RC:$reg3))]>;
 
-multiclass ZRI_R_RR<string mnemonic, PatFrag frag> {
-  def NAME#8  : ZRI_R_RR_Sized<mnemonic, ZRC8,  frag>, ZROpSize8;
-  def NAME#16 : ZRI_R_RR_Sized<mnemonic, ZRC16, frag>, ZROpSize16;
-  def NAME#32 : ZRI_R_RR_Sized<mnemonic, ZRC32, frag>, ZROpSize32;
-  def NAME#64 : ZRI_R_RR_Sized<mnemonic, ZRC64, frag>, ZROpSize64;
+multiclass ZRI_R_RR<string mnemonic, SDPatternOperator operator> {
+  def NAME#8  : ZRI_R_RR_Sized<mnemonic, ZRC8,  operator>, ZROpSize8;
+  def NAME#16 : ZRI_R_RR_Sized<mnemonic, ZRC16, operator>, ZROpSize16;
+  def NAME#32 : ZRI_R_RR_Sized<mnemonic, ZRC32, operator>, ZROpSize32;
+  def NAME#64 : ZRI_R_RR_Sized<mnemonic, ZRC64, operator>, ZROpSize64;
 }
 
-def add_frag : PatFrag<(ops node:$dst, node:$src1, node:$src2),
-                       (set node:$dst, (add node:$src1, node:$src2))>;
-defm ZADD : ZRI_R_RR<"zadd", add_frag>;
+//def add_frag : PatFrag<(ops node:$dst, node:$src1, node:$src2),
+//                       (set node:$dst, (add node:$src1, node:$src2))>;
+defm ZADD : ZRI_R_RR<"zadd", add>;
 
-def sub_frag : PatFrag<(ops node:$dst, node:$src1, node:$src2),
-                       (set node:$dst, (sub node:$src1, node:$src2))>;
-defm ZSUB : ZRI_R_RR<"zsub", sub_frag>;
+//def sub_frag : PatFrag<(ops node:$dst, node:$src1, node:$src2),
+//                       (set node:$dst, (sub node:$src1, node:$src2))>;
+defm ZSUB : ZRI_R_RR<"zsub", sub>;
 
-def and_frag : PatFrag<(ops node:$dst, node:$src1, node:$src2),
-                       (set node:$dst, (and node:$src1, node:$src2))>;
-defm ZAND : ZRI_R_RR<"zand", and_frag>;
+//def and_frag : PatFrag<(ops node:$dst, node:$src1, node:$src2),
+//                       (set node:$dst, (and node:$src1, node:$src2))>;
+defm ZAND : ZRI_R_RR<"zand", and>;
 
-def or_frag : PatFrag<(ops node:$dst, node:$src1, node:$src2),
-                      (set node:$dst, (or node:$src1, node:$src2))>;
-defm ZOR : ZRI_R_RR<"zor", or_frag>;
+//def or_frag : PatFrag<(ops node:$dst, node:$src1, node:$src2),
+//                      (set node:$dst, (or node:$src1, node:$src2))>;
+defm ZOR : ZRI_R_RR<"zor", or>;
 
-def xor_frag : PatFrag<(ops node:$dst, node:$src1, node:$src2),
-                       (set node:$dst, (xor node:$src1, node:$src2))>;
-defm ZXOR : ZRI_R_RR<"zxor", xor_frag>;
+//def xor_frag : PatFrag<(ops node:$dst, node:$src1, node:$src2),
+//                       (set node:$dst, (xor node:$src1, node:$src2))>;
+defm ZXOR : ZRI_R_RR<"zxor", xor>;
 
 // class ZSHL<RegisterClass RC, ValueType Ty>
 //   : ZRInstr<(outs RC:$dst), (ins RC:$src, ZRC16:$amt), "zshl $dst,$src,$amt",

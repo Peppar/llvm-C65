@@ -41,7 +41,7 @@ using namespace llvm;
 
 C65TargetLowering::C65TargetLowering(const TargetMachine &TM,
                                      const C65Subtarget &STI)
-  : TargetLowering(TM), Subtarget(&STI) {
+  : TargetLowering(TM), Subtarget(STI) {
 
   // Zero-page registers
   addRegisterClass(MVT::i8, &C65::ZRC8RegClass);
@@ -49,11 +49,11 @@ C65TargetLowering::C65TargetLowering(const TargetMachine &TM,
   addRegisterClass(MVT::i32, &C65::ZRC32RegClass);
   addRegisterClass(MVT::i64, &C65::ZRC64RegClass);
 
-  computeRegisterProperties(Subtarget->getRegisterInfo());
+  computeRegisterProperties(Subtarget.getRegisterInfo());
 
   // Division and select is very expensive
   //setIntDivIsCheap(false);
-  setSelectIsExpensive(true);
+  //setSelectIsExpensive(true);
 
   // Jump is cheap
   setJumpIsExpensive(false);
@@ -68,7 +68,7 @@ C65TargetLowering::C65TargetLowering(const TargetMachine &TM,
   // addRegisterClass(MVT::i8, &C65::CCRRegClass);
 
   // Compute derived properties from the register classes
-  //computeRegisterProperties(Subtarget->getRegisterInfo());
+  //computeRegisterProperties(Subtarget.getRegisterInfo());
 
   // Copied from SystemZ
   //setSchedulingPreference(Sched::RegPressure);
@@ -245,11 +245,11 @@ EVT C65TargetLowering::getSetCCResultType(const DataLayout &DL, LLVMContext &,
 
 /// Return the type that should be used to zero or sign extend a
 /// zeroext/signext integer argument or return value.
-EVT C65TargetLowering::
-getTypeForExtArgOrReturn(LLVMContext &Context, EVT VT,
-                         ISD::NodeType ExtendKind) const {
-  return VT;
-}
+//EVT C65TargetLowering::
+//getTypeForExtArgOrReturn(LLVMContext &Context, EVT VT,
+//                         ISD::NodeType ExtendKind) const {
+//  return VT;
+//}
 
 /// This callback is invoked for operations that are unsupported by
 /// the target, which are registered to use 'custom' lowering, and
@@ -361,7 +361,7 @@ SDValue C65TargetLowering::LowerShift(SDValue Op, SelectionDAG &DAG) const {
 SDValue
 C65TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
   MachineFunction &MF = DAG.getMachineFunction();
-  MachineFrameInfo &MFI = *MF.getFrameInfo();
+  MachineFrameInfo &MFI = MF.getFrameInfo();
   C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
 
   // Need frame address to find the address of VarArgsFrameIndex.
@@ -377,7 +377,7 @@ C65TargetLowering::LowerVASTART(SDValue Op, SelectionDAG &DAG) const {
                                       DL));
   const Value *SV = cast<SrcValueSDNode>(Op.getOperand(2))->getValue();
   return DAG.getStore(Op.getOperand(0), DL, Offset, Op.getOperand(1),
-                      MachinePointerInfo(SV), false, false, 0);
+                      MachinePointerInfo(SV));
 }
 
 SDValue
@@ -390,23 +390,22 @@ C65TargetLowering::LowerVAARG(SDValue Op, SelectionDAG &DAG) const {
   const Value *SV = cast<SrcValueSDNode>(Node->getOperand(2))->getValue();
   SDLoc DL(Node);
   SDValue VAList = DAG.getLoad(PtrVT, DL, InChain, VAListPtr,
-                               MachinePointerInfo(SV), false, false, false, 0);
+                               MachinePointerInfo(SV));
   // Increment the pointer, VAList, to the next vaarg.
   SDValue NextPtr = DAG.getNode(ISD::ADD, DL, PtrVT, VAList,
                                 DAG.getIntPtrConstant(VT.getSizeInBits()/8,
                                                       DL));
   // Store the incremented VAList to the legalized pointer.
   InChain = DAG.getStore(VAList.getValue(1), DL, NextPtr,
-                         VAListPtr, MachinePointerInfo(SV), false, false, 0);
+                         VAListPtr, MachinePointerInfo(SV));
   // Load the actual argument out of the pointer VAList.
-  return DAG.getLoad(VT, DL, InChain, VAList, MachinePointerInfo(),
-                     false, false, false, 1);
+  return DAG.getLoad(VT, DL, InChain, VAList, MachinePointerInfo());
 }
 
 SDValue
 C65TargetLowering::LowerFRAMEADDR(SDValue Op, SelectionDAG &DAG) const {
-  MachineFrameInfo *MFI = DAG.getMachineFunction().getFrameInfo();
-  MFI->setFrameAddressIsTaken(true);
+  MachineFrameInfo &MFI = DAG.getMachineFunction().getFrameInfo();
+  MFI.setFrameAddressIsTaken(true);
 
   EVT VT = Op.getValueType();
   SDLoc DL(Op);
@@ -551,28 +550,28 @@ static struct Comparison getComparison(ISD::CondCode CC,
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZBR_CC(MachineInstr *MI,
+C65TargetLowering::EmitZBR_CC(MachineInstr &MI,
                               MachineBasicBlock *MBB,
                               unsigned NumBytes) const {
 
-  bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
+  bool Use8Bit = NumBytes == 1 || !Subtarget.has65816();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI.getDebugLoc();
   MachineFunction *MF = MBB->getParent();
-  //  MachineRegisterInfo &MRI = MF->getRegInfo();
+  //  MachineRegisterInfo &MRI = MF.getRegInfo();
 
   const BasicBlock *BB = MBB->getBasicBlock();
   MachineFunction::iterator MFI = MBB->getIterator();
   ++MFI;
 
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  const C65InstrInfo *TII = Subtarget.getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget.getRegisterInfo();
 
-  struct Comparison C = getComparison((ISD::CondCode)MI->getOperand(0).getImm(),
-                                      MI->getOperand(1),
-                                      MI->getOperand(2));
-  MachineBasicBlock *Dest = MI->getOperand(3).getMBB();
+  struct Comparison C = getComparison((ISD::CondCode)MI.getOperand(0).getImm(),
+                                      MI.getOperand(1),
+                                      MI.getOperand(2));
+  MachineBasicBlock *Dest = MI.getOperand(3).getMBB();
 
   if (C.Equality) {
     // thisMBB:
@@ -641,7 +640,7 @@ C65TargetLowering::EmitZBR_CC(MachineInstr *MI,
 
     MF->insert(MFI, sinkMBB);
 
-    MI->eraseFromParent();
+    MI.eraseFromParent();
     return sinkMBB;
   } else if (C.Signed) {
     // thisMBB:
@@ -709,7 +708,7 @@ C65TargetLowering::EmitZBR_CC(MachineInstr *MI,
 
     BuildMI(jumpMBB, DL, TII->get(C65::JMPabs)).addMBB(Dest);
 
-    MI->eraseFromParent();
+    MI.eraseFromParent();
     return sinkMBB;
   } else {
     // thisMBB:
@@ -758,36 +757,36 @@ C65TargetLowering::EmitZBR_CC(MachineInstr *MI,
     }
     BuildMI(jumpMBB, DL, TII->get(C65::JMPabs)).addMBB(Dest);
 
-    MI->eraseFromParent();
+    MI.eraseFromParent();
 
     return sinkMBB;
   }
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZSELECT_CC(MachineInstr *MI,
+C65TargetLowering::EmitZSELECT_CC(MachineInstr &MI,
                                   MachineBasicBlock *MBB,
                                   unsigned NumBytes) const {
 
-  bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
+  bool Use8Bit = NumBytes == 1 || !Subtarget.has65816();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI.getDebugLoc();
   MachineFunction *MF = MBB->getParent();
 
   const BasicBlock *BB = MBB->getBasicBlock();
   MachineFunction::iterator MFI = MBB->getIterator();
   ++MFI;
 
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  const C65InstrInfo *TII = Subtarget.getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget.getRegisterInfo();
 
-  struct Comparison C = getComparison((ISD::CondCode)MI->getOperand(5).getImm(),
-                                      MI->getOperand(1),
-                                      MI->getOperand(2));
-  unsigned RetReg = MI->getOperand(0).getReg();
-  unsigned TrueReg = MI->getOperand(3).getReg();
-  unsigned FalseReg = MI->getOperand(4).getReg();
+  struct Comparison C = getComparison((ISD::CondCode)MI.getOperand(5).getImm(),
+                                      MI.getOperand(1),
+                                      MI.getOperand(2));
+  unsigned RetReg = MI.getOperand(0).getReg();
+  unsigned TrueReg = MI.getOperand(3).getReg();
+  unsigned FalseReg = MI.getOperand(4).getReg();
 
   unsigned ZMOVInstr;
   unsigned NumMovBytes;
@@ -969,7 +968,7 @@ C65TargetLowering::EmitZSELECT_CC(MachineInstr *MI,
     BuildMI(trueMBB, DL, TII->get(ZMOVInstr))
     .addReg(RetReg)
     .addReg(TrueReg);
-  EmitZMOV(TrueMI, trueMBB, NumMovBytes, NumMovBytes, false);
+  EmitZMOV(*TrueMI, trueMBB, NumMovBytes, NumMovBytes, false);
   BuildMI(trueMBB, DL, TII->get(C65::JMPabs)).addMBB(sinkMBB);
   trueMBB->addSuccessor(sinkMBB);
 
@@ -978,36 +977,36 @@ C65TargetLowering::EmitZSELECT_CC(MachineInstr *MI,
     BuildMI(falseMBB, DL, TII->get(ZMOVInstr))
     .addReg(RetReg)
     .addReg(FalseReg);
-  EmitZMOV(FalseMI, falseMBB, NumMovBytes, NumMovBytes, false);
+  EmitZMOV(*FalseMI, falseMBB, NumMovBytes, NumMovBytes, false);
   falseMBB->addSuccessor(sinkMBB);
 
   // sinkMBB:
 
-  MI->eraseFromParent();
+  MI.eraseFromParent();
 
   return sinkMBB;
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZST(MachineInstr *MI,
+C65TargetLowering::EmitZST(MachineInstr &MI,
                            MachineBasicBlock *MBB,
                            bool Stack,
                            unsigned NumBytes,
                            bool Far) const {
-  bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
+  bool Use8Bit = NumBytes == 1 || !Subtarget.has65816();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
-  const MachineOperand *Src = &MI->getOperand(0);
-  const MachineOperand *Op1 = &MI->getOperand(1);
+  const MachineOperand *Src = &MI.getOperand(0);
+  const MachineOperand *Op1 = &MI.getOperand(1);
   const MachineOperand *Op2;
 
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  const C65InstrInfo *TII = Subtarget.getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget.getRegisterInfo();
   unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
   unsigned STAInstr;
-  unsigned NumOperands = TII->get(MI->getOpcode()).getNumOperands();
+  unsigned NumOperands = TII->get(MI.getOpcode()).getNumOperands();
 
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI.getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
   bool YIndirect;
@@ -1033,7 +1032,7 @@ C65TargetLowering::EmitZST(MachineInstr *MI,
     YIndirect = false;
   } else /* NumOperands == 3 */ {
     assert(Op1->isReg());
-    Op2 = &MI->getOperand(2);
+    Op2 = &MI.getOperand(2);
     if (Far)
       STAInstr = Use8Bit ? C65::STA8dppostiyl16 : C65::STA16dppostiyl16;
     else
@@ -1056,7 +1055,7 @@ C65TargetLowering::EmitZST(MachineInstr *MI,
         .addImm(RI->getZRAddress(Op1->getReg()));
     } else {
       BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
-        .addDisp(MI->getOperand(1), I);
+        .addDisp(MI.getOperand(1), I);
     }
     if (YIndirect && I != NumBytes - AccSize) {
       BuildMI(*MBB, MBBI, DL, TII->get(C65::INY16));
@@ -1065,34 +1064,34 @@ C65TargetLowering::EmitZST(MachineInstr *MI,
     }
   }
 
-  MI->eraseFromParent();
+  MI.eraseFromParent();
 
   return MBB;
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZLD(MachineInstr *MI,
+C65TargetLowering::EmitZLD(MachineInstr &MI,
                            MachineBasicBlock *MBB,
                            bool Stack,
                            unsigned NumBytes,
                            bool Far,
                            unsigned ExtendBegin,
                            bool Signed) const {
-  bool Use8Bit = ExtendBegin == 1 || !Subtarget->has65802();
+  bool Use8Bit = ExtendBegin == 1 || !Subtarget.has65802();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
-  const MachineOperand *Dest = &MI->getOperand(0);
-  const MachineOperand *Op1 = &MI->getOperand(1);
+  const MachineOperand *Dest = &MI.getOperand(0);
+  const MachineOperand *Op1 = &MI.getOperand(1);
   const MachineOperand *Op2;
 
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  const C65InstrInfo *TII = Subtarget.getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget.getRegisterInfo();
   unsigned STAInstr = Use8Bit ? C65::STA8zp : C65::STA16zp;
   unsigned STZInstr = Use8Bit ? C65::STZ8zp : C65::STZ16zp;
   unsigned LDAInstr;
-  unsigned NumOperands = TII->get(MI->getOpcode()).getNumOperands();
+  unsigned NumOperands = TII->get(MI.getOpcode()).getNumOperands();
 
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI.getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
   bool YIndirect;
@@ -1118,7 +1117,7 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
     YIndirect = false;
   } else /* NumOperands == 3 */ {
     assert(Op1->isReg());
-    Op2 = &MI->getOperand(2);
+    Op2 = &MI.getOperand(2);
     if (Far)
       LDAInstr = Use8Bit ? C65::LDA8dppostiyl16 : C65::LDA16dppostiyl16;
     else
@@ -1139,7 +1138,7 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
         .addImm(RI->getZRAddress(Op1->getReg()));
     } else {
       BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
-        .addDisp(MI->getOperand(1), I);
+        .addDisp(MI.getOperand(1), I);
     }
     BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
       .addImm(RI->getZRAddress(Dest->getReg()) + I);
@@ -1152,7 +1151,7 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
 
   if (ExtendBegin == NumBytes) {
     // No extend
-    MI->eraseFromParent();
+    MI.eraseFromParent();
     return MBB;
   } else if (Signed) {
     // thisMBB:
@@ -1194,7 +1193,7 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
       BuildMI(zextMBB, DL, TII->get(STZInstr))
         .addImm(RI->getZRAddress(Dest->getReg()) + I);
     }
-    BuildMI(zextMBB, DL, TII->get(Subtarget->has65C02() ?
+    BuildMI(zextMBB, DL, TII->get(Subtarget.has65C02() ?
                                   C65::BRA : C65::JMPabs))
       .addMBB(sinkMBB);
 
@@ -1211,7 +1210,7 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
     zextMBB->addSuccessor(sinkMBB);
     sextMBB->addSuccessor(sinkMBB);
 
-    MI->eraseFromParent();
+    MI.eraseFromParent();
     return sinkMBB;
   } else {
     // Always extend with zeroes
@@ -1219,27 +1218,27 @@ C65TargetLowering::EmitZLD(MachineInstr *MI,
       BuildMI(*MBB, MBBI, DL, TII->get(STZInstr))
         .addImm(RI->getZRAddress(Dest->getReg()) + I);
     }
-    MI->eraseFromParent();
+    MI.eraseFromParent();
     return MBB;
   }
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZLDimm(MachineInstr *MI,
+C65TargetLowering::EmitZLDimm(MachineInstr &MI,
                               MachineBasicBlock *MBB,
                               unsigned NumBytes) const {
-  const bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
+  const bool Use8Bit = NumBytes == 1 || !Subtarget.has65816();
   const unsigned AccSize = Use8Bit ? 1 : 2;
 
-  const MachineOperand *Op1 = &MI->getOperand(1);
+  const MachineOperand *Op1 = &MI.getOperand(1);
 
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  const C65InstrInfo *TII = Subtarget.getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget.getRegisterInfo();
   const unsigned LDAInstr = Use8Bit ? C65::LDA8imm : C65::LDA16imm;
   const unsigned STAInstr = Use8Bit ? C65::STA8zp  : C65::STA16zp;
   const unsigned STZInstr = Use8Bit ? C65::STZ8zp  : C65::STZ16zp;
 
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI.getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
   for (unsigned I = 0; I < NumBytes; I += AccSize) {
@@ -1253,12 +1252,12 @@ C65TargetLowering::EmitZLDimm(MachineInstr *MI,
       }
       if (Value == 0) {
         BuildMI(*MBB, MBBI, DL, TII->get(STZInstr))
-          .addImm(RI->getZRAddress(MI->getOperand(0).getReg()) + I);
+          .addImm(RI->getZRAddress(MI.getOperand(0).getReg()) + I);
       } else {
         BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
           .addImm(Value);
         BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
-          .addImm(RI->getZRAddress(MI->getOperand(0).getReg()) + I);
+          .addImm(RI->getZRAddress(MI.getOperand(0).getReg()) + I);
       }
     } else {
       // C65 uses the MachineOperand target flags as a bit shift
@@ -1267,32 +1266,32 @@ C65TargetLowering::EmitZLDimm(MachineInstr *MI,
       // and finally to the corresponding VLAK stack calculation
       // (MCObjectWriter).
       MachineInstr *LDAMI = BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
-        .addOperand(*Op1);
+        .add(*Op1);
       LDAMI->getOperand(LDAMI->getNumOperands() - 1).setTargetFlags(ShiftAmt);
       BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
-        .addImm(RI->getZRAddress(MI->getOperand(0).getReg()) + I);
+        .addImm(RI->getZRAddress(MI.getOperand(0).getReg()) + I);
     }
   }
 
-  MI->eraseFromParent();
+  MI.eraseFromParent();
 
   return MBB;
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitBinaryZI(MachineInstr *MI, MachineBasicBlock *MBB,
+C65TargetLowering::EmitBinaryZI(MachineInstr &MI, MachineBasicBlock *MBB,
                                 unsigned NumBytes,
                                 unsigned Instr8, unsigned Instr16,
                                 bool clc, bool stc) const {
-  const bool Use8Bit = NumBytes == 1 || !Subtarget->has65816();
+  const bool Use8Bit = NumBytes == 1 || !Subtarget.has65816();
   const unsigned AccSize = Use8Bit ? 1 : 2;
 
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  const C65InstrInfo *TII = Subtarget.getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget.getRegisterInfo();
   const unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
   const unsigned OPInstr  = Use8Bit ? Instr8 : Instr16;
   const unsigned STAInstr = Use8Bit ? C65::STA8zp : C65::STA16zp;
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI.getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
   if (clc) {
@@ -1302,38 +1301,38 @@ C65TargetLowering::EmitBinaryZI(MachineInstr *MI, MachineBasicBlock *MBB,
   }
   for (unsigned I = 0; I < NumBytes; I += AccSize) {
     BuildMI(*MBB, MBBI, DL, TII->get(LDAInstr))
-      .addImm(RI->getZRAddress(MI->getOperand(1).getReg()) + I);
+      .addImm(RI->getZRAddress(MI.getOperand(1).getReg()) + I);
     BuildMI(*MBB, MBBI, DL, TII->get(OPInstr))
-      .addImm(RI->getZRAddress(MI->getOperand(2).getReg()) + I);
+      .addImm(RI->getZRAddress(MI.getOperand(2).getReg()) + I);
     BuildMI(*MBB, MBBI, DL, TII->get(STAInstr))
-      .addImm(RI->getZRAddress(MI->getOperand(0).getReg()) + I);
+      .addImm(RI->getZRAddress(MI.getOperand(0).getReg()) + I);
   }
 
-  MI->eraseFromParent();
+  MI.eraseFromParent();
 
   return MBB;
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZMOV(MachineInstr *MI,
+C65TargetLowering::EmitZMOV(MachineInstr &MI,
                             MachineBasicBlock *MBB,
                             unsigned NumBytes,
                             unsigned ExtendBegin,
                             bool Signed) const {
-  bool Use8Bit = ExtendBegin == 1 || !Subtarget->has65802();
+  bool Use8Bit = ExtendBegin == 1 || !Subtarget.has65802();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
-  const MachineOperand *Dest = &MI->getOperand(0);
-  const MachineOperand *Src = &MI->getOperand(1);
+  const MachineOperand *Dest = &MI.getOperand(0);
+  const MachineOperand *Src = &MI.getOperand(1);
 
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  const C65InstrInfo *TII = Subtarget.getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget.getRegisterInfo();
   unsigned LDAInstr = Use8Bit ? C65::LDA8zp : C65::LDA16zp;
   unsigned STAInstr = Use8Bit ? C65::STA8zp : C65::STA16zp;
   unsigned STZInstr = Use8Bit ? C65::STZ8zp : C65::STZ16zp;
-  //unsigned NumOperands = TII->get(MI->getOpcode()).getNumOperands();
+  //unsigned NumOperands = TII->get(MI.getOpcode()).getNumOperands();
 
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI.getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
   if (Src->getReg() == Dest->getReg()) {
@@ -1359,7 +1358,7 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
 
   if (ExtendBegin == NumBytes) {
     // No extend
-    MI->eraseFromParent();
+    MI.eraseFromParent();
     return MBB;
   } else if (Signed) {
     // thisMBB:
@@ -1401,7 +1400,7 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
       BuildMI(zextMBB, DL, TII->get(STZInstr))
         .addImm(RI->getZRAddress(Dest->getReg()) + I);
     }
-    BuildMI(zextMBB, DL, TII->get(Subtarget->has65C02() ?
+    BuildMI(zextMBB, DL, TII->get(Subtarget.has65C02() ?
                                   C65::BRA : C65::JMPabs))
       .addMBB(sinkMBB);
 
@@ -1418,7 +1417,7 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
     zextMBB->addSuccessor(sinkMBB);
     sextMBB->addSuccessor(sinkMBB);
 
-    MI->eraseFromParent();
+    MI.eraseFromParent();
     return sinkMBB;
   } else {
     // Always extend with zeroes
@@ -1426,17 +1425,17 @@ C65TargetLowering::EmitZMOV(MachineInstr *MI,
       BuildMI(*MBB, MBBI, DL, TII->get(STZInstr))
         .addImm(RI->getZRAddress(Dest->getReg()) + I);
     }
-    MI->eraseFromParent();
+    MI.eraseFromParent();
     return MBB;
   }
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZLEA(MachineInstr *MI,
+C65TargetLowering::EmitZLEA(MachineInstr &MI,
                             MachineBasicBlock *MBB) const {
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
-  DebugLoc DL = MI->getDebugLoc();
+  const C65InstrInfo *TII = Subtarget.getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget.getRegisterInfo();
+  DebugLoc DL = MI.getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
   unsigned FrameReg = RI->getFrameRegister(*MBB->getParent());
 
@@ -1451,26 +1450,26 @@ C65TargetLowering::EmitZLEA(MachineInstr *MI,
     llvm_unreachable("Unknown frame register");
 
   BuildMI(*MBB, MBBI, DL, TII->get(C65::ADC16imm))
-    .addImm(MI->getOperand(1).getImm());
+    .addImm(MI.getOperand(1).getImm());
   BuildMI(*MBB, MBBI, DL, TII->get(C65::STA16zp))
-    .addImm(RI->getZRAddress(MI->getOperand(0).getReg()));
-  MI->eraseFromParent();
+    .addImm(RI->getZRAddress(MI.getOperand(0).getReg()));
+  MI.eraseFromParent();
   return MBB;
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZPUSH(MachineInstr *MI,
+C65TargetLowering::EmitZPUSH(MachineInstr &MI,
                              MachineBasicBlock *MBB,
                              unsigned NumBytes) const {
-  bool Use8Bit = NumBytes == 1 || !Subtarget->has65802();
+  bool Use8Bit = NumBytes == 1 || !Subtarget.has65802();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
-  const MachineOperand *Op = &MI->getOperand(0);
+  const MachineOperand *Op = &MI.getOperand(0);
 
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  const C65InstrInfo *TII = Subtarget.getInstrInfo();
+  const C65RegisterInfo *RI = Subtarget.getRegisterInfo();
 
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI.getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
   // Stack grows downwards, push in reverse order.
@@ -1485,24 +1484,24 @@ C65TargetLowering::EmitZPUSH(MachineInstr *MI,
     }
   }
 
-  MI->eraseFromParent();
+  MI.eraseFromParent();
 
   return MBB;
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZPUSHimm(MachineInstr *MI,
+C65TargetLowering::EmitZPUSHimm(MachineInstr &MI,
                                 MachineBasicBlock *MBB,
                                 unsigned NumBytes) const {
-  bool Use8Bit = NumBytes == 1 || !Subtarget->has65802();
+  bool Use8Bit = NumBytes == 1 || !Subtarget.has65802();
   unsigned AccSize = Use8Bit ? 1 : 2;
 
-  const MachineOperand *Op = &MI->getOperand(0);
+  const MachineOperand *Op = &MI.getOperand(0);
 
-  const C65InstrInfo *TII = Subtarget->getInstrInfo();
-  //const C65RegisterInfo *RI = Subtarget->getRegisterInfo();
+  const C65InstrInfo *TII = Subtarget.getInstrInfo();
+  //const C65RegisterInfo *RI = Subtarget.getRegisterInfo();
 
-  DebugLoc DL = MI->getDebugLoc();
+  DebugLoc DL = MI.getDebugLoc();
   MachineBasicBlock::iterator MBBI = MI;
 
   // Stack grows downwards, push in reverse order.
@@ -1529,21 +1528,21 @@ C65TargetLowering::EmitZPUSHimm(MachineInstr *MI,
       // then to the corresponding bit shift fixup kind (CodeEmitter),
       // and finally to the corresponding VLAK stack calculation
       // (MCObjectWriter).
-      MIB.addOperand(*Op);
+      MIB.add(*Op);
       MachineInstr *MI2 = MIB;
       MI2->getOperand(MI2->getNumOperands() - 1).setTargetFlags(ShiftAmt);
     }
   }
 
-  MI->eraseFromParent();
+  MI.eraseFromParent();
 
   return MBB;
 }
 
 MachineBasicBlock *
-C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
-  unsigned OpSize = 1 << C65II::getZROpSize(MI->getDesc().TSFlags);
-  switch (MI->getOpcode()) {
+C65TargetLowering::EmitZInstr(MachineInstr &MI, MachineBasicBlock *MBB) const {
+  unsigned OpSize = 1 << C65II::getZROpSize(MI.getDesc().TSFlags);
+  switch (MI.getOpcode()) {
   default: llvm_unreachable("unknown Z instruction to emit");
     // ZPUSH
   case C65::ZPUSH8:
@@ -1992,7 +1991,7 @@ C65TargetLowering::EmitZInstr(MachineInstr *MI, MachineBasicBlock *MBB) const {
 /// creating new basic blocks and control flow.
 ///
 MachineBasicBlock *
-C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr *MI,
+C65TargetLowering::EmitInstrWithCustomInserter(MachineInstr &MI,
                                                MachineBasicBlock *MBB) const {
   return MBB;
 }
@@ -2013,12 +2012,12 @@ C65TargetLowering::isOffsetFoldingLegal(const GlobalAddressSDNode *GA) const {
 ///
 void C65TargetLowering::
 computeKnownBitsForTargetNode(const SDValue Op,
-                              APInt &KnownZero,
-                              APInt &KnownOne,
+                              KnownBits &Known,
+                              const APInt &DemandedElts,
                               const SelectionDAG &DAG,
                               unsigned Depth) const {
   // TODO
-  KnownZero = KnownOne = APInt(KnownZero.getBitWidth(), 0);
+  Known.resetAll();
 }
 
 //===----------------------------------------------------------------------===//
@@ -2036,7 +2035,7 @@ C65TargetLowering::LowerReturn(SDValue Chain,
                                CallingConv::ID CallConv, bool IsVarArg,
                                const SmallVectorImpl<ISD::OutputArg> &Outs,
                                const SmallVectorImpl<SDValue> &OutVals,
-                               SDLoc DL, SelectionDAG &DAG) const {
+                               const SDLoc &DL, SelectionDAG &DAG) const {
   SmallVector<CCValAssign, 16> RVLocs;
   SmallVector<SDValue, 4> RetOps(1, Chain);
   SDValue Glue;
@@ -2078,11 +2077,11 @@ LowerFormalArguments(SDValue Chain,
                      CallingConv::ID CallConv,
                      bool IsVarArg,
                      const SmallVectorImpl<ISD::InputArg> &Ins,
-                     SDLoc DL,
+                     const SDLoc &DL,
                      SelectionDAG &DAG,
                      SmallVectorImpl<SDValue> &InVals) const {
   MachineFunction &MF = DAG.getMachineFunction();
-  MachineFrameInfo *MFI = MF.getFrameInfo();
+  MachineFrameInfo &MFI = MF.getFrameInfo();
   //MachineRegisterInfo &MRI = MF.getRegInfo();
   C65MachineFunctionInfo *FuncInfo = MF.getInfo<C65MachineFunctionInfo>();
 
@@ -2092,7 +2091,7 @@ LowerFormalArguments(SDValue Chain,
   CCState CCInfo(CallConv, IsVarArg, DAG.getMachineFunction(),
                  ArgLocs, *DAG.getContext());
 
-  bool Is16Bit = Subtarget->has65802();
+  bool Is16Bit = Subtarget.has65802();
   unsigned RetAddrSize = FuncInfo->getIsFar() ? 3 : 2;
   unsigned FramePtrSize = Is16Bit ? 2 : 1;
   CCInfo.AllocateStack(RetAddrSize, 1);
@@ -2100,9 +2099,9 @@ LowerFormalArguments(SDValue Chain,
   CCInfo.AnalyzeFormalArguments(Ins, CC_C65);
 
   // The first stack object is the return address.
-  //  int ReturnAddrIndex = MFI->CreateStackObject(RetAddrSize, 1,
+  //  int ReturnAddrIndex = MFI.CreateStackObject(RetAddrSize, 1,
   //                                               false);
-  //  int ReturnAddrIndex = MFI->CreateFixedObject(RetAddrSize, , true);
+  //  int ReturnAddrIndex = MFI.CreateFixedObject(RetAddrSize, , true);
   //  FuncInfo->setRAIndex(ReturnAddrIndex);
 
   for (unsigned I = 0, E = ArgLocs.size(); I != E; ++I) {
@@ -2131,15 +2130,14 @@ LowerFormalArguments(SDValue Chain,
       EVT ValVT = VA.getValVT();
 
       // Create the frame index object for this parameter.
-      int FI = MFI->CreateFixedObject(ValVT.getSizeInBits() / 8,
-                                      VA.getLocMemOffset(), true);
+      int FI = MFI.CreateFixedObject(ValVT.getSizeInBits() / 8,
+                                     VA.getLocMemOffset(), true);
 
       // Create the SelectionDAG nodes corresponding to a load from
       // this parameter
       SDValue FIN = DAG.getFrameIndex(FI, getPointerTy(DAG.getDataLayout()));
       MachinePointerInfo MPI = MachinePointerInfo::getFixedStack(MF, FI);
-      ArgValue = DAG.getLoad(ValVT, DL, Chain, FIN,
-                             MPI, false, false, false, 0);
+      ArgValue = DAG.getLoad(ValVT, DL, Chain, FIN, MPI);
     }
     InVals.push_back(ArgValue);
   }
@@ -2191,7 +2189,7 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
   unsigned NumBytes = CCInfo.getNextStackOffset();
 
   // Mark the start of the call.
-  Chain = DAG.getCALLSEQ_START(Chain, DAG.getIntPtrConstant(0, DL, true), DL);
+  Chain = DAG.getCALLSEQ_START(Chain, NumBytes, 0, DL);
 
   // Copy argument values to their designated locations.
   SmallVector<std::pair<unsigned, SDValue>, 3> RegsToPass;
@@ -2207,8 +2205,7 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
       SDValue SpillSlot = DAG.CreateStackTemporary(VA.getValVT());
       int FI = cast<FrameIndexSDNode>(SpillSlot)->getIndex();
       MachinePointerInfo MPI = MachinePointerInfo::getFixedStack(MF, FI);
-      MemOpChains.push_back(DAG.getStore(Chain, DL, ArgValue, SpillSlot,
-                                         MPI, false, false, 0));
+      MemOpChains.push_back(DAG.getStore(Chain, DL, ArgValue, SpillSlot, MPI));
       ArgValue = SpillSlot;
     }
 
@@ -2270,7 +2267,7 @@ C65TargetLowering::LowerCall(TargetLowering::CallLoweringInfo &CLI,
 
   // Add a register mask operand representing the call-preserved
   // registers.
-  const TargetRegisterInfo *TRI = Subtarget->getRegisterInfo();
+  const TargetRegisterInfo *TRI = Subtarget.getRegisterInfo();
   const uint32_t *Mask = TRI->getCallPreservedMask(MF, CallConv);
   assert(Mask && "Missing call preserved mask for calling convention");
   Ops.push_back(DAG.getRegisterMask(Mask));
@@ -2303,7 +2300,7 @@ SDValue
 C65TargetLowering::LowerCallResult(SDValue Chain, SDValue Glue,
                                    CallingConv::ID CallConv, bool IsVarArg,
                                    const SmallVectorImpl<ISD::InputArg> &Ins,
-                                   SDLoc DL, SelectionDAG &DAG,
+                                   const SDLoc &DL, SelectionDAG &DAG,
                                    SmallVectorImpl<SDValue> &InVals) const {
 
   // Assign locations to each value returned by this call.
@@ -2345,8 +2342,8 @@ C65TargetLowering::makeC65LibCall(SelectionDAG &DAG,
   for (unsigned I = 0; I != NumOps; ++I) {
     Entry.Node = Ops[I];
     Entry.Ty = Entry.Node.getValueType().getTypeForEVT(*DAG.getContext());
-    Entry.isSExt = isSigned;
-    Entry.isZExt = !isSigned;
+    Entry.IsSExt = isSigned;
+    Entry.IsZExt = !isSigned;
     Args.push_back(Entry);
   }
   SDValue Callee = DAG.getExternalSymbol(LCName,
@@ -2356,7 +2353,7 @@ C65TargetLowering::makeC65LibCall(SelectionDAG &DAG,
   TargetLowering::CallLoweringInfo CLI(DAG);
   CLI.setDebugLoc(DL).setChain(DAG.getEntryNode())
     .setCallee(CallingConv::PreserveAll, RetTy,
-               Callee, std::move(Args), 0)
+               Callee, std::move(Args))
     .setNoReturn(doesNotReturn).setDiscardResult(!isReturnValueUsed)
     .setSExtResult(isSigned).setZExtResult(!isSigned);
   return LowerCallTo(CLI);

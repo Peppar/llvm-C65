@@ -15,7 +15,7 @@
 #define C65_FRAMEINFO_H
 
 #include "C65.h"
-#include "llvm/Target/TargetFrameLowering.h"
+#include "llvm/CodeGen/TargetFrameLowering.h"
 
 namespace llvm {
 
@@ -30,7 +30,7 @@ public:
                        MachineBasicBlock::iterator MBBI,
                        int NumBytes) const;
 
-  void
+  MachineBasicBlock::iterator
   eliminateCallFramePseudoInstr(MachineFunction &MF, MachineBasicBlock &MBB,
                                 MachineBasicBlock::iterator I) const;
 

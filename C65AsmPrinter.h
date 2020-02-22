@@ -32,11 +32,11 @@ namespace llvm {
                            std::unique_ptr<MCStreamer> Streamer)
       : AsmPrinter(TM, std::move(Streamer)) {}
 
-    const char *getPassName() const override {
+    StringRef getPassName() const override {
       return "C65 Assembly / Object Emitter";
     }
 
-    void printOperand(const MachineInstr *MI, int opNum, raw_ostream &OS);
+    void printOperand(const MachineInstr *MI, unsigned opNum, raw_ostream &OS);
 
     MCOperand LowerSymbolOperand(const MachineOperand &MO);
 
@@ -48,12 +48,10 @@ namespace llvm {
     virtual void EmitInstruction(const MachineInstr *) override;
 
     bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
-                         unsigned AsmVariant, const char *ExtraCode,
-                         raw_ostream &O) override;
+                         const char *ExtraCode, raw_ostream &O) override;
 
     bool PrintAsmMemoryOperand(const MachineInstr *MI, unsigned OpNo,
-                               unsigned AsmVariant, const char *ExtraCode,
-                               raw_ostream &O) override;
+                               const char *ExtraCode, raw_ostream &O) override;
   };
 } // end namespace llvm
 

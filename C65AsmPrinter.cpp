@@ -32,6 +32,8 @@
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
+#include "TargetInfo/C65TargetInfo.h"
+
 using namespace llvm;
 
 #define DEBUG_TYPE "c65-asm-printer"
@@ -158,7 +160,7 @@ static const char *getRegisterName(unsigned RegNo) {
   return C65InstPrinter::getRegisterName(RegNo);
 }
 
-void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
+void C65AsmPrinter::printOperand(const MachineInstr *MI, unsigned opNum,
                                  raw_ostream &O) {
   const DataLayout &DL = getDataLayout();
   const MachineOperand &MO = MI->getOperand(opNum);
@@ -192,15 +194,13 @@ void C65AsmPrinter::printOperand(const MachineInstr *MI, int opNum,
 }
 
 bool C65AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
-                                    unsigned AsmVariant,
-                                    const char *ExtraCode,
-                                    raw_ostream &O) {
+                                    const char *ExtraCode, raw_ostream &O) {
   if (ExtraCode && ExtraCode[0]) {
     if (ExtraCode[1] != 0) {
       // Unknown modifier.
       return true;
     } else {
-      return AsmPrinter::PrintAsmOperand(MI, OpNo, AsmVariant, ExtraCode, O);
+      return AsmPrinter::PrintAsmOperand(MI, OpNo, ExtraCode, O);
     }
   } else {
     printOperand(MI, OpNo, O);
@@ -208,10 +208,8 @@ bool C65AsmPrinter::PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
   }
 }
 
-bool C65AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
-                                          unsigned OpNo, unsigned AsmVariant,
-                                          const char *ExtraCode,
-                                          raw_ostream &O) {
+bool C65AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI, unsigned OpNo, 
+                                          const char *ExtraCode, raw_ostream &O) {
   if (ExtraCode && ExtraCode[0]) {
     // Unknown modifier
     return true;
@@ -223,5 +221,5 @@ bool C65AsmPrinter::PrintAsmMemoryOperand(const MachineInstr *MI,
 
 // Force static initialization.
 extern "C" void LLVMInitializeC65AsmPrinter() {
-  RegisterAsmPrinter<C65AsmPrinter> X(The65C816Target);
+  RegisterAsmPrinter<C65AsmPrinter> X(getThe65C816Target());
 }

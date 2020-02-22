@@ -12,13 +12,13 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TARGET_C65_ISELLOWERING_H
-#define LLVM_TARGET_C65_ISELLOWERING_H
+#ifndef LLVM_LIB_TARGET_C65_C65ISELLOWERING_H
+#define LLVM_LIB_TARGET_C65_C65ISELLOWERING_H
 
 #include "C65.h"
 #include "llvm/CodeGen/MachineOperand.h"
+#include "llvm/CodeGen/TargetLowering.h"
 #include "llvm/MC/MCInstrDesc.h"
-#include "llvm/Target/TargetLowering.h"
 
 namespace llvm {
   class C65Subtarget;
@@ -50,7 +50,7 @@ namespace llvm {
   }
 
   class C65TargetLowering : public TargetLowering {
-    const C65Subtarget *Subtarget;
+    const C65Subtarget &Subtarget;
   public:
     C65TargetLowering(const TargetMachine &TM,
                       const C65Subtarget &STI);
@@ -59,51 +59,51 @@ namespace llvm {
     /// in Mask are known to be either zero or one and return them in the
     /// KnownZero/KnownOne bitsets.
     void computeKnownBitsForTargetNode(const SDValue Op,
-                                       APInt &KnownZero,
-                                       APInt &KnownOne,
+                                       KnownBits &Known,
+                                       const APInt &DemandedElts,
                                        const SelectionDAG &DAG,
                                        unsigned Depth = 0) const override;
 
     MachineBasicBlock *
-      EmitSimpleZI(MachineInstr *MI, MachineBasicBlock *MBB,
+      EmitSimpleZI(MachineInstr &MI, MachineBasicBlock *MBB,
                    unsigned NumBytes) const;
     MachineBasicBlock *
-      EmitBinaryZI(MachineInstr *MI, MachineBasicBlock *MBB,
+      EmitBinaryZI(MachineInstr &MI, MachineBasicBlock *MBB,
                    unsigned NumBytes, unsigned Instr8, unsigned Instr16,
                    bool clc = false, bool stc = false) const;
-    MachineBasicBlock *EmitZBR_CC(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZBR_CC(MachineInstr &MI, MachineBasicBlock *MBB,
                                  unsigned NumBytes) const;
-    MachineBasicBlock *EmitZSELECT_CC(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZSELECT_CC(MachineInstr &MI, MachineBasicBlock *MBB,
                                       unsigned NumBytes) const;
-    MachineBasicBlock *EmitZST(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZST(MachineInstr &MI, MachineBasicBlock *MBB,
                                bool Stack,
                                unsigned NumBytes,
                                bool Far) const;
-    MachineBasicBlock *EmitZLD(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZLD(MachineInstr &MI, MachineBasicBlock *MBB,
                                bool Stack,
                                unsigned NumBytes,
                                bool Far,
                                unsigned ExtendBegin,
                                bool Signed = false) const;
-    MachineBasicBlock *EmitZLDimm(MachineInstr *MI, MachineBasicBlock *MBB,
+    MachineBasicBlock *EmitZLDimm(MachineInstr &MI, MachineBasicBlock *MBB,
                                   unsigned NumBytes) const;
-    MachineBasicBlock *EmitZMOV(MachineInstr *MI,
+    MachineBasicBlock *EmitZMOV(MachineInstr &MI,
                                 MachineBasicBlock *MBB,
                                 unsigned NumBytes,
                                 unsigned ExtendBegin,
                                 bool Signed = false) const;
-    MachineBasicBlock *EmitZLEA(MachineInstr *MI,
+    MachineBasicBlock *EmitZLEA(MachineInstr &MI,
                                 MachineBasicBlock *MBB) const;
-    MachineBasicBlock *EmitZPUSH(MachineInstr *MI,
+    MachineBasicBlock *EmitZPUSH(MachineInstr &MI,
                                  MachineBasicBlock *MBB,
                                  unsigned NumBytes) const;
-    MachineBasicBlock *EmitZPUSHimm(MachineInstr *MI,
+    MachineBasicBlock *EmitZPUSHimm(MachineInstr &MI,
                                     MachineBasicBlock *MBB,
                                     unsigned NumBytes) const;
-    MachineBasicBlock *EmitZInstr(MachineInstr *MI,
+    MachineBasicBlock *EmitZInstr(MachineInstr &MI,
                                   MachineBasicBlock *MBB) const;
     MachineBasicBlock *
-      EmitInstrWithCustomInserter(MachineInstr *MI,
+      EmitInstrWithCustomInserter(MachineInstr &MI,
                                   MachineBasicBlock *MBB) const override;
 
     const char *getTargetNodeName(unsigned Opcode) const override;
@@ -114,8 +114,8 @@ namespace llvm {
       return MVT::i8;
     }
 
-    EVT getTypeForExtArgOrReturn(LLVMContext &Context, EVT VT,
-                                 ISD::NodeType ExtendKind) const override;
+    //EVT getTypeForExtArgOrReturn(LLVMContext &Context, EVT VT,
+    //                             ISD::NodeType ExtendKind) const override;
 
     EVT getSetCCResultType(const DataLayout &DL, LLVMContext &Context,
                            EVT VT) const override;
@@ -161,17 +161,15 @@ namespace llvm {
 
     // Call lowering
     SDValue
-    LowerFormalArguments(SDValue Chain,
-                         CallingConv::ID CallConv,
-                         bool IsVarArg,
+    LowerFormalArguments(SDValue Chain, CallingConv::ID CallConv, bool IsVarArg,
                          const SmallVectorImpl<ISD::InputArg> &Ins,
-                         SDLoc dl, SelectionDAG &DAG,
+                         const SDLoc &DL, SelectionDAG &DAG,
                          SmallVectorImpl<SDValue> &InVals) const override;
     SDValue
-    LowerCallResult(SDValue Chain, SDValue Glue,
+    LowerCallResult(SDValue Chain, SDValue InFlag,
                     CallingConv::ID CallConv, bool IsVarArg,
                     const SmallVectorImpl<ISD::InputArg> &Ins,
-                    SDLoc DL, SelectionDAG &DAG,
+                    const SDLoc &DL, SelectionDAG &DAG,
                     SmallVectorImpl<SDValue> &InVals) const;
 
     SDValue
@@ -183,7 +181,7 @@ namespace llvm {
                 CallingConv::ID CallConv, bool isVarArg,
                 const SmallVectorImpl<ISD::OutputArg> &Outs,
                 const SmallVectorImpl<SDValue> &OutVals,
-                SDLoc dl, SelectionDAG &DAG) const override;
+                const SDLoc &DL, SelectionDAG &DAG) const override;
 
 
     std::pair<SDValue, SDValue>
