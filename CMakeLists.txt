@@ -25,6 +25,5 @@ add_llvm_target(C65CodeGen
   )
 
 add_subdirectory(AsmParser)
-add_subdirectory(InstPrinter)
 add_subdirectory(MCTargetDesc)
 add_subdirectory(TargetInfo)

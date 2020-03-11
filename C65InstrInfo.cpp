@@ -79,9 +79,8 @@ void C65InstrInfo::buildPullReg(MachineBasicBlock &MBB,
 
 void C65InstrInfo::copyPhysReg(MachineBasicBlock &MBB,
                                MachineBasicBlock::iterator MBBI,
-                               const DebugLoc &DL,
-                               unsigned DestReg, unsigned SrcReg,
-                               bool KillSrc) const {
+                               const DebugLoc &DL, MCRegister DestReg,
+                               MCRegister SrcReg, bool KillSrc) const {
   unsigned ZMOVInstr =
     C65::ZRC8RegClass.contains(DestReg, SrcReg) ? C65::ZMOV8 :
     C65::ZRC16RegClass.contains(DestReg, SrcReg) ? C65::ZMOV16 :
@@ -212,7 +211,7 @@ unsigned C65InstrInfo::isStoreToStackSlot(const MachineInstr &MI,
 void C65InstrInfo::
 storeRegToStackSlot(MachineBasicBlock &MBB,
                     MachineBasicBlock::iterator MBBI,
-                    unsigned SrcReg, bool isKill, int FI,
+                    Register SrcReg, bool isKill, int FrameIndex,
                     const TargetRegisterClass *RC,
                     const TargetRegisterInfo *TRI) const {
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
@@ -229,7 +228,7 @@ storeRegToStackSlot(MachineBasicBlock &MBB,
     llvm_unreachable("Unable to store reg from stack slot.");
   BuildMI(MBB, MBBI, DL, get(Opcode))
     .addReg(SrcReg, getKillRegState(isKill))
-    .addFrameIndex(FI)
+    .addFrameIndex(FrameIndex)
     .addImm(0);
 }
 
@@ -250,7 +249,7 @@ unsigned C65InstrInfo::isLoadFromStackSlot(const MachineInstr &MI,
 void C65InstrInfo::
 loadRegFromStackSlot(MachineBasicBlock &MBB,
                      MachineBasicBlock::iterator MBBI,
-                     unsigned DestReg, int FI,
+                     Register DestReg, int FrameIndex,
                      const TargetRegisterClass *RC,
                      const TargetRegisterInfo *TRI) const {
   DebugLoc DL = MBBI != MBB.end() ? MBBI->getDebugLoc() : DebugLoc();
@@ -266,7 +265,7 @@ loadRegFromStackSlot(MachineBasicBlock &MBB,
   else
     llvm_unreachable("Unable to load reg from stack slot.");
   BuildMI(MBB, MBBI, DL, get(Opcode), DestReg)
-    .addFrameIndex(FI)
+    .addFrameIndex(FrameIndex)
     .addImm(0);
 }
 

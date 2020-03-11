@@ -49,8 +49,7 @@ private:
   C65FrameLowering FrameLowering;
 
 public:
-  C65Subtarget(const Triple &TT, const std::string &CPU,
-               const std::string &FS, TargetMachine &TM);
+  C65Subtarget(const Triple &TT, StringRef CPU, StringRef FS, TargetMachine &TM);
 
   const C65FrameLowering *getFrameLowering() const override {
     return &FrameLowering;

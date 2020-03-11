@@ -25,7 +25,7 @@ void C65Subtarget::anchor() {}
 
 void
 C65Subtarget::initializeSubtargetDependencies(StringRef CPU, StringRef FS) {
-  std::string CPUName = CPU;
+  StringRef CPUName = CPU;
   if (CPUName.empty() || CPUName == "generic") {
     CPUName = "65816";
   }
@@ -44,8 +44,8 @@ C65Subtarget::initializeSubtargetDependencies(StringRef CPU, StringRef FS) {
     ToggleFeature(C65::ModeIx16Bit);
 }
 
-C65Subtarget::C65Subtarget(const Triple &TT, const std::string &CPU,
-                           const std::string &FS, TargetMachine &TM)
+C65Subtarget::C65Subtarget(const Triple &TT, StringRef CPU, StringRef FS,
+                           TargetMachine &TM)
   : C65GenSubtargetInfo(TT, CPU, FS),
     InstrInfo(*this),
     TLInfo(TM, *this), TSInfo(), FrameLowering() {

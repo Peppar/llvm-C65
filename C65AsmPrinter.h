@@ -15,10 +15,6 @@
 #include "llvm/CodeGen/StackMaps.h"
 #include "llvm/Target/TargetMachine.h"
 
-// Implemented in C65MCInstLower.cpp
-namespace {
-  class C65MCInstLower;
-}
 
 namespace llvm {
   class MCStreamer;
@@ -45,7 +41,7 @@ namespace llvm {
     void LowerC65MachineInstrToMCInst(const MachineInstr *MI,
                                       MCInst &OutMI);
 
-    virtual void EmitInstruction(const MachineInstr *) override;
+    virtual void emitInstruction(const MachineInstr *) override;
 
     bool PrintAsmOperand(const MachineInstr *MI, unsigned OpNo,
                          const char *ExtraCode, raw_ostream &O) override;

@@ -29,7 +29,8 @@
 using namespace llvm;
 
 C65FrameLowering::C65FrameLowering()
-  : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, 1, 0) {}
+  : TargetFrameLowering(TargetFrameLowering::StackGrowsDown, Align(1),
+                        0, Align(1), false /* StackRealignable */) {}
 
 void C65FrameLowering::emitPrologue(MachineFunction &MF,
                                     MachineBasicBlock &MBB) const {

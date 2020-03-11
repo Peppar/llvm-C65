@@ -12,7 +12,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "C65MCTargetDesc.h"
-#include "InstPrinter/C65InstPrinter.h"
 #include "llvm/MC/MCAsmInfo.h"
 //#include "llvm/MC/MCCodeGenInfo.h"
 //#include "llvm/MC/MCELFStreamer.h"
@@ -22,6 +21,7 @@
 #include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/TargetRegistry.h"
+#include "MCTargetDesc/C65InstPrinter.h"
 #include "TargetInfo/C65TargetInfo.h"
 
 using namespace llvm;
@@ -61,7 +61,8 @@ namespace llvm {
 }
 
 static MCAsmInfo *createC65MCAsmInfo(const MCRegisterInfo &MRI,
-                                     const Triple &TT) {
+                                     const Triple &TT,
+                                     const MCTargetOptions &Options) {
   // TODO: Add initial frame state information
   return new C65MCAsmInfo(TT);
 }

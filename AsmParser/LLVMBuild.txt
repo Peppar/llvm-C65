@@ -19,5 +19,5 @@
 type = Library
 name = C65AsmParser
 parent = C65
-required_libraries = MC MCParser Support C65Desc C65Info
+required_libraries = C65Desc C65Info MC MCParser Support
 add_to_library_groups = C65

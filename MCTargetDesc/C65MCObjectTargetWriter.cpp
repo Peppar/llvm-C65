@@ -68,5 +68,5 @@ public:
 
 std::unique_ptr<MCObjectTargetWriter>
 llvm::createC65MCWLAVObjectTargetWriter() {
-  return llvm::make_unique<C65MCWLAVObjectTargetWriter>();
+  return std::make_unique<C65MCWLAVObjectTargetWriter>();
 }

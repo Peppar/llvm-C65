@@ -16,7 +16,6 @@
 #include "C65AsmPrinter.h"
 #include "C65InstrInfo.h"
 #include "C65TargetMachine.h"
-#include "InstPrinter/C65InstPrinter.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/CodeGen/AsmPrinter.h"
 #include "llvm/CodeGen/MachineInstr.h"
@@ -32,6 +31,7 @@
 #include "llvm/MC/MCSymbol.h"
 #include "llvm/Support/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
+#include "MCTargetDesc/C65InstPrinter.h"
 #include "TargetInfo/C65TargetInfo.h"
 
 using namespace llvm;
@@ -131,23 +131,23 @@ void C65AsmPrinter::LowerC65MachineInstrToMCInst(const MachineInstr *MI,
 
 /// Emit an instruction
 ///
-void C65AsmPrinter::EmitInstruction(const MachineInstr *MI) {
+void C65AsmPrinter::emitInstruction(const MachineInstr *MI) {
   // unsigned NumBytes = getOpByteSize(MI);
   if (MI->getOpcode() == TargetOpcode::DBG_VALUE) {
     // FIXME: Debug Value.
     return;
   } else if (MI->getOpcode() == C65::LONGA_ON) {
     if (OutStreamer->hasRawTextSupport())
-      OutStreamer->EmitRawText(".accu 16\n");
+      OutStreamer->emitRawText(".accu 16\n");
   } else if (MI->getOpcode() == C65::LONGA_OFF) {
     if (OutStreamer->hasRawTextSupport())
-      OutStreamer->EmitRawText(".accu 8\n");
+      OutStreamer->emitRawText(".accu 8\n");
   } else if (MI->getOpcode() == C65::LONGI_ON) {
     if (OutStreamer->hasRawTextSupport())
-      OutStreamer->EmitRawText(".index 16\n");
+      OutStreamer->emitRawText(".index 16\n");
   } else if (MI->getOpcode() == C65::LONGI_OFF) {
     if (OutStreamer->hasRawTextSupport())
-      OutStreamer->EmitRawText(".index 8\n");
+      OutStreamer->emitRawText(".index 8\n");
   } else {
     // Normal instruction, emitted as-is
     MCInst TmpInst;

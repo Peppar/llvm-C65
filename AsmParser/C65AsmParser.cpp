@@ -94,20 +94,20 @@ public:
 
   // Create particular kinds of operand.
   static std::unique_ptr<C65Operand> createToken(StringRef Str, SMLoc Loc) {
-    auto Op = make_unique<C65Operand>(KindToken, Loc, Loc);
+    auto Op = std::make_unique<C65Operand>(KindToken, Loc, Loc);
     Op->Tok.Data = Str.data();
     Op->Tok.Length = Str.size();
     return Op;
   }
   static std::unique_ptr<C65Operand>
   createImm(const MCExpr *Expr, SMLoc StartLoc, SMLoc EndLoc) {
-    auto Op = make_unique<C65Operand>(KindImm, StartLoc, EndLoc);
+    auto Op = std::make_unique<C65Operand>(KindImm, StartLoc, EndLoc);
     Op->Imm.Val = Expr;
     return Op;
   }
   static std::unique_ptr<C65Operand>
   createMem(const MCExpr *Addr, unsigned Kind, SMLoc StartLoc, SMLoc EndLoc) {
-    auto Op = make_unique<C65Operand>(KindMem, StartLoc, EndLoc);
+    auto Op = std::make_unique<C65Operand>(KindMem, StartLoc, EndLoc);
     Op->Mem.Kind = Kind;
     Op->Mem.Addr = Addr;
     return Op;
@@ -242,6 +242,8 @@ public:
 
   bool ParseDirective(AsmToken DirectiveID) override;
   bool ParseRegister(unsigned &RegNo, SMLoc &StartLoc, SMLoc &EndLoc) override;
+  OperandMatchResultTy tryParseRegister(unsigned &RegNo, SMLoc &StartLoc,
+                                        SMLoc &EndLoc) override;
   bool ParseInstruction(ParseInstructionInfo &Info, StringRef Name,
                         SMLoc NameLoc, OperandVector &Operands) override;
   bool MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
@@ -619,6 +621,12 @@ bool C65AsmParser::ParseRegister(unsigned &RegNo, SMLoc &StartLoc,
   return true;
 }
 
+OperandMatchResultTy C65AsmParser::tryParseRegister(unsigned &RegNo,
+                                                    SMLoc &StartLoc,
+                                                    SMLoc &EndLoc) {
+  return MatchOperand_NoMatch;
+}
+
 bool C65AsmParser::ParseInstruction(ParseInstructionInfo &Info,
                                     StringRef Name, SMLoc NameLoc,
                                     OperandVector &Operands) {
@@ -693,7 +701,7 @@ bool C65AsmParser::MatchAndEmitInstruction(SMLoc IDLoc, unsigned &Opcode,
   default: break;
   case Match_Success:
     Inst.setLoc(IDLoc);
-    Out.EmitInstruction(Inst, getSTI());
+    Out.emitInstruction(Inst, getSTI());
     // Accumulator and index register size selection directives for
     // 65802 and 65816
     if (Inst.getOpcode() == C65::LONGA_ON) {

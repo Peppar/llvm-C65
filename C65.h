@@ -12,8 +12,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-#ifndef LLVM_TARGET_C65_H
-#define LLVM_TARGET_C65_H
+#ifndef LLVM_LIB_TARGET_C65_C65_H
+#define LLVM_LIB_TARGET_C65_C65_H
 
 #include "MCTargetDesc/C65MCTargetDesc.h"
 

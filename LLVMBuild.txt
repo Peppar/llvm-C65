@@ -16,8 +16,7 @@
 ;===------------------------------------------------------------------------===;
 
 [common]
-subdirectories = AsmParser InstPrinter MCTargetDesc TargetInfo
-; Disassembler
+subdirectories = AsmParser MCTargetDesc TargetInfo
 
 [component_0]
 type = TargetGroup
@@ -32,5 +31,5 @@ has_jit = 0
 type = Library
 name = C65CodeGen
 parent = C65
-required_libraries = AsmPrinter C65AsmPrinter C65Desc C65Info CodeGen Core MC SelectionDAG Support Target
+required_libraries = AsmPrinter C65Desc C65Info CodeGen Core MC SelectionDAG Support Target
 add_to_library_groups = C65

@@ -49,7 +49,7 @@ C65TargetMachine::C65TargetMachine(const Target &T, const Triple &TT,
   : LLVMTargetMachine(T, getDataLayout(TT, CPU, Options), TT, CPU, FS,
                       Options, RM.getValueOr(Reloc::Static),
                       CM.getValueOr(CodeModel::Small), OL),
-    TLOF(make_unique<TargetLoweringObjectFileELF>()),
+    TLOF(std::make_unique<TargetLoweringObjectFileELF>()),
     Subtarget(TT, CPU, FS, *this) {
   initAsmInfo();
 }

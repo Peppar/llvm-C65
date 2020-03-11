@@ -12,8 +12,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "C65.h"
-#include "C65InstPrinter.h"
 #include "MCTargetDesc/C65BaseInfo.h"
+#include "MCTargetDesc/C65InstPrinter.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
 #include "llvm/MC/MCInstrInfo.h"
@@ -31,14 +31,12 @@ using namespace llvm;
 #include "C65GenAsmWriter.inc"
 
 namespace {
-
 void printImm(int64_t N, raw_ostream &O) {
   if (N < 0)
     O << "-$" << format_hex_no_prefix((uint64_t)-N, 6);
   else
     O << "$" << format_hex_no_prefix((uint64_t)N, 6);
 }
-
 }
 
 void C65InstPrinter::printRegName(raw_ostream &OS, unsigned RegNo) const {
@@ -82,10 +80,10 @@ void C65InstPrinter::printComments(const MCInst *MI, raw_ostream &OS) {
     OS << '\n';
 }
 
-void C65InstPrinter::printInst(const MCInst *MI, raw_ostream &OS,
-                               StringRef Annot, const MCSubtargetInfo &STI) {
+void C65InstPrinter::printInst(const MCInst *MI, uint64_t Address, StringRef Annot,
+                               const MCSubtargetInfo &STI, raw_ostream &OS) {
   if (!printAliasInstr(MI, OS))
-    printInstruction(MI, OS);
+    printInstruction(MI, Address, OS);
 
   // Next always print the annotation.
   printAnnotation(OS, Annot);

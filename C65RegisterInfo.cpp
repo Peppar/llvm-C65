@@ -224,7 +224,8 @@ C65RegisterInfo::eliminateFrameIndex(MachineBasicBlock::iterator II,
   MI.RemoveOperand(FIOperandNum + 1);
 }
 
-unsigned C65RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
+Register
+C65RegisterInfo::getFrameRegister(const MachineFunction &MF) const {
   const C65Subtarget &STI = MF.getSubtarget<C65Subtarget>();
   const C65FrameLowering &TFI = *STI.getFrameLowering();
   if (STI.has65802()) {
