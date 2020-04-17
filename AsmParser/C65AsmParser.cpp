@@ -8,16 +8,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "MCTargetDesc/C65MCTargetDesc.h"
+#include "TargetInfo/C65TargetInfo.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/MC/MCContext.h"
 #include "llvm/MC/MCExpr.h"
 #include "llvm/MC/MCInst.h"
-#include "llvm/MC/MCStreamer.h"
-#include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/MC/MCParser/MCParsedAsmOperand.h"
 #include "llvm/MC/MCParser/MCTargetAsmParser.h"
+#include "llvm/MC/MCStreamer.h"
+#include "llvm/MC/MCSubtargetInfo.h"
 #include "llvm/Support/TargetRegistry.h"
-#include "TargetInfo/C65TargetInfo.h"
 
 using namespace llvm;
 
@@ -231,8 +231,7 @@ private:
 
 public:
   C65AsmParser(const MCSubtargetInfo &sti, MCAsmParser &parser,
-               const MCInstrInfo &MII,
-               const MCTargetOptions &Options)
+               const MCInstrInfo &MII, const MCTargetOptions &Options)
       : MCTargetAsmParser(Options, sti, MII), Parser(parser) {
     MCAsmParserExtension::Initialize(Parser);
 
@@ -255,26 +254,33 @@ public:
   OperandMatchResultTy parseImmOperand(OperandVector &Operands) {
     SMLoc StartLoc = Parser.getTok().getLoc();
     const MCExpr *Imm;
+    unsigned ShiftAmt2;
     // Hash required for immediate operands
     if (!getLexer().is(AsmToken::Hash))
       return MatchOperand_NoMatch;
     Parser.Lex();
     if (getLexer().is(AsmToken::Less)) {
-      // Get lower byte of operand (no-op)
+      // Get lower byte of operand (no shift)
       Parser.Lex();
+      ShiftAmt2 = 0;
     } else if (getLexer().is(AsmToken::Greater)) {
       // Get higher byte of operand (shift right 8 bits)
       Parser.Lex();
-      const MCExpr *ShiftAmt = MCConstantExpr::create(8, Parser.getContext());
-      Imm = MCBinaryExpr::createLShr(Imm, ShiftAmt, Parser.getContext());
+      ShiftAmt2 = 8;
     } else if (getLexer().is(AsmToken::Colon)) {
       // Get bank byte of operand (shift right 16 bits)
       Parser.Lex();
-      const MCExpr *ShiftAmt = MCConstantExpr::create(16, Parser.getContext());
-      Imm = MCBinaryExpr::createLShr(Imm, ShiftAmt, Parser.getContext());
+      ShiftAmt2 = 16;
+    } else {
+      ShiftAmt2 = 0;
     }
     if (getParser().parseExpression(Imm))
       return MatchOperand_ParseFail;
+    if (ShiftAmt2) {
+      const MCExpr *ShiftAmt =
+          MCConstantExpr::create(ShiftAmt2, Parser.getContext());
+      Imm = MCBinaryExpr::createLShr(Imm, ShiftAmt, Parser.getContext());
+    }
     SMLoc EndLoc =
       SMLoc::getFromPointer(Parser.getTok().getLoc().getPointer() - 1);
 

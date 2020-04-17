@@ -13,6 +13,7 @@
 
 #include "C65MCTargetDesc.h"
 #include "llvm/MC/MCAsmInfo.h"
+#include "llvm/MC/MCAsmInfoWLAV.h"
 //#include "llvm/MC/MCCodeGenInfo.h"
 //#include "llvm/MC/MCELFStreamer.h"
 #include "llvm/MC/MCInstrInfo.h"
@@ -36,7 +37,7 @@ using namespace llvm;
 #include "C65GenRegisterInfo.inc"
 
 namespace llvm {
-  class C65MCAsmInfo : public MCAsmInfo {
+  class C65MCAsmInfo : public MCAsmInfoWLAV {
   public:
     explicit C65MCAsmInfo(const Triple &TT) {
       // TODO: Make use of TT
