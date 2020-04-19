@@ -87,8 +87,8 @@ static bool operator<(const Branch& LHS, const Branch& RHS) {
 typedef std::set<Branch> BranchSet;
 typedef std::map<MachineBasicBlock *, BranchSet> BranchMap;
 typedef std::set<MachineBasicBlock *> MBBSet;
-typedef std::map<MachineBasicBlock *,
-                 std::pair<unsigned, unsigned> > StatusMap;
+typedef std::pair<unsigned, unsigned> StatusPair;
+typedef std::map<MachineBasicBlock *, StatusPair> StatusMap;
 
 #if !defined(NDEBUG)
 std::string getMBBName(MachineBasicBlock *MBB) {
@@ -147,6 +147,7 @@ eliminateNullBranches(BranchMap &IncomingBr, MBBSet &NullBr) {
 
 static void
 getOutBranches(MachineBasicBlock *MBB,
+               MachineBasicBlock *NMBB,
                BranchSet &IxBr,
                BranchSet &AccBr,
                StatusMap &FallthroughStatus) {
@@ -228,13 +229,14 @@ getOutBranches(MachineBasicBlock *MBB,
     }
   }
 
-  MachineBasicBlock *NMBB = &(*std::next(MachineFunction::iterator(MBB)));
-  if (!HasExited) {
-    // Fall-through to the next MBB.
-    AccBr.insert({ NMBB, AccSize });
-    IxBr.insert({ NMBB, IxSize });
+  if (NMBB != nullptr) {
+    if (!HasExited) {
+      // Fall-through to the next MBB.
+      AccBr.insert({ NMBB, AccSize });
+      IxBr.insert({ NMBB, IxSize });
+    }
+    FallthroughStatus[NMBB] = std::make_pair(IxSize, AccSize);
   }
-  FallthroughStatus[NMBB] = std::make_pair(IxSize, AccSize);
 }
 
 // Convert outgoing branches to incoming branches, and mark MBB's with
@@ -296,7 +298,10 @@ getInBranches(MachineFunction &MF,
     MachineBasicBlock *MBB = &(*I);
     BranchSet OutBrIx;
     BranchSet OutBrAcc;
-    getOutBranches(MBB, OutBrIx, OutBrAcc, FallthroughStatus);
+    auto NI = std::next(I);
+    MachineBasicBlock *NMBB = NI != MF.end() ? &(*NI) : nullptr;
+
+    getOutBranches(MBB, NMBB, OutBrIx, OutBrAcc, FallthroughStatus);
 
     LLVM_DEBUG(dbgs() << getMBBName(MBB) << "(Ix)->";
                dumpBranches(OutBrIx);
