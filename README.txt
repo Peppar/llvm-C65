@@ -28,7 +28,7 @@ git submodule update --init
 
 mkdir build
 cd build
-cmake ../llvm -DLLVM_TARGETS_TO_BUILD="X86" -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="C65" -DLLVM_ENABLE_TARGETS="clang"
+cmake ../llvm -DLLVM_TARGETS_TO_BUILD="X86" -DLLVM_EXPERIMENTAL_TARGETS_TO_BUILD="C65" -DLLVM_ENABLE_PROJECTS="clang"
 cmake --build .
 
 
